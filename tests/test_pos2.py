@@ -24,17 +24,18 @@ CONTRACT_PH = bytes32.fromhex("01" * 32)
 
 
 @pytest.mark.parametrize(
-    "strength, pool_pk, contract_ph, plot_index, meta_group, expected_proofs",
+    "strength, pool_pk, contract_ph, plot_index, meta_group, expected_proofs, testnet",
     [
-        (2, POOL_PK, None, uint16(0), uint8(0), 446),
-        (2, POOL_PK, None, uint16(0), uint8(1), 322),
-        (2, POOL_PK, None, uint16(1), uint8(0), 378),
-        (2, None, CONTRACT_PH, uint16(0), uint8(0), 362),
-        (2, None, CONTRACT_PH, uint16(1000), uint8(7), 383),
-        (3, POOL_PK, None, uint16(0), uint8(0), 412),
-        (3, None, CONTRACT_PH, uint16(0), uint8(0), 379),
+        (2, POOL_PK, None, uint16(0), uint8(0), 212, False),
+        (2, POOL_PK, None, uint16(0), uint8(1), 210, False),
+        (2, POOL_PK, None, uint16(1), uint8(0), 199, False),
+        (2, None, CONTRACT_PH, uint16(0), uint8(0), 205, False),
+        (2, None, CONTRACT_PH, uint16(1000), uint8(7), 191, False),
+        (3, POOL_PK, None, uint16(0), uint8(0), 224, False),
+        (3, None, CONTRACT_PH, uint16(0), uint8(0), 160, False),
+        (3, None, CONTRACT_PH, uint16(0), uint8(0), 166, True),
     ],
-    ids=["0", "1", "2", "3", "4", "5", "6"],
+    ids=["0", "1", "2", "3", "4", "5", "6", "7"],
 )
 def test_plot_roundtrip(
     strength: int,
@@ -43,19 +44,20 @@ def test_plot_roundtrip(
     plot_index: uint16,
     meta_group: uint8,
     expected_proofs: int,
+    testnet: bool,
 ) -> None:
     plot_id = compute_plot_id_v2(
         uint8(strength), PLOT_PK, pool_pk, contract_ph, plot_index, meta_group
     )
     k = 22
     pool_or_contract = "pool" if pool_pk is not None else "contract"
-    plot_path = (
-        f"k-22-test-{strength}-{plot_index}-{meta_group}-{pool_or_contract}.plot2"
-    )
+    plot_path = f"k-22-test-{strength}-{plot_index}-{meta_group}-{pool_or_contract}-{testnet}.plot2"
 
     memo = bytes(contract_ph) if pool_pk is None else bytes(pool_pk) + bytes(PLOT_PK) + bytes(b"5" * 32)  # type: ignore[arg-type]
     if not Path(plot_path).exists():
-        create_v2_plot(plot_path, k, strength, plot_id, plot_index, meta_group, memo)
+        create_v2_plot(
+            plot_path, k, strength, plot_id, plot_index, meta_group, memo, testnet
+        )
 
     prover = Prover(plot_path)
 
@@ -87,10 +89,12 @@ def test_plot_roundtrip(
         if partial_proofs == []:
             continue
         for pp in partial_proofs:
-            full_proof = solve_proof(pp, plot_id, strength, k)
+            full_proof = solve_proof(pp, plot_id, strength, k, testnet)
             assert len(full_proof) * 8 / 128 == k
             num_proofs += 1
-            quality = validate_proof_v2(plot_id, k, challenge, strength, full_proof)
+            quality = validate_proof_v2(
+                plot_id, k, challenge, strength, full_proof, testnet
+            )
             assert quality is not None
             assert quality == pp.get_string(uint8(strength))
 
