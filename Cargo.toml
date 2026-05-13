@@ -142,7 +142,7 @@ chia-protocol-fuzz = { path = "./crates/chia-protocol/fuzz", version = "0.42.0" 
 chia-puzzle-types-fuzz = { path = "./crates/chia-puzzle-types/fuzz", version = "0.42.0" }
 clvm-traits-fuzz = { path = "./crates/clvm-traits/fuzz", version = "0.42.0" }
 clvm-utils-fuzz = { path = "./crates/clvm-utils/fuzz", version = "0.42.0" }
-blst = { version = "0.3.16", features = ["portable"] }
+blst = "0.3.16"
 clvmr = "0.17.7"
 clvm-fuzzing = "0.17.0"
 syn = "2.0.101"
