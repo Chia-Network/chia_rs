@@ -609,6 +609,7 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
     is_canonical_serialization(buf)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[pyo3::pyfunction]
 pub fn create_v2_plot(
     filename: &str,
@@ -618,6 +619,7 @@ pub fn create_v2_plot(
     plot_index: u16,
     meta_group: u8,
     memo: &[u8],
+    testnet: bool,
 ) -> PyResult<()> {
     Ok(chia_pos2::create_v2_plot(
         Path::new(filename),
@@ -627,6 +629,7 @@ pub fn create_v2_plot(
         plot_index,
         meta_group,
         memo,
+        testnet,
     )?)
 }
 
@@ -698,6 +701,7 @@ pub fn validate_proof_v2(
     challenge: Bytes32,
     plot_strength: u8,
     proof: &[u8],
+    testnet: bool,
 ) -> Option<Bytes32> {
     chia_pos2::validate_proof_v2(
         &plot_id.to_bytes(),
@@ -705,6 +709,7 @@ pub fn validate_proof_v2(
         &challenge.to_bytes(),
         plot_strength,
         proof,
+        testnet,
     )
     .map(|quality| -> Bytes32 {
         let mut sha256 = Sha256::new();
@@ -717,7 +722,13 @@ pub fn validate_proof_v2(
 }
 
 #[pyo3::pyfunction]
-pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: u8) -> Vec<u8> {
+pub fn solve_proof(
+    fragments: &PartialProof,
+    plot_id: Bytes32,
+    strength: u8,
+    k: u8,
+    testnet: bool,
+) -> Vec<u8> {
     chia_pos2::solve_proof(
         &chia_pos2::QualityChain {
             chain_links: fragments.fragments,
@@ -725,6 +736,7 @@ pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: 
         &plot_id.to_bytes(),
         k,
         strength,
+        testnet,
     )
 }
 
