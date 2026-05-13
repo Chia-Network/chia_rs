@@ -155,7 +155,7 @@ pub fn additions_and_removals<'a>(
 ///
 /// Deserializes (with back-refs), interns the tree, and returns
 /// `atom_bytes + 2*atom_count + 3*pair_count`.  Multiply by
-/// `COST_PER_BYTE` to get the full generator size cost.
+/// `cost_per_byte` from consensus constants to get the full generator size cost.
 #[pyfunction]
 pub fn generator_interned_weight(py: Python<'_>, program: PyBuffer<u8>) -> PyResult<u64> {
     let program = py_to_slice(program);

@@ -4,7 +4,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
-use crate::generator_cost::total_cost_from_tree;
+use crate::generator_cost::interned_weight;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
 use crate::solution_generator::{build_generator, calculate_generator_length};
@@ -64,7 +64,7 @@ fn calculate_base_cost(
         .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        Ok(total_cost_from_tree(&interned))
+        Ok(interned_weight(&interned) * constants.cost_per_byte)
     } else {
         // We don't pay the size cost (nor execution cost) of being wrapped by a
         // quote (in solution_generator).
