@@ -28,6 +28,22 @@ impl GeneratorInfo {
         Self(bytes)
     }
 
+    /// Build from the public FullBlock generator fields.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_parts(
+        transactions_generator: Option<Program>,
+        transactions_generator_ref_list: Vec<u32>,
+    ) -> Self {
+        let mut bytes = Vec::new();
+        transactions_generator
+            .stream(&mut bytes)
+            .expect("streaming transactions_generator into memory cannot fail");
+        transactions_generator_ref_list
+            .stream(&mut bytes)
+            .expect("streaming transactions_generator_ref_list into memory cannot fail");
+        Self(Bytes::from(bytes))
+    }
+
     /// Get raw bytes (used during serialization)
     pub fn as_bytes(&self) -> &Bytes {
         &self.0
@@ -53,7 +69,7 @@ impl GeneratorInfo {
 
 impl Streamable for GeneratorInfo {
     fn update_digest(&self, digest: &mut Sha256) {
-        self.0.update_digest(digest);
+        digest.update(self.0.as_slice());
     }
 
     fn stream(&self, out: &mut Vec<u8>) -> Result<()> {

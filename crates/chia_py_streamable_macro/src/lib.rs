@@ -3,7 +3,7 @@
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{DeriveInput, FieldsNamed, FieldsUnnamed, parse_macro_input};
+use syn::{Attribute, DeriveInput, FieldsNamed, FieldsUnnamed, parse_macro_input, parse_quote};
 
 fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     if py_uppercase {
@@ -16,7 +16,13 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
-#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
+fn is_py_generator_info(attrs: &[Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("py_generator_info"))
+}
+
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle, py_generator_info))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -105,47 +111,105 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let mut fnames = Vec::<Ident>::new();
     let mut ftypes = Vec::<syn::Type>::new();
+    let mut py_fnames = Vec::<Ident>::new();
+    let mut py_ftypes = Vec::<syn::Type>::new();
+    let mut py_init = Vec::<proc_macro2::TokenStream>::new();
+    let mut replace_pre = Vec::<proc_macro2::TokenStream>::new();
+    let mut replace_arms = Vec::<proc_macro2::TokenStream>::new();
+    let mut replace_post = Vec::<proc_macro2::TokenStream>::new();
 
     match fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
             for f in &named {
-                fnames.push(f.ident.as_ref().unwrap().clone());
-                ftypes.push(f.ty.clone());
+                let fname = f.ident.as_ref().unwrap().clone();
+                let ftype = f.ty.clone();
+                let py_generator_info = is_py_generator_info(&f.attrs);
+                fnames.push(fname.clone());
+                ftypes.push(ftype.clone());
+
+                if py_generator_info {
+                    let transactions_generator =
+                        Ident::new("transactions_generator", Span::call_site());
+                    let transactions_generator_ref_list =
+                        Ident::new("transactions_generator_ref_list", Span::call_site());
+                    let transactions_generator_type: syn::Type = parse_quote!(Option<Program>);
+                    let transactions_generator_ref_list_type: syn::Type = parse_quote!(Vec<u32>);
+
+                    py_fnames.push(transactions_generator.clone());
+                    py_ftypes.push(transactions_generator_type);
+                    py_fnames.push(transactions_generator_ref_list.clone());
+                    py_ftypes.push(transactions_generator_ref_list_type);
+
+                    py_init.push(quote! {
+                        #fname: #ftype::from_parts(
+                            #transactions_generator,
+                            #transactions_generator_ref_list,
+                        )
+                    });
+
+                    replace_pre.push(quote! {
+                        let (
+                            mut #transactions_generator,
+                            mut #transactions_generator_ref_list,
+                        ) = ret.#fname
+                            .parse_generator_info()
+                            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    });
+                    replace_arms.push(quote! {
+                        stringify!(#transactions_generator) => {
+                            #transactions_generator = value.extract()?;
+                        }
+                    });
+                    replace_arms.push(quote! {
+                        stringify!(#transactions_generator_ref_list) => {
+                            #transactions_generator_ref_list = value.extract()?;
+                        }
+                    });
+                    replace_post.push(quote! {
+                        ret.#fname = #ftype::from_parts(
+                            #transactions_generator,
+                            #transactions_generator_ref_list,
+                        );
+                    });
+                } else {
+                    let py_fname = if py_uppercase {
+                        Ident::new(&fname.to_string().to_uppercase(), Span::call_site())
+                    } else {
+                        fname.clone()
+                    };
+                    py_fnames.push(fname.clone());
+                    py_ftypes.push(ftype.clone());
+                    py_init.push(quote! { #fname: #py_fname });
+                    replace_arms.push(quote! {
+                        stringify!(#py_fname) => {
+                            ret.#fname = value.extract()?;
+                        }
+                    });
+                }
             }
 
-            let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
+            let py_fnames_maybe_upper = maybe_upper_fields(py_uppercase, py_fnames.clone());
 
             py_protocol.extend(quote! {
                 #[pyo3::pymethods]
                 impl #ident {
                     #[allow(too_many_arguments)]
                     #[new]
-                    #[pyo3(signature = (#(#fnames_maybe_upper),*))]
-                    pub fn py_new ( #(#fnames_maybe_upper : #ftypes),* ) -> Self {
-                        Self { #(#fnames: #fnames_maybe_upper),* }
+                    #[pyo3(signature = (#(#py_fnames_maybe_upper),*))]
+                    pub fn py_new ( #(#py_fnames_maybe_upper : #py_ftypes),* ) -> Self {
+                        Self { #(#py_init),* }
                     }
                 }
             });
 
-            if py_uppercase {
-                py_protocol.extend(quote! {
-                    #[pyo3::pymethods]
-                    impl #ident {
-                        fn __repr__(&self) -> pyo3::PyResult<String> {
-                            Ok(format!(concat!(stringify!(#ident), " {{ ", #(stringify!(#fnames_maybe_upper), ": {:?}, ",)* "}}"), #(self.#fnames,)*))
-                        }
+            py_protocol.extend(quote! {
+                #[pyo3::pymethods]
+                impl #ident {
+                    fn __repr__(&self) -> pyo3::PyResult<String> {
+                        Ok(format!("{self:?}"))
                     }
-                });
-            } else {
-                py_protocol.extend(quote! {
-                    #[pyo3::pymethods]
-                    impl #ident {
-                        fn __repr__(&self) -> pyo3::PyResult<String> {
-                            Ok(format!("{self:?}"))
-                        }
-                    }
-                });
-            }
+                }
+            });
 
             if !named.is_empty() {
                 py_protocol.extend(quote! {
@@ -154,6 +218,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                         #[pyo3(signature = (**kwargs))]
                         fn replace(&self, kwargs: Option<&pyo3::Bound<pyo3::types::PyDict>>) -> pyo3::PyResult<Self> {
                             let mut ret = self.clone();
+                            #(#replace_pre)*
                             if let Some(kwargs) = kwargs {
                                 use pyo3::prelude::PyDictMethods;
                                 let iter = kwargs.iter();
@@ -161,13 +226,12 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                                     use pyo3::prelude::PyAnyMethods;
                                     let field = field.extract::<String>()?;
                                     match field.as_str() {
-                                        #(stringify!(#fnames_maybe_upper) => {
-                                            ret.#fnames = value.extract()?;
-                                        }),*
+                                        #(#replace_arms),*
                                         _ => { return Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown field {field}"))); }
                                     }
                                 }
                             }
+                            #(#replace_post)*
                             Ok(ret)
                         }
                     }
@@ -382,7 +446,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyJsonDict, attributes(py_uppercase))]
+#[proc_macro_derive(PyJsonDict, attributes(py_uppercase, py_generator_info))]
 pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -435,12 +499,63 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         syn::Fields::Named(FieldsNamed { named, .. }) => {
             let mut fnames = Vec::<Ident>::new();
             let mut ftypes = Vec::<syn::Type>::new();
+            let mut to_json_items = Vec::<proc_macro2::TokenStream>::new();
+            let mut from_json_items = Vec::<proc_macro2::TokenStream>::new();
             for f in &named {
-                fnames.push(f.ident.as_ref().unwrap().clone());
-                ftypes.push(f.ty.clone());
-            }
+                let fname = f.ident.as_ref().unwrap().clone();
+                let ftype = f.ty.clone();
+                fnames.push(fname.clone());
+                ftypes.push(ftype.clone());
 
-            let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
+                if is_py_generator_info(&f.attrs) {
+                    let transactions_generator =
+                        Ident::new("transactions_generator", Span::call_site());
+                    let transactions_generator_ref_list =
+                        Ident::new("transactions_generator_ref_list", Span::call_site());
+                    let transactions_generator_type: syn::Type = parse_quote!(Option<Program>);
+                    let transactions_generator_ref_list_type: syn::Type = parse_quote!(Vec<u32>);
+                    to_json_items.push(quote! {
+                        let (
+                            #transactions_generator,
+                            #transactions_generator_ref_list,
+                        ) = self.#fname
+                            .parse_generator_info()
+                            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                        ret.set_item(
+                            stringify!(#transactions_generator),
+                            #transactions_generator.to_json_dict(py)?,
+                        )?;
+                        ret.set_item(
+                            stringify!(#transactions_generator_ref_list),
+                            #transactions_generator_ref_list.to_json_dict(py)?,
+                        )?;
+                    });
+                    from_json_items.push(quote! {
+                        #fname: #ftype::from_parts(
+                            <#transactions_generator_type as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(
+                                &o.get_item(stringify!(#transactions_generator))?,
+                            )?,
+                            <#transactions_generator_ref_list_type as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(
+                                &o.get_item(stringify!(#transactions_generator_ref_list))?,
+                            )?,
+                        )
+                    });
+                } else {
+                    let fname_maybe_upper = if py_uppercase {
+                        Ident::new(&fname.to_string().to_uppercase(), Span::call_site())
+                    } else {
+                        fname.clone()
+                    };
+                    to_json_items.push(quote! {
+                        ret.set_item(stringify!(#fname_maybe_upper), self.#fname.to_json_dict(py)?)?;
+                    });
+                    from_json_items.push(quote! {
+                        #fname: <#ftype as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(
+                            &o.get_item(stringify!(#fname_maybe_upper))?,
+                        )?
+                    });
+                }
+            }
 
             py_protocol.extend( quote! {
 
@@ -448,7 +563,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                     fn to_json_dict(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::Py<pyo3::PyAny>> {
                         use pyo3::prelude::PyDictMethods;
                         let ret = pyo3::types::PyDict::new(py);
-                        #(ret.set_item(stringify!(#fnames_maybe_upper), self.#fnames.to_json_dict(py)?)?);*;
+                        #(#to_json_items)*
                         Ok(ret.into_any().unbind())
                     }
                 }
@@ -457,7 +572,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                     fn from_json_dict(o: &pyo3::Bound<pyo3::PyAny>) -> pyo3::PyResult<Self> {
                         use pyo3::prelude::PyAnyMethods;
                         Ok(Self{
-                            #(#fnames: <#ftypes as #crate_name::from_json_dict::FromJsonDict>::from_json_dict(&o.get_item(stringify!(#fnames_maybe_upper))?)?,)*
+                            #(#from_json_items),*
                         })
                     }
                 }
@@ -495,7 +610,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyGetters, attributes(py_uppercase))]
+#[proc_macro_derive(PyGetters, attributes(py_uppercase, py_generator_info))]
 pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let DeriveInput {
         ident, data, attrs, ..
@@ -527,10 +642,40 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     };
 
     let mut fnames = Vec::<Ident>::new();
-    let mut ftypes = Vec::<syn::Type>::new();
+    let mut getters = Vec::<proc_macro2::TokenStream>::new();
     for f in named {
-        fnames.push(f.ident.unwrap());
-        ftypes.push(f.ty);
+        let fname = f.ident.unwrap();
+        if is_py_generator_info(&f.attrs) {
+            let transactions_generator = Ident::new("transactions_generator", Span::call_site());
+            let transactions_generator_ref_list =
+                Ident::new("transactions_generator_ref_list", Span::call_site());
+            let py_transactions_generator =
+                Ident::new("py_transactions_generator", Span::call_site());
+            let py_transactions_generator_ref_list =
+                Ident::new("py_transactions_generator_ref_list", Span::call_site());
+            getters.push(quote! {
+                #[getter]
+                #[pyo3(name = "transactions_generator")]
+                fn #py_transactions_generator<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+                    let (#transactions_generator, _) = self.#fname
+                        .parse_generator_info()
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    #crate_name::ChiaToPython::to_python(&#transactions_generator, py)
+                }
+            });
+            getters.push(quote! {
+                #[getter]
+                #[pyo3(name = "transactions_generator_ref_list")]
+                fn #py_transactions_generator_ref_list<'a>(&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
+                    let (_, #transactions_generator_ref_list) = self.#fname
+                        .parse_generator_info()
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                    #crate_name::ChiaToPython::to_python(&#transactions_generator_ref_list, py)
+                }
+            });
+        } else {
+            fnames.push(fname);
+        }
     }
 
     let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
@@ -538,6 +683,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     let ret = quote! {
         #[pyo3::pymethods]
         impl #ident {
+            #(#getters)*
             #(
             #[getter]
             fn #fnames_maybe_upper<'a> (&self, py: pyo3::Python<'a>) -> pyo3::PyResult<pyo3::Bound<'a, pyo3::PyAny>> {
