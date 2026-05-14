@@ -26,7 +26,7 @@ pub struct FullBlock {
     transactions_info: Option<TransactionsInfo>,
 
     // Combined tail (reads to EOF - everything after transactions_info)
-    #[cfg_attr(feature = "py-bindings", py_generator_info)]
+    #[cfg_attr(feature = "py-bindings", py_api_flatten)]
     generator_info: GeneratorInfo,
 }
 

@@ -16,13 +16,13 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
-fn is_py_generator_info(attrs: &[Attribute]) -> bool {
+fn is_py_api_flatten(attrs: &[Attribute]) -> bool {
     attrs
         .iter()
-        .any(|attr| attr.path().is_ident("py_generator_info"))
+        .any(|attr| attr.path().is_ident("py_api_flatten"))
 }
 
-#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle, py_generator_info))]
+#[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle, py_api_flatten))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -123,11 +123,11 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             for f in &named {
                 let fname = f.ident.as_ref().unwrap().clone();
                 let ftype = f.ty.clone();
-                let py_generator_info = is_py_generator_info(&f.attrs);
+                let py_api_flatten = is_py_api_flatten(&f.attrs);
                 fnames.push(fname.clone());
                 ftypes.push(ftype.clone());
 
-                if py_generator_info {
+                if py_api_flatten {
                     let transactions_generator =
                         Ident::new("transactions_generator", Span::call_site());
                     let transactions_generator_ref_list =
@@ -446,7 +446,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyJsonDict, attributes(py_uppercase, py_generator_info))]
+#[proc_macro_derive(PyJsonDict, attributes(py_uppercase, py_api_flatten))]
 pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -507,7 +507,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                 fnames.push(fname.clone());
                 ftypes.push(ftype.clone());
 
-                if is_py_generator_info(&f.attrs) {
+                if is_py_api_flatten(&f.attrs) {
                     let transactions_generator =
                         Ident::new("transactions_generator", Span::call_site());
                     let transactions_generator_ref_list =
@@ -610,7 +610,7 @@ pub fn py_json_dict_macro(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     py_protocol.into()
 }
 
-#[proc_macro_derive(PyGetters, attributes(py_uppercase, py_generator_info))]
+#[proc_macro_derive(PyGetters, attributes(py_uppercase, py_api_flatten))]
 pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let DeriveInput {
         ident, data, attrs, ..
@@ -645,7 +645,7 @@ pub fn py_getters_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     let mut getters = Vec::<proc_macro2::TokenStream>::new();
     for f in named {
         let fname = f.ident.unwrap();
-        if is_py_generator_info(&f.attrs) {
+        if is_py_api_flatten(&f.attrs) {
             let transactions_generator = Ident::new("transactions_generator", Span::call_site());
             let transactions_generator_ref_list =
                 Ident::new("transactions_generator_ref_list", Span::call_site());
