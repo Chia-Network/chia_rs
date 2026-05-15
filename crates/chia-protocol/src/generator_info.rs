@@ -18,7 +18,6 @@ use std::io::Cursor;
 /// The old eager `FullBlock` layout lives only in the proving tool that checks
 /// this representation against mainnet blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GeneratorInfo(Bytes);
 
@@ -85,14 +84,25 @@ impl Streamable for GeneratorInfo {
         let remaining = &buf[pos..];
 
         input.set_position(buf.len() as u64);
-        
+
         // Validate the blob is well-formed by attempting to parse it
         // This ensures trailing garbage is detected
         if !TRUSTED {
             Self(Bytes::from(remaining)).parse_generator_info()?;
         }
-        
+
         Ok(Self(Bytes::from(remaining)))
+    }
+}
+
+// Manual Arbitrary impl that produces only well-formed blobs (valid wire format),
+// so fuzz roundtrip tests don't fail on the parse-time validation in parse().
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for GeneratorInfo {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let generator = Option::<Program>::arbitrary(u)?;
+        let ref_list = Vec::<u32>::arbitrary(u)?;
+        Ok(Self::from_parts(generator, ref_list))
     }
 }
 
