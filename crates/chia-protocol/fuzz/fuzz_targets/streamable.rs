@@ -6,7 +6,13 @@ use chia_traits::Streamable;
 use libfuzzer_sys::fuzz_target;
 
 pub fn test_streamable<T: Streamable + std::fmt::Debug + PartialEq>(obj: &T) {
-    let bytes = obj.to_bytes().unwrap();
+    // Some types (e.g., ProofOfSpace) can generate invalid states via Arbitrary
+    // that fail serialization. Skip those cases.
+    let bytes = match obj.to_bytes() {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+
     let Ok(obj2) = T::from_bytes(&bytes) else {
         panic!(
             "failed to parse input: {}, from object: {:?}",
