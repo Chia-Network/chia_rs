@@ -41,3 +41,4 @@ path = "fuzz_targets/fullblock_comparison.rs"
 test = false
 doc = false
 bench = false
+
