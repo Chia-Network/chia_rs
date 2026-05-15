@@ -34,3 +34,10 @@ path = "fuzz_targets/spend-bundle.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fullblock_comparison"
+path = "fuzz_targets/fullblock_comparison.rs"
+test = false
+doc = false
+bench = false
