@@ -86,8 +86,8 @@ impl Streamable for GeneratorInfo {
         input.set_position(buf.len() as u64);
 
         // Validate the blob is well-formed by attempting to parse it
-        // This ensures trailing garbage is detected
-        if !TRUSTED {
+        // This ensures trailing garbage is detected. Empty blob is valid (no generator info).
+        if !TRUSTED && !remaining.is_empty() {
             Self(Bytes::from(remaining)).parse_generator_info()?;
         }
 
