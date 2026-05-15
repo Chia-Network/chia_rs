@@ -85,6 +85,13 @@ impl Streamable for GeneratorInfo {
         let remaining = &buf[pos..];
 
         input.set_position(buf.len() as u64);
+        
+        // Validate the blob is well-formed by attempting to parse it
+        // This ensures trailing garbage is detected
+        if !TRUSTED {
+            Self(Bytes::from(remaining)).parse_generator_info()?;
+        }
+        
         Ok(Self(Bytes::from(remaining)))
     }
 }
