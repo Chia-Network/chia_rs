@@ -387,7 +387,7 @@ where
         // 2 MB
         let puzzle_program = Program::from_clvm(&a, puzzle)
             .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;       
-       let solution_program = Program::from_clvm(&a, solution)
+        let solution_program = Program::from_clvm(&a, solution)
             .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
