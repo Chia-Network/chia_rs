@@ -385,10 +385,14 @@ where
         // solution reuses CLVM subtrees such that a plain serialization becomes
         // very large. from_clvm() fails if the resulting buffer is greater than
         // 2 MB
-        let puzzle_program = Program::from_clvm(&a, puzzle)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;       
-        let solution_program = Program::from_clvm(&a, solution)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        let puzzle_program = match Program::from_clvm(&a, puzzle) {
+             Ok(program) => program,
+             Err(_) => continue,
+        };
+        let solution_program = match Program::from_clvm(&a, solution) {
+             Ok(program) => program,
+             Err(_) => continue,
+        };
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
     }
@@ -482,10 +486,14 @@ where
             puzhash.into(),
             parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
         );
-        let puzzle_program = Program::from_clvm(&a, puzzle)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
-        let solution_program = Program::from_clvm(&a, solution)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        let puzzle_program = match Program::from_clvm(&a, puzzle) {
+            Ok(program) => program,
+            Err(_) => continue,
+        };
+        let solution_program = match Program::from_clvm(&a, solution) {
+            Ok(program) => program,
+            Err(_) => continue,
+        };
         let Reduction(_clvm_cost, res) = run_program(
             &mut a,
             &dialect,
