@@ -24,7 +24,6 @@ repos:
       - id: clippy
         name: clippy
         description: run cargo clippy on the workspace
-        stages: [pre-push]
         entry: cargo clippy --workspace --all-features --all-targets
         language: system
         pass_filenames: false
