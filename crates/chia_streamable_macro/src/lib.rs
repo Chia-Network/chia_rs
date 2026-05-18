@@ -23,11 +23,13 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let is_message = &attr.to_string() == "message";
-    let is_subclass = &attr.to_string() == "subclass";
-    let no_serde = &attr.to_string() == "no_serde";
-    let no_json = &attr.to_string() == "no_json";
-    let no_streamable = &attr.to_string() == "no_streamable";
+    let attr_str = attr.to_string();
+    let is_message = attr_str.contains("message");
+    let is_subclass = attr_str.contains("subclass");
+    let no_serde = attr_str.contains("no_serde");
+    let no_json = attr_str.contains("no_json");
+    let no_streamable = attr_str.contains("no_streamable");
+    let no_arbitrary = attr_str.contains("no_arbitrary");
 
     let mut input: DeriveInput = parse_macro_input!(item);
     let name = input.ident.clone();
@@ -128,6 +130,14 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
 
+        let arbitrary_derive = if no_arbitrary {
+            TokenStream2::default()
+        } else {
+            quote! {
+                #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+            }
+        };
+
         quote! {
             #[cfg_attr(
                 feature = "py-bindings", pyo3::pyclass(#class_attrs), derive(
@@ -137,7 +147,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
             )]
             #json_dict
             #main_derives
-            #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+            #arbitrary_derive
             #serde
         }
     } else {

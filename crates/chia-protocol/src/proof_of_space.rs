@@ -10,7 +10,7 @@ use std::io::Cursor;
 // is set or not. Only 1 bit out of 8 are used. The byte prefix for
 // pool_contract_puzzle_hash is used to indicate whether this is a v1 or v2
 // proof.
-#[streamable(no_streamable)]
+#[streamable(no_streamable, no_arbitrary)]
 pub struct ProofOfSpace {
     challenge: Bytes32,
     pool_public_key: Option<G1Element>,
@@ -328,6 +328,58 @@ impl Streamable for ProofOfSpace {
             })
         } else {
             Err(Error::InvalidPoS)
+        }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for ProofOfSpace {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let challenge = Bytes32::arbitrary(u)?;
+        let plot_public_key = G1Element::arbitrary(u)?;
+        let proof = Bytes::arbitrary(u)?;
+        let version: u8 = u.int_in_range(0..=1)?;
+
+        if version == 0 {
+            // v1 proof: pool_pk XOR pool_contract (or neither), size field used
+            let pool_public_key = Option::<G1Element>::arbitrary(u)?;
+            let pool_contract_puzzle_hash = Option::<Bytes32>::arbitrary(u)?;
+            let size = u8::arbitrary(u)?;
+            Ok(ProofOfSpace {
+                challenge,
+                pool_public_key,
+                pool_contract_puzzle_hash,
+                plot_public_key,
+                version: 0,
+                plot_index: 0,
+                meta_group: 0,
+                strength: 0,
+                size,
+                proof,
+            })
+        } else {
+            // v2 proof: exactly one of pool_pk / pool_contract must be set
+            let use_pool_pk = bool::arbitrary(u)?;
+            let (pool_public_key, pool_contract_puzzle_hash) = if use_pool_pk {
+                (Some(G1Element::arbitrary(u)?), None)
+            } else {
+                (None, Some(Bytes32::arbitrary(u)?))
+            };
+            let plot_index = u16::arbitrary(u)?;
+            let meta_group = u8::arbitrary(u)?;
+            let strength = u8::arbitrary(u)?;
+            Ok(ProofOfSpace {
+                challenge,
+                pool_public_key,
+                pool_contract_puzzle_hash,
+                plot_public_key,
+                version: 1,
+                plot_index,
+                meta_group,
+                strength,
+                size: 0,
+                proof,
+            })
         }
     }
 }
