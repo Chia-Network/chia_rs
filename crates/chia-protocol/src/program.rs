@@ -11,8 +11,9 @@ use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::run_program;
 use clvmr::serde::{
-    node_from_bytes, node_from_bytes_backrefs, node_to_bytes, serialized_length_from_bytes,
-    serialized_length_from_bytes_trusted,
+    SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes,
+    serialized_length_from_bytes, serialized_length_from_bytes_trusted,
+    serialized_length_serde_2026,
 };
 use clvmr::{Allocator, ChiaDialect, ClvmFlags, NodePtr};
 #[cfg(feature = "py-bindings")]
@@ -436,7 +437,13 @@ impl Streamable for Program {
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         let pos = input.position();
         let buf: &[u8] = &input.get_ref()[pos as usize..];
-        let len = if TRUSTED {
+        let len = if buf.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            // Framing-only walk: chia-protocol just needs to find the byte
+            // boundary. Consensus caps (max_atom_len) are enforced later, at
+            // run_block_generator time, so accept anything that's structurally
+            // walkable here.
+            serialized_length_serde_2026(buf, usize::MAX, false).map_err(|_e| Error::EndOfBuffer)?
+        } else if TRUSTED {
             serialized_length_from_bytes_trusted(buf).map_err(|_e| Error::EndOfBuffer)?
         } else {
             serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?
@@ -467,18 +474,28 @@ impl Program {
             "This class does not support from_parent().",
         ))
     }
+
+    /// Wrap raw bytes as a Program without CLVM structure validation.
+    /// Use for non-standard serializations (e.g. serde_2026) that will be
+    /// validated at execution time by run_block_generator / node_from_bytes_auto.
+    #[staticmethod]
+    fn from_program_bytes(blob: &[u8]) -> Self {
+        Self(blob.into())
+    }
 }
 
 #[cfg(feature = "py-bindings")]
 impl FromJsonDict for Program {
     fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
         let bytes = Bytes::from_json_dict(o)?;
-        let len =
-            serialized_length_from_bytes(bytes.as_slice()).map_err(|_e| Error::EndOfBuffer)?;
-        if len as usize != bytes.len() {
-            // If the bytes in the JSON string is not a valid CLVM
-            // serialization, or if it has garbage at the end of the string,
-            // reject it
+        let buf = bytes.as_slice();
+        let len = if buf.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            // Framing-only walk; see Streamable::parse for rationale.
+            serialized_length_serde_2026(buf, usize::MAX, false).map_err(|_e| Error::EndOfBuffer)?
+        } else {
+            serialized_length_from_bytes(buf).map_err(|_e| Error::EndOfBuffer)?
+        };
+        if len as usize != buf.len() {
             return Err(Error::InvalidClvm)?;
         }
         Ok(Self(bytes))

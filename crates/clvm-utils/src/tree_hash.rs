@@ -404,6 +404,59 @@ fn test_tree_hash_from_bytes() {
     assert_eq!(hash1, hash3);
 }
 
+#[test]
+fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
+    use clvmr::serde::{
+        SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
+        node_to_bytes_backrefs, serialize_2026,
+    };
+
+    // 1 MiB matches the legacy clvm_rs default; this test isn't consensus.
+    const TEST_MAX_ATOM_LEN: usize = 1 << 20;
+    let auto = |a: &mut Allocator, bytes: &[u8]| {
+        if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            deserialize_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
+        } else {
+            node_from_bytes_backrefs(a, bytes)
+        }
+    };
+
+    let mut a = Allocator::new();
+    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+    let node1 = a.new_pair(atom1, atom2).unwrap();
+    let node2 = a.new_pair(atom2, atom1).unwrap();
+    let node1 = a.new_pair(node1, node1).unwrap();
+    let node2 = a.new_pair(node2, node2).unwrap();
+    let root = a.new_pair(node1, node2).unwrap();
+
+    let canonical_hash = tree_hash(&a, root);
+
+    let standard = node_to_bytes(&a, root).unwrap();
+    let backrefs = node_to_bytes_backrefs(&a, root).unwrap();
+    let serde_2026 = serialize_2026(&a, root, 0).unwrap();
+
+    // tree_hash_from_bytes only handles standard + backrefs
+    assert_eq!(tree_hash_from_bytes(&standard).unwrap(), canonical_hash);
+    assert_eq!(tree_hash_from_bytes(&backrefs).unwrap(), canonical_hash);
+    // tree_hash_from_bytes rejects serde_2026
+    assert!(tree_hash_from_bytes(&serde_2026).is_err());
+
+    // sniff-and-dispatch + tree_hash works for ALL formats (mirrors
+    // chia_rs::serde_2026::node_from_bytes_auto, which clvm-utils can't
+    // depend on without pulling in chia-consensus).
+    for (label, bytes) in [
+        ("standard", &standard),
+        ("backrefs", &backrefs),
+        ("serde_2026", &serde_2026),
+    ] {
+        let mut a2 = Allocator::new();
+        let node = auto(&mut a2, bytes).unwrap_or_else(|e| panic!("{label}: auto failed: {e}"));
+        let hash = tree_hash(&a2, node);
+        assert_eq!(hash, canonical_hash, "{label}: tree_hash mismatch");
+    }
+}
+
 #[cfg(test)]
 use rstest::rstest;
 
