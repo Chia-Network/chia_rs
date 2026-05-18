@@ -31,7 +31,7 @@
 //!
 //! # Cost model
 //!
-//! Generator cost = `interned_weight(tree) × COST_PER_BYTE`.  This is a
+//! Generator cost = `interned_vbytes(tree) × COST_PER_BYTE`.  This is a
 //! property of the tree shape (after deduplication), not the serialized bytes.
 //! Serialization with serde_2026 happens once per validation, not incrementally.
 //!
@@ -45,7 +45,7 @@
 
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
-use crate::generator_cost::interned_weight;
+use crate::generator_cost::interned_vbytes;
 use crate::solution_generator::build_generator;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
@@ -132,7 +132,7 @@ fn compute_spend_weight(bundle: &SpendBundle) -> Result<u64> {
         .collect();
     let generator = build_generator(&mut a, spends)?;
     let interned = intern_tree(&a, generator)?;
-    let total = interned_weight(&interned);
+    let total = interned_vbytes(&interned);
     Ok(total.saturating_sub(WRAPPER_WEIGHT))
 }
 
@@ -240,7 +240,7 @@ impl BuilderInner {
 
         let generator = build_generator(&mut a, spend_tuples)?;
         let interned = intern_tree(&a, generator)?;
-        let exact_weight = interned_weight(&interned);
+        let exact_weight = interned_vbytes(&interned);
         let generator_cost = exact_weight * self.cost_per_byte;
         let total_cost = self.included_irreducible + generator_cost;
 
