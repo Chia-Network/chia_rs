@@ -5,7 +5,6 @@ use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
-use chia_consensus::validation_error::ValidationErr;
 use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::cost::Cost;
@@ -62,11 +61,10 @@ pub fn run_block_generator<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(error_code)) => (
-                Some(error_code.into()),
-                Some(format!("{error_code:?}")),
-                None,
-            ),
+            Err(e) => {
+                let code = e.error_code();
+                (Some(code.into()), Some(format!("{e}")), None)
+            }
         }
     })
 }
@@ -114,11 +112,10 @@ pub fn run_block_generator2<'a>(
                     spend_bundle_conds,
                 )),
             ),
-            Err(ValidationErr(error_code)) => (
-                Some(error_code.into()),
-                Some(format!("{error_code:?}")),
-                None,
-            ),
+            Err(e) => {
+                let code = e.error_code();
+                (Some(code.into()), Some(format!("{e}")), None)
+            }
         }
     })
 }

@@ -189,10 +189,11 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
                 result,
                 &Coin::new(find_parent, find_ph, find_amount),
             ) {
-                Err(ValidationErr(_)) => Err(EvalErr::InvalidOpArg(
+                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
                     NodePtr::NIL,
                     "coin not found".to_string(),
                 )),
+                Err(ValidationErr::Eval(e)) => Err(e),
                 Ok(pair) => Ok(pair),
             }
         })
@@ -239,10 +240,11 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
             let Reduction(_cost, result) =
                 run_program(&mut allocator, dialect, generator, args, max_cost)?;
             match parse_puzzle_solution(&allocator, result, find_coin) {
-                Err(ValidationErr(_)) => Err(EvalErr::InvalidOpArg(
+                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
                     NodePtr::NIL,
                     "coin not found".to_string(),
                 )),
+                Err(ValidationErr::Eval(e)) => Err(e),
                 Ok(pair) => Ok(pair),
             }
         })

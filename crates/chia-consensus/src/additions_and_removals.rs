@@ -59,7 +59,7 @@ where
         iter = rest;
         let (_parent_id, (puzzle, _rest)) =
             <(NodePtr, (NodePtr, NodePtr))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::Err(ErrorCode::InvalidCondition))?;
         cache.visit_tree(&a, puzzle);
     }
 
@@ -69,7 +69,7 @@ where
         // process the spend
         let (parent_id, (puzzle, (amount, (solution, _spend_level_extra)))) =
             <(Bytes32, (NodePtr, (NodePtr, (NodePtr, NodePtr))))>::from_clvm(&a, spend)
-                .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
+                .map_err(|_| ValidationErr::Err(ErrorCode::InvalidCondition))?;
         let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
         let Reduction(clvm_cost, mut iter) =
@@ -104,7 +104,7 @@ where
 
             let (puzzle_hash, (amount, hint)) =
                 <(Bytes32, (NodePtr, NodePtr))>::from_clvm(&a, c)
-                    .map_err(|_| ValidationErr(ErrorCode::InvalidCondition))?;
+                    .map_err(|_| ValidationErr::Err(ErrorCode::InvalidCondition))?;
             let amount = parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?;
 
             let coin = Coin {

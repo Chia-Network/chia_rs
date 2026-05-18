@@ -10,4 +10,4 @@ atoms: 128
 pairs: 284
 heap: 68
 STRICT:
-FAILED: InvalidConditionOpcode (10)
+FAILED: validation error: InvalidConditionOpcode (10)

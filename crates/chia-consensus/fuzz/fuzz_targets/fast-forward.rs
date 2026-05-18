@@ -7,7 +7,8 @@ use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::fast_forward::fast_forward_singleton;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::spend_visitor::SpendVisitor;
-use chia_consensus::validation_error::{ErrorCode, ValidationErr};
+use chia_consensus::validation_error::ErrorCode;
+use chia_consensus::validation_error::ValidationErr;
 use chia_protocol::Bytes32;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
@@ -166,7 +167,9 @@ fn test_ff(
     ];
 
     match (conditions1, conditions2) {
-        (Err(ValidationErr(msg1)), Err(ValidationErr(msg2))) => {
+        (Err(e1), Err(e2)) => {
+            let msg1 = e1.error_code();
+            let msg2 = e2.error_code();
             if msg1 != msg2 {
                 assert!(discrepancy_errors.contains(&msg1) || discrepancy_errors.contains(&msg2));
             }
@@ -205,19 +208,21 @@ fn test_ff(
             assert_eq!(spend1.create_coin, spend2.create_coin);
             assert_eq!(spend1.flags, spend2.flags);
         }
-        (Ok(conditions1), Err(ValidationErr(msg2))) => {
+        (Ok(conditions1), Err(e2)) => {
             // if the spend is valid and becomes invalid when
             // rebased/fast-forwarded, it should at least not be considered
             // eligible.
+            let msg2 = e2.error_code();
             assert!((conditions1.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
             assert!(discrepancy_errors.contains(&msg2));
         }
-        (Err(ValidationErr(msg1)), Ok(conditions2)) => {
+        (Err(e1), Ok(conditions2)) => {
             // if the spend is invalid and becomes valid when
             // rebased/fast-forwarded, it should not be considered
             // eligible. This is a bit of a far-fetched scenario, but could
             // happen if there's an ASSERT_MY_COINID that's only valid after the
             // fast-forward
+            let msg1 = e1.error_code();
             assert!((conditions2.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
             assert!(discrepancy_errors.contains(&msg1));
         }

@@ -61,9 +61,9 @@ fn calculate_base_cost(
                 .iter()
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
         )
-        .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         Ok(total_cost_from_tree(&interned))
     } else {
         // We don't pay the size cost (nor execution cost) of being wrapped by a
@@ -96,7 +96,7 @@ pub fn run_spendbundle(
     if flags.contains(ConsensusFlags::LIMIT_SPENDS)
         && spend_bundle.coin_spends.len() > MAX_SPENDS_PER_BLOCK
     {
-        return Err(ValidationErr(ErrorCode::TooManySpends));
+        return Err(ValidationErr::Err(ErrorCode::TooManySpends));
     }
 
     for coin_spend in &spend_bundle.coin_spends {
@@ -112,7 +112,7 @@ pub fn run_spendbundle(
 
         let buf = tree_hash(a, puz);
         if coin_spend.coin.puzzle_hash != buf.into() {
-            return Err(ValidationErr(ErrorCode::WrongPuzzleHash));
+            return Err(ValidationErr::Err(ErrorCode::WrongPuzzleHash));
         }
         let puzzle_hash = a.new_atom(&buf)?;
         let spend = process_single_spend::<MempoolVisitor>(
@@ -634,7 +634,7 @@ mod tests {
                     (
                         0,
                         0,
-                        format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0)),
+                        format!("FAILED: {code} ({:?})\n", u32::from(code.error_code())),
                         block_conds,
                     )
                 }
@@ -694,7 +694,7 @@ mod tests {
             }
             Err(code) => {
                 println!("error: {code:?}");
-                format!("FAILED: {:?} ({})\n", code.0, u32::from(code.0))
+                format!("FAILED: {code} ({:?})\n", u32::from(code.error_code()))
             }
         };
 
@@ -748,7 +748,7 @@ mod tests {
         let result = run_spendbundle(&mut alloc, &bundle, u64::MAX, flags, &TEST_CONSTANTS);
         match (expected_err, result) {
             (Some(err), Err(e)) => {
-                assert_eq!(e.0, err);
+                assert_eq!(e.error_code(), err);
             }
             (None, Ok((conds, _))) => {
                 assert_eq!(conds.spends.len(), num_spends);

@@ -28,7 +28,7 @@ use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
-        Err(ValidationErr(ErrorCode::CostExceeded))
+        Err(ValidationErr::Err(ErrorCode::CostExceeded))
     } else {
         *cost_left -= subtract;
         Ok(())
@@ -49,7 +49,7 @@ where
     // need to pass in the deserialization program
     if flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
         if block_refs.into_iter().next().is_some() {
-            return Err(ValidationErr(ErrorCode::TooManyGeneratorRefs));
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
         }
         return Ok(a.nil());
     }
@@ -161,7 +161,7 @@ fn extract_n<const N: usize>(
         counter += 1;
     }
     if counter != N - 1 {
-        return Err(ValidationErr(e));
+        return Err(ValidationErr::Err(e));
     }
     ret[counter] = n;
     Ok(ret)
@@ -174,7 +174,7 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
-        Err(ValidationErr(ErrorCode::ComplexGeneratorReceived))
+        Err(ValidationErr::Err(ErrorCode::ComplexGeneratorReceived))
     }
 }
 
@@ -191,7 +191,7 @@ pub fn check_generator_node(
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
     match <(MatchByte<1>, NodePtr)>::from_clvm(a, program) {
-        Err(..) => Err(ValidationErr(ErrorCode::ComplexGeneratorReceived)),
+        Err(..) => Err(ValidationErr::Err(ErrorCode::ComplexGeneratorReceived)),
         _ => Ok(()),
     }
 }
@@ -225,7 +225,7 @@ where
         let mut decode_allocator = Allocator::new();
         let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let cost = total_cost_from_tree(&interned);
         let InternedTree {
             allocator, root, ..
@@ -283,7 +283,7 @@ where
     while let Some((spend, rest)) = a.next(iter) {
         iter = rest;
         if spends_left == 0 {
-            return Err(ValidationErr(ErrorCode::TooManySpends));
+            return Err(ValidationErr::Err(ErrorCode::TooManySpends));
         }
         spends_left -= 1;
         // process the spend
@@ -314,7 +314,7 @@ where
         )?;
     }
     if a.atom_len(iter) != 0 {
-        return Err(ValidationErr(ErrorCode::GeneratorRuntimeError));
+        return Err(ValidationErr::Err(ErrorCode::GeneratorRuntimeError));
     }
 
     validate_conditions(&a, &ret, &state, flags)?;
@@ -355,7 +355,7 @@ where
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -375,7 +375,7 @@ where
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(ErrorCode::InvalidParentId))?;
+            .map_err(|_| ValidationErr::Err(ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
@@ -451,11 +451,11 @@ where
         args,
         constants.max_block_cost_clvm,
     )
-    .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+    .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
 
     let (first, _rest) = a
         .next(res)
-        .ok_or(ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        .ok_or(ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
     let mut cache = TreeCache::default();
     let mut iter = first;
     while let Some((spend, rest)) = a.next(iter) {
@@ -474,7 +474,7 @@ where
         };
         let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
         let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr(ErrorCode::InvalidParentId))?;
+            .map_err(|_| ValidationErr::Err(ErrorCode::InvalidParentId))?;
         let coin = Coin::new(
             parent_id,
             puzhash.into(),
@@ -490,7 +490,7 @@ where
             solution,
             constants.max_block_cost_clvm,
         )
-        .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         // conditions_list is the full returned output of puzzle ran with solution
         // ((51 0xcafef00d 100) (51 0x1234 200) ...)
 
@@ -623,7 +623,7 @@ mod tests {
         );
         match (expected_err, result) {
             (Some(err), Err(e)) => {
-                assert_eq!(e.0, err);
+                assert_eq!(e.error_code(), err);
             }
             (None, Ok(conds)) => {
                 assert_eq!(conds.1.spends.len(), num_spends);
