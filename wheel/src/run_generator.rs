@@ -2,7 +2,7 @@ use chia_bls::{BlsCache, Signature};
 use chia_consensus::additions_and_removals::additions_and_removals as native_additions_and_removals;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::ConsensusFlags;
-use chia_consensus::generator_cost::interned_weight;
+use chia_consensus::generator_cost::interned_vbytes;
 use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
@@ -157,7 +157,7 @@ pub fn additions_and_removals<'a>(
 /// `atom_bytes + 2*atom_count + 3*pair_count`.  Multiply by
 /// `cost_per_byte` from consensus constants to get the full generator size cost.
 #[pyfunction]
-pub fn generator_interned_weight(py: Python<'_>, program: PyBuffer<u8>) -> PyResult<u64> {
+pub fn generator_interned_vbytes(py: Python<'_>, program: PyBuffer<u8>) -> PyResult<u64> {
     let program = py_to_slice(program);
     py.detach(|| {
         let mut a = Allocator::new();
@@ -165,6 +165,6 @@ pub fn generator_interned_weight(py: Python<'_>, program: PyBuffer<u8>) -> PyRes
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("bad generator: {e}")))?;
         let tree = intern_tree_limited(&a, node, u32::MAX as usize)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("intern failed: {e}")))?;
-        Ok(interned_weight(&tree))
+        Ok(interned_vbytes(&tree))
     })
 }

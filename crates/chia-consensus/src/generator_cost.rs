@@ -1,6 +1,6 @@
 //! Chia-specific generator cost calculation.
 //!
-//! Pure storage model: cost = interned_weight(tree) * cost_per_byte.
+//! Pure storage model: cost = interned_vbytes(tree) * cost_per_byte.
 //! The weight `atom_bytes + 2*atoms + 3*pairs` is an upper bound on the
 //! serialized byte count. Multiply by the consensus constant `cost_per_byte`
 //! to get the full generator size cost.
@@ -17,7 +17,7 @@ use clvmr::serde::InternedTree;
 /// Multiply by `cost_per_byte` from `ConsensusConstants` to get the full
 /// generator size cost.
 #[inline]
-pub fn interned_weight(tree: &InternedTree) -> u64 {
+pub fn interned_vbytes(tree: &InternedTree) -> u64 {
     let atom_count = tree.atoms.len() as u64;
     let pair_count = tree.pairs.len() as u64;
 
@@ -36,12 +36,12 @@ mod tests {
     use clvmr::serde::intern_tree;
 
     #[test]
-    fn test_interned_weight_nil() {
+    fn test_interned_vbytes_nil() {
         // nil atom: 0 atom bytes, 1 atom, 0 pairs → 0 + 2*1 + 3*0 = 2
         let allocator = Allocator::new();
         let node = allocator.nil();
         let tree = intern_tree(&allocator, node).unwrap();
-        assert_eq!(interned_weight(&tree), 2);
+        assert_eq!(interned_vbytes(&tree), 2);
     }
 
     #[test]
@@ -52,7 +52,7 @@ mod tests {
         let right = allocator.new_atom(&[4, 5, 6]).unwrap();
         let node = allocator.new_pair(left, right).unwrap();
         let tree = intern_tree(&allocator, node).unwrap();
-        assert_eq!(interned_weight(&tree), 13);
+        assert_eq!(interned_vbytes(&tree), 13);
     }
 
     #[test]
@@ -62,7 +62,7 @@ mod tests {
         let atom = allocator.new_atom(&[42]).unwrap();
         let node = allocator.new_pair(atom, atom).unwrap();
         let tree = intern_tree(&allocator, node).unwrap();
-        assert_eq!(interned_weight(&tree), 6);
+        assert_eq!(interned_vbytes(&tree), 6);
     }
 
     #[test]
@@ -72,6 +72,6 @@ mod tests {
         let atom = allocator.new_atom(&[1, 2, 3, 4, 5]).unwrap();
         let node = allocator.new_pair(atom, allocator.nil()).unwrap();
         let tree = intern_tree(&allocator, node).unwrap();
-        assert_eq!(interned_weight(&tree), 12);
+        assert_eq!(interned_vbytes(&tree), 12);
     }
 }
