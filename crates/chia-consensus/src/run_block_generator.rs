@@ -182,7 +182,9 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
     if !flags.contains(ConsensusFlags::INTERNED_GENERATOR)
         && program.starts_with(&SERDE_2026_MAGIC_PREFIX)
     {
-        return Err(ValidationErr(ErrorCode::InvalidTransactionsGeneratorEncoding));
+        return Err(ValidationErr(
+            ErrorCode::InvalidTransactionsGeneratorEncoding,
+        ));
     }
     if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         // serde_2026 blocks have a different serialization header

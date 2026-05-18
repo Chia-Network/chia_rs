@@ -83,7 +83,9 @@ use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes};
+use clvmr::serde::{
+    SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes,
+};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
