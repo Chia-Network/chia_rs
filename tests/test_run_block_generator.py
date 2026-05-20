@@ -1,4 +1,7 @@
+import pytest
+
 from chia_rs import (
+    generator_interned_vbytes,
     run_block_generator,
     run_block_generator2,
     G2Element,
@@ -131,3 +134,40 @@ def test_run_block_generator_cost() -> None:
     assert err == 23
     assert err_msg == "validation error: CostExceeded"
     assert conds is None
+
+
+def test_generator_interned_vbytes_nil() -> None:
+    # \x80 encodes the nil atom (0-byte atom).
+    # Interned tree: 1 atom (0 atom bytes), 0 pairs.
+    # weight = atom_bytes + 2*atoms + 3*pairs = 0 + 2 + 0 = 2
+    assert generator_interned_vbytes(b"\x80") == 2
+
+
+def test_generator_interned_vbytes_single_byte_atom() -> None:
+    # \x01 encodes a 1-byte atom with value 1.
+    # Interned tree: 1 atom (1 atom byte), 0 pairs.
+    # weight = 1 + 2*1 + 3*0 = 3
+    assert generator_interned_vbytes(b"\x01") == 3
+
+
+def test_generator_interned_vbytes_dedup_pair() -> None:
+    # \xff\x80\x80 encodes (nil . nil).
+    # After interning, both nil atoms collapse to one unique atom.
+    # Interned tree: 1 unique atom (0 bytes), 1 pair.
+    # weight = 0 + 2*1 + 3*1 = 5
+    assert generator_interned_vbytes(b"\xff\x80\x80") == 5
+
+
+def test_generator_interned_vbytes_real_block() -> None:
+    generator = bytes.fromhex(
+        open("generator-tests/block-834768.txt", "r").read().split("\n")[0]
+    )
+    weight = generator_interned_vbytes(generator)
+    # Pinned value for block-834768 (39090 bytes serialized, 13465 unique weight).
+    # Interning deduplicates shared subtrees: 13465 << 39090.
+    assert weight == 13465
+
+
+def test_generator_interned_vbytes_bad_input() -> None:
+    with pytest.raises(ValueError):
+        generator_interned_vbytes(b"\xff\xff")

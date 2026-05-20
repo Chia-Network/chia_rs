@@ -6,7 +6,7 @@ use crate::conditions::{
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
-use crate::generator_cost::total_cost_from_tree;
+use crate::generator_cost::interned_vbytes;
 use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
@@ -226,7 +226,7 @@ where
         let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        let cost = total_cost_from_tree(&interned);
+        let cost = interned_vbytes(&interned) * constants.cost_per_byte;
         let InternedTree {
             allocator, root, ..
         } = interned;

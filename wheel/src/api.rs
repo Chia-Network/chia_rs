@@ -1,6 +1,7 @@
 use crate::error::map_pyerr;
 use crate::run_generator::{
-    additions_and_removals, py_to_slice, run_block_generator, run_block_generator2,
+    additions_and_removals, generator_interned_vbytes, py_to_slice, run_block_generator,
+    run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
@@ -768,6 +769,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // generator functions
     m.add_function(wrap_pyfunction!(run_block_generator, m)?)?;
     m.add_function(wrap_pyfunction!(run_block_generator2, m)?)?;
+    m.add_function(wrap_pyfunction!(generator_interned_vbytes, m)?)?;
     m.add_function(wrap_pyfunction!(additions_and_removals, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator, m)?)?;
     m.add_function(wrap_pyfunction!(solution_generator_backrefs, m)?)?;
