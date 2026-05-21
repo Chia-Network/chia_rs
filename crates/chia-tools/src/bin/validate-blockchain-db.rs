@@ -49,7 +49,10 @@ struct Args {
     testnet: bool,
 }
 
-const MAINNET_CONSTANTS: ConsensusConstants = TEST_CONSTANTS;
+const MAINNET_CONSTANTS: ConsensusConstants = ConsensusConstants {
+    testnet: false,
+    ..TEST_CONSTANTS
+};
 const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
     agg_sig_me_additional_data: Bytes32::new(hex!(
         "37a90eb5185a9c4439a91ddc98bbadce7b4feba060d50116a067de66bf236615"
@@ -94,6 +97,7 @@ const TESTNET11_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_128_height: 6_029_568,
     plot_filter_64_height: 11_075_328,
     plot_filter_32_height: 16_121_088,
+    testnet: true,
     ..MAINNET_CONSTANTS
 };
 

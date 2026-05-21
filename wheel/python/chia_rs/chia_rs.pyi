@@ -4565,6 +4565,7 @@ class ConsensusConstants:
     PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32
     PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
+    TESTNET: bool
     def __new__(
         cls,
         SLOT_BLOCKS_TARGET: uint32,
@@ -4621,7 +4622,8 @@ class ConsensusConstants:
         MAX_PLOT_STRENGTH: uint8,
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: uint32,
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: uint32,
-        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32
+        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: uint32,
+        TESTNET: bool
     ) -> Self: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -4694,4 +4696,5 @@ class ConsensusConstants:
         MAX_PLOT_STRENGTH: Union[ uint8, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_FIRST_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
         PLOT_FILTER_V2_SECOND_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
-        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec()) -> ConsensusConstants: ...
+        PLOT_FILTER_V2_THIRD_ADJUSTMENT_HEIGHT: Union[ uint32, _Unspec] = _Unspec(),
+        TESTNET: Union[ bool, _Unspec] = _Unspec()) -> ConsensusConstants: ...
