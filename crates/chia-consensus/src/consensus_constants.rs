@@ -169,6 +169,9 @@ pub struct ConsensusConstants {
     plot_filter_v2_first_adjustment_height: u32,
     plot_filter_v2_second_adjustment_height: u32,
     plot_filter_v2_third_adjustment_height: u32,
+
+    /// Whether we're running on a testnet (or in tests) as opposed to mainnet.
+    testnet: bool,
 }
 
 pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
@@ -249,4 +252,6 @@ pub const TEST_CONSTANTS: ConsensusConstants = ConsensusConstants {
     plot_filter_v2_first_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_second_adjustment_height: 0xffff_ffff, // placeholder
     plot_filter_v2_third_adjustment_height: 0xffff_ffff, // placeholder
+
+    testnet: true,
 };
