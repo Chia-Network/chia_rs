@@ -1,3 +1,4 @@
+use crate::build_block_common::{BuildBlockResult, MIN_COST_THRESHOLD, skip_result};
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
 use crate::generator_cost::interned_vbytes;
@@ -11,23 +12,6 @@ use std::borrow::Borrow;
 use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyList;
-
-const MAX_SKIPPED_ITEMS: u32 = 6;
-const MIN_COST_THRESHOLD: u64 = 6_000_000;
-
-#[derive(PartialEq)]
-pub enum BuildBlockResult {
-    KeepGoing,
-    Done,
-}
-
-fn result(num_skipped: u32) -> BuildBlockResult {
-    if num_skipped > MAX_SKIPPED_ITEMS {
-        BuildBlockResult::Done
-    } else {
-        BuildBlockResult::KeepGoing
-    }
-}
 
 /// Builds a block generator under the INTERNED_GENERATOR cost model.
 ///
@@ -66,7 +50,7 @@ impl InternedBlockBuilder {
         // Build (q . ((spend_list)))
         let inner = allocator.new_pair(spend_list, allocator.nil())?;
         let outer = allocator.new_pair(allocator.one(), inner)?;
-        let interned = intern_tree_limited(allocator, outer, usize::MAX)?;
+        let interned = intern_tree_limited(allocator, outer, u32::MAX as usize)?;
         Ok(interned_vbytes(&interned) * cost_per_byte)
     }
 
@@ -91,12 +75,15 @@ impl InternedBlockBuilder {
 
         if self.generator_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
-            return Ok((false, result(self.num_skipped)));
+            return Ok((false, skip_result(self.num_skipped)));
         }
 
         let saved_spend_list = self.spend_list;
         let a = &mut self.allocator;
 
+        // Accumulate into a local variable so that any mid-loop error leaves
+        // self.spend_list untouched and consistent with the tracked costs.
+        let mut local_spend_list = saved_spend_list;
         let mut cumulative_signature = Signature::default();
         for bundle in bundles {
             for spend in &bundle.borrow().coin_spends {
@@ -108,10 +95,11 @@ impl InternedBlockBuilder {
                 let item = a.new_pair(puzzle, item)?;
                 let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
                 let item = a.new_pair(parent_id, item)?;
-                self.spend_list = a.new_pair(item, self.spend_list)?;
+                local_spend_list = a.new_pair(item, local_spend_list)?;
             }
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
+        self.spend_list = local_spend_list;
 
         let new_generator_cost = Self::compute_generator_cost(
             &mut self.allocator,
@@ -123,7 +111,7 @@ impl InternedBlockBuilder {
             // Restore: the allocator is not reset (dead nodes are acceptable).
             self.spend_list = saved_spend_list;
             self.num_skipped += 1;
-            return Ok((false, result(self.num_skipped)));
+            return Ok((false, skip_result(self.num_skipped)));
         }
 
         self.generator_cost = new_generator_cost;
@@ -177,16 +165,14 @@ impl InternedBlockBuilder {
         cost: u64,
         constants: &ConsensusConstants,
     ) -> PyResult<(bool, bool)> {
-        let (added, result) = self.add_spend_bundles(
-            bundles.iter().map(|item| {
+        let bundles_vec: Vec<SpendBundle> = bundles
+            .iter()
+            .map(|item| {
                 item.extract::<Bound<'_, SpendBundle>>()
-                    .expect("spend bundle")
-                    .get()
-                    .clone()
-            }),
-            cost,
-            constants,
-        )?;
+                    .map(|b| b.get().clone())
+            })
+            .collect::<PyResult<_>>()?;
+        let (added, result) = self.add_spend_bundles(bundles_vec, cost, constants)?;
         let done = matches!(result, BuildBlockResult::Done);
         Ok((added, done))
     }
@@ -447,7 +433,7 @@ mod tests {
                     generator.as_slice(),
                     [],
                     TEST_CONSTANTS.max_block_cost_clvm,
-                    MEMPOOL_MODE,
+                    MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
                     &signature,
                     None,
                     &TEST_CONSTANTS,
