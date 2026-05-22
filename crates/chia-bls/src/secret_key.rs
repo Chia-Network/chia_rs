@@ -149,6 +149,11 @@ impl SecretKey {
     }
 
     #[must_use]
+    pub fn as_hex_string(&self) -> String {
+        hex::encode(self.to_bytes())
+    }
+
+    #[must_use]
     pub fn derive_hardened(&self, idx: u32) -> SecretKey {
         // described here:
         // https://eips.ethereum.org/EIPS/eip-2333#derive_child_sk
@@ -213,10 +218,7 @@ impl AddAssign<&SecretKey> for SecretKey {
 
 impl fmt::Debug for SecretKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_fmt(format_args!(
-            "<PrivateKey {}>",
-            &hex::encode(self.to_bytes())
-        ))
+        formatter.write_str("<PrivateKey>")
     }
 }
 
@@ -272,6 +274,11 @@ impl SecretKey {
 
     pub fn __str__(&self) -> String {
         hex::encode(self.to_bytes())
+    }
+
+    #[pyo3(name = "as_hex_string")]
+    pub fn py_as_hex_string(&self) -> String {
+        self.as_hex_string()
     }
 
     #[classmethod]
@@ -479,7 +486,8 @@ mod tests {
     fn test_debug() {
         let sk_hex = "52d75c4707e39595b27314547f9723e5530c01198af3fc5849d9a7af65631efb";
         let sk = SecretKey::from_bytes(&<[u8; 32]>::from_hex(sk_hex).unwrap()).unwrap();
-        assert_eq!(format!("{sk:?}"), format!("<PrivateKey {sk_hex}>"));
+        assert_eq!(format!("{sk:?}"), "<PrivateKey>");
+        assert_eq!(sk.as_hex_string(), sk_hex);
     }
 
     #[test]
