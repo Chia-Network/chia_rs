@@ -1,6 +1,6 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
-use crate::generator_cost::total_cost_from_tree;
+use crate::generator_cost::interned_vbytes;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
@@ -32,8 +32,8 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 /// Builds a block generator under the INTERNED_GENERATOR cost model.
 ///
 /// Unlike `BlockBuilder`, serialization cost is not computed incrementally.
-/// Cost comes from `total_cost_from_tree(intern_tree_limited(...))` on the
-/// full quoted generator tree. Serialization happens once in `finalize()`.
+/// Cost comes from `interned_vbytes(intern_tree_limited(...)) * cost_per_byte`
+/// on the full quoted generator tree. Serialization happens once in `finalize()`.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct InternedBlockBuilder {
     allocator: Allocator,
@@ -58,12 +58,16 @@ impl InternedBlockBuilder {
         })
     }
 
-    fn compute_generator_cost(allocator: &mut Allocator, spend_list: NodePtr) -> Result<u64> {
+    fn compute_generator_cost(
+        allocator: &mut Allocator,
+        spend_list: NodePtr,
+        cost_per_byte: u64,
+    ) -> Result<u64> {
         // Build (q . ((spend_list)))
         let inner = allocator.new_pair(spend_list, allocator.nil())?;
         let outer = allocator.new_pair(allocator.one(), inner)?;
         let interned = intern_tree_limited(allocator, outer, usize::MAX)?;
-        Ok(total_cost_from_tree(&interned))
+        Ok(interned_vbytes(&interned) * cost_per_byte)
     }
 
     /// Add a batch of spend bundles. `cost` must be execution + conditions cost
@@ -109,8 +113,11 @@ impl InternedBlockBuilder {
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
 
-        let new_generator_cost =
-            Self::compute_generator_cost(&mut self.allocator, self.spend_list)?;
+        let new_generator_cost = Self::compute_generator_cost(
+            &mut self.allocator,
+            self.spend_list,
+            constants.cost_per_byte,
+        )?;
 
         if new_generator_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             // Restore: the allocator is not reset (dead nodes are acceptable).
@@ -148,7 +155,11 @@ impl InternedBlockBuilder {
 
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
-        let generator_cost = Self::compute_generator_cost(&mut self.allocator, self.spend_list)?;
+        let generator_cost = Self::compute_generator_cost(
+            &mut self.allocator,
+            self.spend_list,
+            constants.cost_per_byte,
+        )?;
         let total_cost = generator_cost + self.block_cost;
 
         assert!(total_cost <= constants.max_block_cost_clvm);
