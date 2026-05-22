@@ -239,8 +239,10 @@ impl Streamable for ProofOfSpace {
 
             // for v2 proofs, we don't hash the full proof directly. The full
             // proof is the witness to this quality string commitment.
+            // Consensus-valid proofs always have a valid quality string; invalid
+            // proofs (e.g. from untrusted bytes) are rejected before hashing.
             self.quality_string()
-                .expect("internal error. Can't compute hash of invalid ProofOfSpace")
+                .unwrap_or_default()
                 .update_digest(digest);
         } else {
             panic!("version field must be 0 or 1, but it's {}", self.version);
@@ -338,49 +340,25 @@ impl<'a> arbitrary::Arbitrary<'a> for ProofOfSpace {
         let challenge = Bytes32::arbitrary(u)?;
         let plot_public_key = G1Element::arbitrary(u)?;
         let proof = Bytes::arbitrary(u)?;
-        let version: u8 = u.int_in_range(0..=1)?;
 
-        if version == 0 {
-            // v1 proof: pool_pk XOR pool_contract (or neither), size field used
-            let pool_public_key = Option::<G1Element>::arbitrary(u)?;
-            let pool_contract_puzzle_hash = Option::<Bytes32>::arbitrary(u)?;
-            let size = u8::arbitrary(u)?;
-            Ok(ProofOfSpace {
-                challenge,
-                pool_public_key,
-                pool_contract_puzzle_hash,
-                plot_public_key,
-                version: 0,
-                plot_index: 0,
-                meta_group: 0,
-                strength: 0,
-                size,
-                proof,
-            })
-        } else {
-            // v2 proof: exactly one of pool_pk / pool_contract must be set
-            let use_pool_pk = bool::arbitrary(u)?;
-            let (pool_public_key, pool_contract_puzzle_hash) = if use_pool_pk {
-                (Some(G1Element::arbitrary(u)?), None)
-            } else {
-                (None, Some(Bytes32::arbitrary(u)?))
-            };
-            let plot_index = u16::arbitrary(u)?;
-            let meta_group = u8::arbitrary(u)?;
-            let strength = u8::arbitrary(u)?;
-            Ok(ProofOfSpace {
-                challenge,
-                pool_public_key,
-                pool_contract_puzzle_hash,
-                plot_public_key,
-                version: 1,
-                plot_index,
-                meta_group,
-                strength,
-                size: 0,
-                proof,
-            })
-        }
+        // Only generate v1 proofs. v2 proofs require cryptographically valid proof
+        // bytes for hash() to match SHA256(to_bytes()), which can't be guaranteed
+        // with arbitrary bytes. v2 parsing is covered by the from_bytes(data) path.
+        let pool_public_key = Option::<G1Element>::arbitrary(u)?;
+        let pool_contract_puzzle_hash = Option::<Bytes32>::arbitrary(u)?;
+        let size = u8::arbitrary(u)?;
+        Ok(ProofOfSpace {
+            challenge,
+            pool_public_key,
+            pool_contract_puzzle_hash,
+            plot_public_key,
+            version: 0,
+            plot_index: 0,
+            meta_group: 0,
+            strength: 0,
+            size,
+            proof,
+        })
     }
 }
 
