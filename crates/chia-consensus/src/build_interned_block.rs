@@ -230,17 +230,17 @@ mod tests {
     fn test_generator_cost_accuracy() {
         // Test that self.generator_cost matches what compute_generator_cost returns
         let mut builder = InternedBlockBuilder::new().expect("new builder");
-        
+
         // Load a simple bundle
         let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
         if !std::path::Path::new(file).exists() {
             // Skip if test bundles aren't available
             return;
         }
-        
+
         let buf = fs::read(file).expect("read bundle file");
         let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parse SpendBundle");
-        
+
         let mut a = Allocator::new();
         let conds = run_spendbundle(
             &mut a,
@@ -251,17 +251,17 @@ mod tests {
         )
         .expect("run_spendbundle")
         .0;
-        
+
         let cost = conds.cost
             - (calculate_generator_length(&bundle.coin_spends) as u64 - 2)
                 * TEST_CONSTANTS.cost_per_byte;
-        
+
         let (added, _) = builder
             .add_spend_bundles([&bundle], cost, &TEST_CONSTANTS)
             .expect("add_spend_bundles");
-        
+
         assert!(added);
-        
+
         // Verify that the tracked generator_cost matches what compute_generator_cost returns
         let expected_cost = InternedBlockBuilder::compute_generator_cost(
             &mut builder.allocator,
@@ -269,16 +269,16 @@ mod tests {
             TEST_CONSTANTS.cost_per_byte,
         )
         .expect("compute_generator_cost");
-        
+
         assert_eq!(
             builder.generator_cost, expected_cost,
             "Tracked generator_cost should match computed cost"
         );
-        
+
         // Now finalize and verify the cost is still accurate
         let total_cost_before = builder.generator_cost + builder.block_cost;
         let (_, _, total_cost_after) = builder.finalize(&TEST_CONSTANTS).expect("finalize");
-        
+
         assert_eq!(
             total_cost_before, total_cost_after,
             "finalize() should use tracked cost, not recompute"
@@ -289,13 +289,13 @@ mod tests {
     fn test_basic_functionality() {
         // Test basic add and finalize flow
         let mut builder = InternedBlockBuilder::new().expect("new builder");
-        
+
         assert_eq!(builder.cost(), 20); // Initial cost (quote operation)
         assert_eq!(builder.generator_cost, 0);
         assert_eq!(builder.block_cost, 20);
-        
+
         let (generator, sig, cost) = builder.finalize(&TEST_CONSTANTS).expect("finalize");
-        
+
         assert!(!generator.is_empty());
         assert_eq!(sig, Signature::default());
         assert_eq!(cost, 20);
@@ -390,20 +390,20 @@ mod tests {
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
                 let mut spends = vec![];
-                
+
                 for entry in &bundles {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
-                    
+
                     // Verify cost accuracy before adding
                     let cost_before = builder.cost();
-                    
+
                     let (added, result) = builder
                         .add_spend_bundles([bundle], *cost, &TEST_CONSTANTS)
                         .expect("add_spend_bundle");
 
                     max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
-                    
+
                     if added {
                         // Verify that tracked cost matches what compute_generator_cost returns
                         let expected_gen_cost = InternedBlockBuilder::compute_generator_cost(
@@ -412,12 +412,12 @@ mod tests {
                             TEST_CONSTANTS.cost_per_byte,
                         )
                         .expect("compute_generator_cost");
-                        
+
                         assert_eq!(
                             builder.generator_cost, expected_gen_cost,
                             "Generator cost should be accurate after add"
                         );
-                        
+
                         num_tx += 1;
                         spends.extend(conds.spends.iter());
                     } else {
@@ -427,11 +427,11 @@ mod tests {
                         break;
                     }
                 }
-                
+
                 let total_cost_before_finalize = builder.cost();
                 let (generator, signature, cost) =
                     builder.finalize(&TEST_CONSTANTS).expect("finalize()");
-                
+
                 // Verify finalize doesn't change the cost
                 assert_eq!(
                     total_cost_before_finalize, cost,
@@ -472,4 +472,3 @@ mod tests {
         assert_eq!(pool.panic_count(), 0);
     }
 }
-
