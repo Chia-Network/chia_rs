@@ -182,7 +182,7 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
     if !flags.contains(ConsensusFlags::INTERNED_GENERATOR)
         && program.starts_with(&SERDE_2026_MAGIC_PREFIX)
     {
-        return Err(ValidationErr(
+        return Err(ValidationErr::Err(
             ErrorCode::InvalidTransactionsGeneratorEncoding,
         ));
     }
@@ -245,7 +245,7 @@ where
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
         let program_node = node_from_bytes_auto(&mut decode_allocator, program)
-            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+            .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let cost = interned_vbytes(&interned) * constants.cost_per_byte;
