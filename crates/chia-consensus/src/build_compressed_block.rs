@@ -1,4 +1,3 @@
-use crate::build_block_common::{MIN_COST_THRESHOLD, skip_result};
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
 use chia_bls::Signature;
@@ -12,7 +11,29 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyList;
 
-pub use crate::build_block_common::BuildBlockResult;
+/// Maximum number of mempool items that can be skipped during block creation.
+const MAX_SKIPPED_ITEMS: u32 = 6;
+
+/// Typical cost of a standard XCH spend, used as a heuristic threshold.
+const MIN_COST_THRESHOLD: u64 = 6_000_000;
+
+/// Returned from add_spend_bundle(), indicating whether more bundles can be
+/// added or not.
+#[derive(PartialEq)]
+pub enum BuildBlockResult {
+    /// More spend bundles can be added
+    KeepGoing,
+    /// No more spend bundles can be added. We're too close to the limit
+    Done,
+}
+
+fn skip_result(num_skipped: u32) -> BuildBlockResult {
+    if num_skipped > MAX_SKIPPED_ITEMS {
+        BuildBlockResult::Done
+    } else {
+        BuildBlockResult::KeepGoing
+    }
+}
 
 /// This takes a list of spends, highest priority first, and returns a
 /// block generator with as many spends as possible, that fit within the
