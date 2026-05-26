@@ -48,7 +48,7 @@ impl InternedBlockBuilder {
         cost_per_byte: u64,
     ) -> Result<u64> {
         // Build (q . ((spend_list)))
-        let inner = allocator.new_pair(spend_list, allocator.nil())?;
+        let inner = allocator.new_pair(spend_list, NodePtr::NIL)?;
         let outer = allocator.new_pair(allocator.one(), inner)?;
         let interned = intern_tree_limited(allocator, outer, u32::MAX as usize)?;
         Ok(interned_vbytes(&interned) * cost_per_byte)
@@ -69,7 +69,7 @@ impl InternedBlockBuilder {
         if self.generator_cost + self.block_cost + MIN_COST_THRESHOLD
             > constants.max_block_cost_clvm
         {
-            self.num_skipped += 1;
+            // Block is full regardless of what bundle we try next.
             return Ok((false, BuildBlockResult::Done));
         }
 
@@ -167,9 +167,8 @@ impl InternedBlockBuilder {
     ) -> PyResult<(bool, bool)> {
         let bundles_vec: Vec<SpendBundle> = bundles
             .iter()
-            .map(|item| {
-                item.extract::<Bound<'_, SpendBundle>>()
-                    .map(|b| b.get().clone())
+            .map(|item| -> PyResult<SpendBundle> {
+                Ok(item.extract::<Bound<'_, SpendBundle>>()?.get().clone())
             })
             .collect::<PyResult<_>>()?;
         let (added, result) = self.add_spend_bundles(bundles_vec, cost, constants)?;
