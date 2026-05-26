@@ -1,4 +1,25 @@
-use crate::build_block_common::{BuildBlockResult, MIN_COST_THRESHOLD, skip_result};
+/// Maximum number of mempool items that can be skipped during block creation.
+const MAX_SKIPPED_ITEMS: u32 = 6;
+
+/// Typical cost of a standard XCH spend, used as a heuristic threshold.
+const MIN_COST_THRESHOLD: u64 = 6_000_000;
+
+/// Returned from `add_spend_bundles()`, indicating whether more bundles can be added.
+#[derive(PartialEq)]
+pub enum BuildBlockResult {
+    /// More spend bundles can be added
+    KeepGoing,
+    /// No more spend bundles can be added. We're too close to the limit
+    Done,
+}
+
+fn skip_result(num_skipped: u32) -> BuildBlockResult {
+    if num_skipped > MAX_SKIPPED_ITEMS {
+        BuildBlockResult::Done
+    } else {
+        BuildBlockResult::KeepGoing
+    }
+}
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
 use crate::generator_cost::interned_vbytes;
@@ -21,7 +42,7 @@ use pyo3::types::PyList;
 /// computed when the upper bound approaches the block limit or in `finalize()`.
 /// The 11-vbyte wrapper constant accounts for `(q . ((spend_list)))`.
 #[cfg_attr(feature = "py-bindings", pyclass)]
-pub struct InternedBlockBuilder {
+pub struct BlockBuilder2026 {
     allocator: Allocator,
     signature: Signature,
     spend_list: NodePtr,
@@ -33,7 +54,7 @@ pub struct InternedBlockBuilder {
     num_skipped: u32,
 }
 
-impl InternedBlockBuilder {
+impl BlockBuilder2026 {
     /// Wrapper constant: (q . ((spend_list))) adds 2 pairs plus the q atom
     /// and nil. Using 11 as a conservative upper bound (treats q and nil as
     /// not already present in the tree).
@@ -212,7 +233,7 @@ impl InternedBlockBuilder {
 
 #[cfg(feature = "py-bindings")]
 #[pymethods]
-impl InternedBlockBuilder {
+impl BlockBuilder2026 {
     #[new]
     pub fn py_new() -> PyResult<Self> {
         Ok(Self::new()?)
@@ -246,7 +267,7 @@ impl InternedBlockBuilder {
         &mut self,
         constants: &ConsensusConstants,
     ) -> PyResult<(Vec<u8>, Signature, u64)> {
-        let mut temp = InternedBlockBuilder::new()?;
+        let mut temp = BlockBuilder2026::new()?;
         std::mem::swap(self, &mut temp);
         let (generator, sig, cost) = temp.finalize(constants)?;
         Ok((generator, sig, cost))
@@ -275,7 +296,7 @@ mod tests {
     fn test_generator_cost_accuracy() {
         // Verify that the upper-bound estimate is always >= the exact cost,
         // and that finalize() returns the correct exact cost.
-        let mut builder = InternedBlockBuilder::new().expect("new builder");
+        let mut builder = BlockBuilder2026::new().expect("new builder");
 
         let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
         if !std::path::Path::new(file).exists() {
@@ -317,7 +338,7 @@ mod tests {
     #[test]
     fn test_basic_functionality() {
         // Test basic add and finalize flow
-        let builder = InternedBlockBuilder::new().expect("new builder");
+        let builder = BlockBuilder2026::new().expect("new builder");
 
         assert_eq!(builder.cost(), 20); // Initial cost: block_cost=20, cost_per_byte=0
 
@@ -412,7 +433,7 @@ mod tests {
                 bundles.shuffle(&mut rng);
 
                 let start = Instant::now();
-                let mut builder = InternedBlockBuilder::new().expect("InternedBlockBuilder");
+                let mut builder = BlockBuilder2026::new().expect("BlockBuilder2026");
                 let mut skipped = 0;
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
