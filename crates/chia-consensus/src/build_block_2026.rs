@@ -97,15 +97,21 @@ impl BlockBuilder2026 {
         atom_bytes + 2 * atom_count + 3 * pair_count
     }
 
-    /// Exact generator cost by interning spend_list directly.
-    /// The wrapper constant is added separately to avoid allocating wrapper nodes.
+    /// Exact generator cost, matching the validator exactly.
+    ///
+    /// Builds the `(q . ((spend_list)))` wrapper and interns from the root so
+    /// that shared atoms (q, nil) are deduplicated the same way the validator
+    /// does when it calls `intern_tree_limited` on the deserialized program.
+    /// The two wrapper nodes are dead after this call but harmless.
     fn exact_generator_cost(
-        allocator: &Allocator,
+        allocator: &mut Allocator,
         spend_list: NodePtr,
         cost_per_byte: u64,
     ) -> Result<u64> {
-        let interned = intern_tree_limited(allocator, spend_list, u32::MAX as usize)?;
-        Ok((interned_vbytes(&interned) + Self::WRAPPER_VBYTES) * cost_per_byte)
+        let inner = allocator.new_pair(spend_list, NodePtr::NIL)?;
+        let outer = allocator.new_pair(allocator.one(), inner)?;
+        let interned = intern_tree_limited(allocator, outer, u32::MAX as usize)?;
+        Ok(interned_vbytes(&interned) * cost_per_byte)
     }
 
     /// Add a batch of spend bundles. `cost` must be execution + conditions cost
@@ -181,8 +187,11 @@ impl BlockBuilder2026 {
         }
 
         // Slow path: upper bound exceeded — compute exact cost to see if it fits.
-        let exact_cost =
-            Self::exact_generator_cost(&self.allocator, local_spend_list, constants.cost_per_byte)?;
+        let exact_cost = Self::exact_generator_cost(
+            &mut self.allocator,
+            local_spend_list,
+            constants.cost_per_byte,
+        )?;
 
         if exact_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             // Doesn't fit even exactly. Restore state (allocator nodes are dead but harmless).
@@ -222,9 +231,9 @@ impl BlockBuilder2026 {
         let root = self.allocator.new_pair(self.allocator.one(), inner)?;
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
-        let exact_generator_cost =
-            Self::exact_generator_cost(&self.allocator, self.spend_list, constants.cost_per_byte)?;
-        let total_cost = exact_generator_cost + self.block_cost;
+        // Intern from root (same tree the validator sees) to get the exact cost.
+        let interned = intern_tree_limited(&self.allocator, root, u32::MAX as usize)?;
+        let total_cost = interned_vbytes(&interned) * constants.cost_per_byte + self.block_cost;
 
         assert!(total_cost <= constants.max_block_cost_clvm);
         Ok((serialized, self.signature, total_cost))
