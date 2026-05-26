@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn test_basic_functionality() {
         // Test basic add and finalize flow
-        let mut builder = InternedBlockBuilder::new().expect("new builder");
+        let builder = InternedBlockBuilder::new().expect("new builder");
 
         assert_eq!(builder.cost(), 20); // Initial cost (quote operation)
         assert_eq!(builder.generator_cost, 0);
@@ -379,9 +379,6 @@ mod tests {
                 for entry in &bundles {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
-
-                    // Verify cost accuracy before adding
-                    let cost_before = builder.cost();
 
                     let (added, result) = builder
                         .add_spend_bundles([bundle], *cost, &TEST_CONSTANTS)
