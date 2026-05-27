@@ -281,6 +281,11 @@ impl Streamable for ProofOfSpace {
         let pool_public_key = <Option<G1Element> as Streamable>::parse::<TRUSTED>(input)?;
 
         let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
+        // Only bits 0 and 1 are defined; reject non-canonical prefix bytes so
+        // that serialization round-trips and invalid blocks are rejected.
+        if prefix & !0b11 != 0 {
+            return Err(Error::InvalidPoS);
+        }
         let version = u8::from((prefix & 0b10) != 0);
         let pool_contract_puzzle_hash = if (prefix & 1) != 0 {
             Some(<Bytes32 as Streamable>::parse::<TRUSTED>(input)?)

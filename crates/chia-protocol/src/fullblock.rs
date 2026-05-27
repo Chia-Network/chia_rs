@@ -193,3 +193,21 @@ impl FullBlock {
         self.is_fully_compactified()
     }
 }
+
+#[cfg(test)]
+mod roundtrip_tests {
+    use super::*;
+    use chia_traits::Streamable;
+
+    #[test]
+    fn prefix_byte_non_canonical_is_rejected() {
+        // Regression: ProofOfSpace prefix byte with reserved bits set (e.g. 0x08)
+        // was silently accepted but re-serialized as 0x00, breaking roundtrip.
+        // Now it is rejected with InvalidPoS.
+        let data: &[u8] = include_bytes!("../fuzz/artifacts/fullblock_comparison/crash-ff93eae1cfd7c458f55a7fecdb2529f848f9d4b0");
+        assert!(
+            FullBlock::from_bytes(data).is_err(),
+            "should reject non-canonical ProofOfSpace prefix byte"
+        );
+    }
+}
