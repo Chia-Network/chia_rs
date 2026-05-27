@@ -355,7 +355,9 @@ mod tests {
 
         assert!(!generator.is_empty());
         assert_eq!(sig, Signature::default());
-        assert_eq!(cost, 20);
+        // Empty builder: block_cost=20 + generator cost of (q . ((nil))) wrapper
+        // = 11 vbytes * cost_per_byte + 20
+        assert_eq!(cost, 11 * TEST_CONSTANTS.cost_per_byte + 20);
     }
 
     #[ignore = "expensive test, only run in release mode (--include-ignored)"]
