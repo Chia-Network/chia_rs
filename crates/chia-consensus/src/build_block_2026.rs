@@ -471,14 +471,15 @@ mod tests {
                     }
                 }
 
-                let total_cost_before_finalize = builder.cost();
+                let upper_bound_cost = builder.cost();
                 let (generator, signature, cost) =
                     builder.finalize(&TEST_CONSTANTS).expect("finalize()");
 
-                // Verify finalize doesn't change the cost
-                assert_eq!(
-                    total_cost_before_finalize, cost,
-                    "finalize() should not recompute cost"
+                // cost() is an upper-bound estimate (no deduplication); finalize() returns
+                // the exact interned cost. The upper bound must be >= the exact cost.
+                assert!(
+                    upper_bound_cost >= cost,
+                    "upper bound {upper_bound_cost} must be >= exact cost {cost}"
                 );
 
                 println!(
