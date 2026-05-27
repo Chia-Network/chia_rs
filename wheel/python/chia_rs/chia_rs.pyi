@@ -1984,6 +1984,8 @@ class FullBlock:
     transactions_info: Optional[TransactionsInfo]
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: list[uint32]
+    transactions_generator_buffer: Optional[list[uint8]]
+    version: uint8
     prev_header_hash: bytes32
     header_hash: bytes32
     def is_transaction_block(self) -> bool: ...
@@ -2005,7 +2007,9 @@ class FullBlock:
         foliage_transaction_block: Optional[FoliageTransactionBlock],
         transactions_info: Optional[TransactionsInfo],
         transactions_generator: Optional[Program],
-        transactions_generator_ref_list: Sequence[uint32]
+        transactions_generator_ref_list: Sequence[uint32],
+        transactions_generator_buffer: Optional[Sequence[uint8]],
+        version: uint8
     ) -> Self: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2035,7 +2039,9 @@ class FullBlock:
         foliage_transaction_block: Union[ Optional[FoliageTransactionBlock], _Unspec] = _Unspec(),
         transactions_info: Union[ Optional[TransactionsInfo], _Unspec] = _Unspec(),
         transactions_generator: Union[ Optional[Program], _Unspec] = _Unspec(),
-        transactions_generator_ref_list: Union[ list[uint32], _Unspec] = _Unspec()) -> FullBlock: ...
+        transactions_generator_ref_list: Union[ list[uint32], _Unspec] = _Unspec(),
+        transactions_generator_buffer: Union[ Optional[list[uint8]], _Unspec] = _Unspec(),
+        version: Union[ uint8, _Unspec] = _Unspec()) -> FullBlock: ...
 
 @final
 class HeaderBlock:
