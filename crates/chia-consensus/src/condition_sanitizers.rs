@@ -8,7 +8,7 @@ pub fn sanitize_hash(
     size: usize,
     code: ErrorCode,
 ) -> Result<NodePtr, ValidationErr> {
-    let buf = atom(a, n, code)?;
+    let buf = atom(a, n, ValidationErr::Err(code))?;
 
     if buf.as_ref().len() == size {
         Ok(n)
@@ -19,7 +19,7 @@ pub fn sanitize_hash(
 
 pub fn parse_amount(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<u64, ValidationErr> {
     // amounts are not allowed to exceed 2^64. i.e. 8 bytes
-    match sanitize_uint(a, n, 8, code)? {
+    match sanitize_uint(a, n, 8, ValidationErr::Err(code))? {
         SanitizedUint::NegativeOverflow | SanitizedUint::PositiveOverflow => {
             Err(ValidationErr::Err(code))
         }
@@ -32,7 +32,7 @@ pub fn sanitize_announce_msg(
     n: NodePtr,
     code: ErrorCode,
 ) -> Result<NodePtr, ValidationErr> {
-    let buf = atom(a, n, code)?;
+    let buf = atom(a, n, ValidationErr::Err(code))?;
 
     if buf.as_ref().len() > 1024 {
         Err(ValidationErr::Err(code))

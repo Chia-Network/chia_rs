@@ -8,7 +8,12 @@ use clvmr::allocator::Allocator;
 fuzz_target!(|data: &[u8]| {
     let mut a = Allocator::new();
     let atom = a.new_atom(data).unwrap();
-    match sanitize_uint(&a, atom, 8, ErrorCode::InvalidCoinAmount) {
+    match sanitize_uint(
+        &a,
+        atom,
+        8,
+        ValidationErr::Err(ErrorCode::InvalidCoinAmount),
+    ) {
         Ok(SanitizedUint::Ok(_)) => {
             assert!(data.len() <= 9);
             if data.len() == 9 {
@@ -29,7 +34,12 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    match sanitize_uint(&a, atom, 4, ErrorCode::InvalidCoinAmount) {
+    match sanitize_uint(
+        &a,
+        atom,
+        4,
+        ValidationErr::Err(ErrorCode::InvalidCoinAmount),
+    ) {
         Ok(SanitizedUint::Ok(_)) => {
             assert!(data.len() <= 5);
             if data.len() == 5 {

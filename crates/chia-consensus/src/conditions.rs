@@ -412,7 +412,12 @@ pub fn parse_args(
             let puzzle_hash = sanitize_hash(a, first(a, c)?, 32, ErrorCode::InvalidPuzzleHash)?;
             c = rest(a, c)?;
             let node = first(a, c)?;
-            let amount = match sanitize_uint(a, node, 8, ErrorCode::InvalidCoinAmount)? {
+            let amount = match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::InvalidCoinAmount),
+            )? {
                 SanitizedUint::PositiveOverflow => {
                     return Err(ValidationErr::Err(ErrorCode::CoinAmountExceedsMaximum));
                 }
@@ -455,7 +460,12 @@ pub fn parse_args(
                 // are all unknown
                 Err(ValidationErr::Err(ErrorCode::InvalidConditionOpcode))
             } else {
-                match sanitize_uint(a, first(a, c)?, 4, ErrorCode::InvalidSoftforkCost)? {
+                match sanitize_uint(
+                    a,
+                    first(a, c)?,
+                    4,
+                    ValidationErr::Err(ErrorCode::InvalidSoftforkCost),
+                )? {
                     // the first argument represents the cost of the condition.
                     // We scale it by 10000 to make the argument be a bit smaller
                     SanitizedUint::Ok(cost) => Ok(Condition::Softfork(cost * 10000)),
@@ -536,7 +546,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthSecondsFailed;
-            match sanitize_uint(a, node, 8, code)? {
+            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
                     Err(ValidationErr::Err(code))
                 }
@@ -547,7 +557,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertMyBirthHeightFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
                     Err(ValidationErr::Err(code))
                 }
@@ -565,7 +575,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertSecondsRelativeFailed;
-            match sanitize_uint(a, node, 8, code)? {
+            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsRelative(r)),
@@ -575,7 +585,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertSecondsAbsoluteFailed;
-            match sanitize_uint(a, node, 8, code)? {
+            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsAbsolute(r)),
@@ -585,7 +595,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertHeightRelativeFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightRelative(r as u32)),
@@ -595,7 +605,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertHeightAbsoluteFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightAbsolute(r as u32)),
@@ -605,7 +615,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeSecondsRelativeFailed;
-            match sanitize_uint(a, node, 8, code)? {
+            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsRelative(r)),
@@ -616,7 +626,7 @@ pub fn parse_args(
 
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeSecondsAbsoluteFailed;
-            match sanitize_uint(a, node, 8, code)? {
+            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsAbsolute(r)),
@@ -626,7 +636,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeHeightRelativeFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightRelative(r as u32)),
@@ -636,7 +646,7 @@ pub fn parse_args(
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
             let code = ErrorCode::AssertBeforeHeightAbsoluteFailed;
-            match sanitize_uint(a, node, 4, code)? {
+            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
                 SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightAbsolute(r as u32)),
