@@ -545,10 +545,14 @@ pub fn parse_args(
         ASSERT_MY_BIRTH_SECONDS => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertMyBirthSecondsFailed;
-            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::AssertMyBirthSecondsFailed),
+            )? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
-                    Err(ValidationErr::Err(code))
+                    Err(ValidationErr::Err(ErrorCode::AssertMyBirthSecondsFailed))
                 }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthSeconds(r)),
             }
@@ -556,10 +560,14 @@ pub fn parse_args(
         ASSERT_MY_BIRTH_HEIGHT => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertMyBirthHeightFailed;
-            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                4,
+                ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed),
+            )? {
                 SanitizedUint::PositiveOverflow | SanitizedUint::NegativeOverflow => {
-                    Err(ValidationErr::Err(code))
+                    Err(ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed))
                 }
                 SanitizedUint::Ok(r) => Ok(Condition::AssertMyBirthHeight(r as u32)),
             }
@@ -574,9 +582,15 @@ pub fn parse_args(
         ASSERT_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsRelativeFailed;
-            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
+            match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed),
+            )? {
+                SanitizedUint::PositiveOverflow => {
+                    Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed))
+                }
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsRelative(r)),
             }
@@ -584,9 +598,15 @@ pub fn parse_args(
         ASSERT_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertSecondsAbsoluteFailed;
-            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
+            match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::AssertSecondsAbsoluteFailed),
+            )? {
+                SanitizedUint::PositiveOverflow => {
+                    Err(ValidationErr::Err(ErrorCode::AssertSecondsAbsoluteFailed))
+                }
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertSecondsAbsolute(r)),
             }
@@ -594,9 +614,15 @@ pub fn parse_args(
         ASSERT_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightRelativeFailed;
-            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
+            match sanitize_uint(
+                a,
+                node,
+                4,
+                ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed),
+            )? {
+                SanitizedUint::PositiveOverflow => {
+                    Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed))
+                }
                 SanitizedUint::NegativeOverflow => Ok(Condition::SkipRelativeCondition),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightRelative(r as u32)),
             }
@@ -604,9 +630,15 @@ pub fn parse_args(
         ASSERT_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertHeightAbsoluteFailed;
-            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
-                SanitizedUint::PositiveOverflow => Err(ValidationErr::Err(code)),
+            match sanitize_uint(
+                a,
+                node,
+                4,
+                ValidationErr::Err(ErrorCode::AssertHeightAbsoluteFailed),
+            )? {
+                SanitizedUint::PositiveOverflow => {
+                    Err(ValidationErr::Err(ErrorCode::AssertHeightAbsoluteFailed))
+                }
                 SanitizedUint::NegativeOverflow => Ok(Condition::Skip),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertHeightAbsolute(r as u32)),
             }
@@ -614,41 +646,64 @@ pub fn parse_args(
         ASSERT_BEFORE_SECONDS_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsRelativeFailed;
-            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+            )? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
+                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeSecondsRelativeFailed,
+                )),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsRelative(r)),
             }
         }
         ASSERT_BEFORE_SECONDS_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
-
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeSecondsAbsoluteFailed;
-            match sanitize_uint(a, node, 8, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                8,
+                ValidationErr::Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed),
+            )? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
+                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeSecondsAbsoluteFailed,
+                )),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeSecondsAbsolute(r)),
             }
         }
         ASSERT_BEFORE_HEIGHT_RELATIVE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightRelativeFailed;
-            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                4,
+                ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+            )? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::SkipRelativeCondition),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
+                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeHeightRelativeFailed,
+                )),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightRelative(r as u32)),
             }
         }
         ASSERT_BEFORE_HEIGHT_ABSOLUTE => {
             maybe_check_args_terminator(a, c, flags)?;
             let node = first(a, c)?;
-            let code = ErrorCode::AssertBeforeHeightAbsoluteFailed;
-            match sanitize_uint(a, node, 4, ValidationErr::Err(code))? {
+            match sanitize_uint(
+                a,
+                node,
+                4,
+                ValidationErr::Err(ErrorCode::AssertBeforeHeightAbsoluteFailed),
+            )? {
                 SanitizedUint::PositiveOverflow => Ok(Condition::Skip),
-                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(code)),
+                SanitizedUint::NegativeOverflow => Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeHeightAbsoluteFailed,
+                )),
                 SanitizedUint::Ok(r) => Ok(Condition::AssertBeforeHeightAbsolute(r as u32)),
             }
         }
