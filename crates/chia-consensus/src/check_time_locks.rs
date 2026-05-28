@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::owned_conditions::OwnedSpendBundleConditions;
-use crate::validation_error::ErrorCode;
+use crate::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::Bytes32;
 use chia_protocol::CoinRecord;
 #[cfg(feature = "py-bindings")]
@@ -15,37 +15,41 @@ pub fn check_time_locks(
     prev_transaction_block_height: u32,
     timestamp: u64,
     nowrap: bool,
-) -> Result<(), ErrorCode> {
+) -> Result<(), ValidationErr> {
     if prev_transaction_block_height < bundle_conds.height_absolute {
-        return Err(ErrorCode::AssertHeightAbsoluteFailed);
+        return Err(ValidationErr::Err(ErrorCode::AssertHeightAbsoluteFailed));
     }
     if timestamp < bundle_conds.seconds_absolute {
-        return Err(ErrorCode::AssertSecondsAbsoluteFailed);
+        return Err(ValidationErr::Err(ErrorCode::AssertSecondsAbsoluteFailed));
     }
     if let Some(before_height_absolute) = bundle_conds.before_height_absolute {
         if prev_transaction_block_height >= before_height_absolute {
-            return Err(ErrorCode::AssertBeforeHeightAbsoluteFailed);
+            return Err(ValidationErr::Err(
+                ErrorCode::AssertBeforeHeightAbsoluteFailed,
+            ));
         }
     }
     if let Some(before_seconds_absolute) = bundle_conds.before_seconds_absolute {
         if timestamp >= before_seconds_absolute {
-            return Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed);
+            return Err(ValidationErr::Err(
+                ErrorCode::AssertBeforeSecondsAbsoluteFailed,
+            ));
         }
     }
 
     for spend in &bundle_conds.spends {
         let Some(unspent) = removal_coin_records.get(&Bytes32::from(spend.coin_id)) else {
-            return Err(ErrorCode::InvalidCoinId);
+            return Err(ValidationErr::Err(ErrorCode::InvalidCoinId));
         };
 
         if let Some(birth_height) = spend.birth_height {
             if birth_height != unspent.confirmed_block_index {
-                return Err(ErrorCode::AssertMyBirthHeightFailed);
+                return Err(ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed));
             }
         }
         if let Some(birth_seconds) = spend.birth_seconds {
             if birth_seconds != unspent.timestamp {
-                return Err(ErrorCode::AssertMyBirthSecondsFailed);
+                return Err(ValidationErr::Err(ErrorCode::AssertMyBirthSecondsFailed));
             }
         }
         if let Some(height_relative) = spend.height_relative {
@@ -55,21 +59,21 @@ pub fn check_time_locks(
                         .confirmed_block_index
                         .saturating_add(height_relative)
                 {
-                    return Err(ErrorCode::AssertHeightRelativeFailed);
+                    return Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed));
                 }
             } else if prev_transaction_block_height
                 < unspent.confirmed_block_index.wrapping_add(height_relative)
             {
-                return Err(ErrorCode::AssertHeightRelativeFailed);
+                return Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed));
             }
         }
         if let Some(seconds_relative) = spend.seconds_relative {
             if nowrap {
                 if timestamp < unspent.timestamp.saturating_add(seconds_relative) {
-                    return Err(ErrorCode::AssertSecondsRelativeFailed);
+                    return Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed));
                 }
             } else if timestamp < unspent.timestamp.wrapping_add(seconds_relative) {
-                return Err(ErrorCode::AssertSecondsRelativeFailed);
+                return Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed));
             }
         }
         if let Some(before_height_relative) = spend.before_height_relative {
@@ -79,23 +83,31 @@ pub fn check_time_locks(
                         .confirmed_block_index
                         .saturating_add(before_height_relative)
                 {
-                    return Err(ErrorCode::AssertBeforeHeightRelativeFailed);
+                    return Err(ValidationErr::Err(
+                        ErrorCode::AssertBeforeHeightRelativeFailed,
+                    ));
                 }
             } else if prev_transaction_block_height
                 >= unspent
                     .confirmed_block_index
                     .wrapping_add(before_height_relative)
             {
-                return Err(ErrorCode::AssertBeforeHeightRelativeFailed);
+                return Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeHeightRelativeFailed,
+                ));
             }
         }
         if let Some(before_seconds_relative) = spend.before_seconds_relative {
             if nowrap {
                 if timestamp >= unspent.timestamp.saturating_add(before_seconds_relative) {
-                    return Err(ErrorCode::AssertBeforeSecondsRelativeFailed);
+                    return Err(ValidationErr::Err(
+                        ErrorCode::AssertBeforeSecondsRelativeFailed,
+                    ));
                 }
             } else if timestamp >= unspent.timestamp.wrapping_add(before_seconds_relative) {
-                return Err(ErrorCode::AssertBeforeSecondsRelativeFailed);
+                return Err(ValidationErr::Err(
+                    ErrorCode::AssertBeforeSecondsRelativeFailed,
+                ));
             }
         }
     }
@@ -124,7 +136,7 @@ pub fn py_check_time_locks(
 
     match res {
         Ok(()) => Ok(None),
-        Err(ec) => Ok(Some(ec.into())),
+        Err(ec) => Ok(Some(ec.error_code().into())),
     }
 }
 
@@ -132,6 +144,7 @@ pub fn py_check_time_locks(
 mod tests {
     use super::*;
     use crate::owned_conditions::OwnedSpendConditions;
+    use crate::validation_error::ValidationErr;
     use chia_protocol::Coin;
     use rstest::rstest;
     use std::collections::HashMap;
@@ -155,7 +168,7 @@ mod tests {
         OwnedSpendBundleConditions { height_absolute: 11, ..Default::default() },
         10,
         0,
-        Err(ErrorCode::AssertHeightAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertHeightAbsoluteFailed))
     )]
     #[case::height_absolute_exact(
         OwnedSpendBundleConditions { height_absolute: 10, ..Default::default() },
@@ -173,7 +186,7 @@ mod tests {
         OwnedSpendBundleConditions { seconds_absolute: 1001, ..Default::default() },
         0,
         1000,
-        Err(ErrorCode::AssertSecondsAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertSecondsAbsoluteFailed))
     )]
     #[case::seconds_absolute_exact(
         OwnedSpendBundleConditions { seconds_absolute: 1000, ..Default::default() },
@@ -197,13 +210,13 @@ mod tests {
         OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
         10,
         0,
-        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightAbsoluteFailed))
     )]
     #[case::before_height_absolute_over(
         OwnedSpendBundleConditions { before_height_absolute: Some(10), ..Default::default() },
         11,
         0,
-        Err(ErrorCode::AssertBeforeHeightAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightAbsoluteFailed))
     )]
     #[case::before_seconds_absolute_under(
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
@@ -215,19 +228,19 @@ mod tests {
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
         0,
         1000,
-        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed))
     )]
     #[case::before_seconds_absolute_over(
         OwnedSpendBundleConditions { before_seconds_absolute: Some(1000), ..Default::default() },
         0,
         1001,
-        Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed)
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsAbsoluteFailed))
     )]
     fn test_absolute_constraints(
         #[case] bundle: OwnedSpendBundleConditions,
         #[case] prev_height: u32,
         #[case] timestamp: u64,
-        #[case] expected: Result<(), ErrorCode>,
+        #[case] expected: Result<(), ValidationErr>,
         #[values(true, false)] nowrap: bool,
     ) {
         let result = check_time_locks(&HashMap::new(), &bundle, prev_height, timestamp, nowrap);
@@ -245,8 +258,8 @@ mod tests {
     // 200 < 100 + 101 = 201 -> Err (both agree, no overflow)
     #[case::height_relative_under(
         Osc { height_relative: Some(101), ..Default::default() },
-        Err(ErrorCode::AssertHeightRelativeFailed),
-        Err(ErrorCode::AssertHeightRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed)),
     )]
     // 200 < 100 + 100 = 200 -> Ok (both agree, no overflow)
     #[case::height_relative_exact(
@@ -263,15 +276,15 @@ mod tests {
     // 200 < 100 + u32::MAX -> Err with nowrap (saturates), Ok without (wraps)
     #[case::height_relative_wrap(
         Osc { height_relative: Some(0xffff_ffff), ..Default::default() },
-        Err(ErrorCode::AssertHeightRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed)),
         Ok(()),
     )]
     // seconds_relative check: timestamp < coin_time + seconds_relative -> Err
     // 2000 < 1000 + 1001 = 2001 -> Err (both agree, no overflow)
     #[case::seconds_relative_under(
         Osc { seconds_relative: Some(1001), ..Default::default() },
-        Err(ErrorCode::AssertSecondsRelativeFailed),
-        Err(ErrorCode::AssertSecondsRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed)),
     )]
     // 2000 < 1000 + 1000 = 2000 -> Ok (both agree, no overflow)
     #[case::seconds_relative_exact(
@@ -288,7 +301,7 @@ mod tests {
     // 2000 < 1000 + u64::MAX -> Err with nowrap (saturates), Ok without (wraps)
     #[case::seconds_relative_wrap(
         Osc { seconds_relative: Some(0xffff_ffff_ffff_ffff), ..Default::default() },
-        Err(ErrorCode::AssertSecondsRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertSecondsRelativeFailed)),
         Ok(()),
     )]
     // before_height_relative check: prev_height >= confirmed + before_height_relative -> Err
@@ -301,20 +314,20 @@ mod tests {
     // 200 >= 100 + 100 = 200 -> Err (both agree, no overflow)
     #[case::before_height_relative_exact(
         Osc { before_height_relative: Some(100), ..Default::default() },
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed)),
     )]
     // 200 >= 100 + 99 = 199 -> Err (both agree, no overflow)
     #[case::before_height_relative_over(
         Osc { before_height_relative: Some(99), ..Default::default() },
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed)),
     )]
     // 200 >= 100 + 0xffff_ffff -> Ok with nowrap (saturates), Err without (wraps)
     #[case::before_height_relative_wrap(
         Osc { before_height_relative: Some(0xffff_ffff), ..Default::default() },
         Ok(()),
-        Err(ErrorCode::AssertBeforeHeightRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeHeightRelativeFailed)),
     )]
     // before_seconds_relative check: timestamp >= coin_time + before_seconds_relative -> Err
     // 2000 >= 1000 + 1001 = 2001 -> Ok (both agree, no overflow)
@@ -326,25 +339,25 @@ mod tests {
     // 2000 >= 1000 + 1000 = 2000 -> Err (both agree, no overflow)
     #[case::before_seconds_relative_exact(
         Osc { before_seconds_relative: Some(1000), ..Default::default() },
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed)),
     )]
     // 2000 >= 1000 + 999 = 1999 -> Err (both agree, no overflow)
     #[case::before_seconds_relative_over(
         Osc { before_seconds_relative: Some(999), ..Default::default() },
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed)),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed)),
     )]
     // 2000 >= 1000 + u64::MAX -> Ok with nowrap (saturates), Err without (wraps)
     #[case::before_seconds_relative_wrap(
         Osc { before_seconds_relative: Some(0xffff_ffff_ffff_ffff), ..Default::default() },
         Ok(()),
-        Err(ErrorCode::AssertBeforeSecondsRelativeFailed),
+        Err(ValidationErr::Err(ErrorCode::AssertBeforeSecondsRelativeFailed)),
     )]
     fn test_relative_constraints(
         #[case] spend: OwnedSpendConditions,
-        #[case] expected_nowrap: Result<(), ErrorCode>,
-        #[case] expected_no_nowrap: Result<(), ErrorCode>,
+        #[case] expected_nowrap: Result<(), ValidationErr>,
+        #[case] expected_no_nowrap: Result<(), ValidationErr>,
         #[values(true, false)] nowrap: bool,
     ) {
         let expected = if nowrap {
@@ -369,7 +382,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result: Result<(), ErrorCode> =
+        let result: Result<(), ValidationErr> =
             check_time_locks(&map, &bundle, now_height, now_timestamp, nowrap);
         assert_eq!(result, expected);
     }
@@ -386,7 +399,7 @@ mod tests {
             ..Default::default()
         };
         let result = check_time_locks(&HashMap::new(), &bundle, 0, 0, nowrap);
-        assert_eq!(result, Err(ErrorCode::InvalidCoinId));
+        assert_eq!(result, Err(ValidationErr::Err(ErrorCode::InvalidCoinId)));
     }
 
     #[rstest]
@@ -440,7 +453,10 @@ mod tests {
         };
 
         let result = check_time_locks(&map, &bundle, 100, 1000, nowrap);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed))
+        );
     }
 
     #[rstest]
@@ -464,7 +480,10 @@ mod tests {
         };
 
         let result = check_time_locks(&map, &bundle, 100, 1000, nowrap);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthSecondsFailed));
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(ErrorCode::AssertMyBirthSecondsFailed))
+        );
     }
 
     #[rstest]
@@ -515,7 +534,10 @@ mod tests {
 
         // spend_relative_fail should fail first as 59 is below required 61 height
         let result = check_time_locks(&map, &bundle, 59, 600, nowrap);
-        assert_eq!(result, Err(ErrorCode::AssertHeightRelativeFailed));
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(ErrorCode::AssertHeightRelativeFailed))
+        );
 
         let mut map = HashMap::new();
         map.insert(coin_id_1, coin_record_1);
@@ -528,6 +550,9 @@ mod tests {
 
         // spend_birth_fail should now fail
         let result = check_time_locks(&map, &bundle, 59, 600, nowrap);
-        assert_eq!(result, Err(ErrorCode::AssertMyBirthHeightFailed));
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed))
+        );
     }
 }
