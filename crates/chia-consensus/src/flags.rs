@@ -28,6 +28,7 @@ bitflags! {
         const ENABLE_SHA256_TREE = 0x0400;
         const ENABLE_SECP_OPS = 0x0800;
         const MALACHITE = 0x1000;
+        const NEW_COST_MODEL = 0x2000;
 
         // Consensus flags
         /// Skip validating AGG_SIG / condition signatures.
@@ -98,6 +99,9 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::MALACHITE) {
             out = out.union(ConsensusFlags::MALACHITE);
         }
+        if clvm.contains(ClvmFlags::NEW_COST_MODEL) {
+            out = out.union(ConsensusFlags::NEW_COST_MODEL);
+        }
         out
     }
 
@@ -138,6 +142,9 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::MALACHITE) {
             out.insert(ClvmFlags::MALACHITE);
+        }
+        if self.contains(ConsensusFlags::NEW_COST_MODEL) {
+            out.insert(ClvmFlags::NEW_COST_MODEL);
         }
         out
     }

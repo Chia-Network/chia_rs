@@ -87,6 +87,7 @@ pub fn get_flags_for_height_and_constants(
         flags |= ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
+            | ConsensusFlags::NEW_COST_MODEL
             | ConsensusFlags::RELAXED_BLS;
     }
 
