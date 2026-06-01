@@ -11,10 +11,13 @@ use pyo3::prelude::*;
 #[cfg(feature = "py-bindings")]
 use pyo3::types::PyList;
 
-/// Maximum number of mempool items that can be skipped during block creation.
+/// Maximum number of mempool items that can be skipped (not considered) during
+/// the creation of a block bundle. An item is skipped if it won't fit in the
+/// block we're trying to create.
 const MAX_SKIPPED_ITEMS: u32 = 6;
 
-/// Typical cost of a standard XCH spend, used as a heuristic threshold.
+/// Typical cost of a standard XCH spend. It's used as a heuristic to help
+/// determine how close to the block size limit we're willing to go.
 const MIN_COST_THRESHOLD: u64 = 6_000_000;
 
 /// Returned from add_spend_bundle(), indicating whether more bundles can be
@@ -25,14 +28,6 @@ pub enum BuildBlockResult {
     KeepGoing,
     /// No more spend bundles can be added. We're too close to the limit
     Done,
-}
-
-fn skip_result(num_skipped: u32) -> BuildBlockResult {
-    if num_skipped > MAX_SKIPPED_ITEMS {
-        BuildBlockResult::Done
-    } else {
-        BuildBlockResult::KeepGoing
-    }
 }
 
 /// This takes a list of spends, highest priority first, and returns a
@@ -62,6 +57,14 @@ pub struct BlockBuilder {
 
     // the serializer for the generator CLVM
     ser: Serializer,
+}
+
+fn result(num_skipped: u32) -> BuildBlockResult {
+    if num_skipped > MAX_SKIPPED_ITEMS {
+        BuildBlockResult::Done
+    } else {
+        BuildBlockResult::KeepGoing
+    }
 }
 
 impl BlockBuilder {
@@ -123,7 +126,7 @@ impl BlockBuilder {
 
         if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
-            return Ok((false, skip_result(self.num_skipped)));
+            return Ok((false, result(self.num_skipped)));
         }
 
         let a = &mut self.allocator;
@@ -164,7 +167,7 @@ impl BlockBuilder {
             self.ser.restore(state);
             self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
             self.num_skipped += 1;
-            return Ok((false, skip_result(self.num_skipped)));
+            return Ok((false, result(self.num_skipped)));
         }
         self.block_cost += cost;
         self.signature.aggregate(&cumulative_signature);
