@@ -103,9 +103,9 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let class_attrs = if is_subclass {
-        quote!(frozen, subclass)
+        quote!(subclass)
     } else {
-        quote!(frozen)
+        quote!()
     };
 
     // If you're calling the macro from `chia-protocol`, enable Python bindings and arbitrary conditionally.

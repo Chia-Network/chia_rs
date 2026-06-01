@@ -94,6 +94,9 @@ class {name}:{"".join(map(add_indent, members))}
 """
         )
 
+    file.write(f"""    def truncate(self, field: str, length: int) -> None: ...
+""")
+
 
 primitives = {
     "Bytes32": "bytes32",

@@ -16,6 +16,15 @@ fn maybe_upper_fields(py_uppercase: bool, fnames: Vec<Ident>) -> Vec<Ident> {
     }
 }
 
+fn is_vec_type(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            return segment.ident == "Vec";
+        }
+    }
+    false
+}
+
 #[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
@@ -173,6 +182,41 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     }
                 });
             }
+
+            let vec_fnames: Vec<_> = fnames
+                .iter()
+                .zip(ftypes.iter())
+                .filter(|(_, ty)| is_vec_type(ty))
+                .map(|(name, _)| name.clone())
+                .collect();
+
+            let vec_fnames_maybe_upper = maybe_upper_fields(py_uppercase, vec_fnames.clone());
+
+            if vec_fnames.is_empty() {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn truncate(&mut self, field: &str, length: usize) -> pyo3::PyResult<()> {
+                            Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown or non-list field {field}")))
+                        }
+                    }
+                });
+            } else {
+                py_protocol.extend(quote! {
+                    #[pyo3::pymethods]
+                    impl #ident {
+                        fn truncate(&mut self, field: &str, length: usize) -> pyo3::PyResult<()> {
+                            match field {
+                                #(stringify!(#vec_fnames_maybe_upper) => {
+                                    self.#vec_fnames.truncate(length);
+                                }),*
+                                _ => { return Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown or non-list field {field}"))); }
+                            }
+                            Ok(())
+                        }
+                    }
+                });
+            }
         }
         syn::Fields::Unnamed(FieldsUnnamed { .. }) => {
             py_protocol.extend(quote! {
@@ -180,6 +224,10 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 impl #ident {
                     fn __repr__(&self) -> pyo3::PyResult<String> {
                         Ok(format!("{self:?}"))
+                    }
+
+                    fn truncate(&mut self, field: &str, length: usize) -> pyo3::PyResult<()> {
+                        Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown or non-list field {field}")))
                     }
                 }
             });
