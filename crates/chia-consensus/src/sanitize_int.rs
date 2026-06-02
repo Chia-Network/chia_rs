@@ -1,5 +1,5 @@
-use super::validation_error::{ErrorCode, ValidationErr, atom};
-use clvmr::allocator::{Allocator, NodePtr};
+use super::validation_error::ValidationErr;
+use clvmr::allocator::{Allocator, NodePtr, SExp};
 
 use clvmr::op_utils::u64_from_bytes;
 
@@ -14,11 +14,14 @@ pub fn sanitize_uint(
     a: &Allocator,
     n: NodePtr,
     max_size: usize,
-    code: ErrorCode,
+    code: ValidationErr,
 ) -> Result<SanitizedUint, ValidationErr> {
     assert!(max_size <= 8);
 
-    let buf = atom(a, n, code)?;
+    let buf = match a.sexp(n) {
+        SExp::Atom => a.atom(n),
+        SExp::Pair(..) => return Err(code),
+    };
     let buf = buf.as_ref();
 
     if buf.is_empty() {
@@ -34,7 +37,7 @@ pub fn sanitize_uint(
     // be interpreted as a negative integer. i.e. if the next top bit is set
     // all other leading zeros are invalid
     if buf == [0_u8] || (buf.len() > 1 && buf[0] == 0 && (buf[1] & 0x80) == 0) {
-        return Err(ValidationErr::Err(code));
+        return Err(code);
     }
 
     // strip the leading zero byte if there is one
@@ -50,6 +53,7 @@ pub fn sanitize_uint(
 
 #[test]
 fn test_sanitize_uint() {
+    use super::validation_error::ErrorCode;
     let mut a = Allocator::new();
 
     // start with one big buffer.
@@ -70,12 +74,15 @@ fn test_sanitize_uint() {
     let e = ErrorCode::InvalidCoinAmount;
     let no_leading_zero = a.new_substr(atom, 0, 8).unwrap();
     // this is a negative number, not allowed
-    assert!(sanitize_uint(&a, no_leading_zero, 8, e) == Ok(SanitizedUint::NegativeOverflow));
+    assert!(
+        sanitize_uint(&a, no_leading_zero, 8, ValidationErr::Err(e))
+            == Ok(SanitizedUint::NegativeOverflow)
+    );
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
     // a zero value must be represented by an empty atom
     assert_eq!(
-        sanitize_uint(&a, just_zeros, 8, e)
+        sanitize_uint(&a, just_zeros, 8, ValidationErr::Err(e))
             .unwrap_err()
             .error_code(),
         ErrorCode::InvalidCoinAmount
@@ -83,26 +90,32 @@ fn test_sanitize_uint() {
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().error_code(),
+        sanitize_uint(&a, a1, 8, ValidationErr::Err(e))
+            .unwrap_err()
+            .error_code(),
         ErrorCode::InvalidCoinAmount
     );
 
     let a1 = a.new_substr(atom, 1, 101).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().error_code(),
+        sanitize_uint(&a, a1, 8, ValidationErr::Err(e))
+            .unwrap_err()
+            .error_code(),
         ErrorCode::InvalidCoinAmount
     );
 
     // a new all-zeros range
     let a1 = a.new_substr(atom, 1000, 1024).unwrap();
     assert_eq!(
-        sanitize_uint(&a, a1, 8, e).unwrap_err().error_code(),
+        sanitize_uint(&a, a1, 8, ValidationErr::Err(e))
+            .unwrap_err()
+            .error_code(),
         ErrorCode::InvalidCoinAmount
     );
 
     let exceed_maximum = a.new_substr(atom, 100, 110).unwrap();
     assert_eq!(
-        sanitize_uint(&a, exceed_maximum, 8, e),
+        sanitize_uint(&a, exceed_maximum, 8, ValidationErr::Err(e)),
         Ok(SanitizedUint::PositiveOverflow)
     );
 }

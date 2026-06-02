@@ -91,7 +91,11 @@ where
         while let Some((mut c, next)) = next(&a, iter)? {
             iter = next;
             let op = first(&a, c)?;
-            let Ok(op) = atom(&a, op, ErrorCode::InvalidConditionOpcode) else {
+            let Ok(op) = atom(
+                &a,
+                op,
+                ValidationErr::Err(ErrorCode::InvalidConditionOpcode),
+            ) else {
                 // unknown opcodes (including pairs) are simply ingnored in
                 // consensus mode
                 continue;

@@ -405,15 +405,18 @@ pub fn next(a: &Allocator, n: NodePtr) -> Result<Option<(NodePtr, NodePtr)>, Val
     }
 }
 
-pub fn atom(a: &Allocator, n: NodePtr, code: ErrorCode) -> Result<Atom<'_>, ValidationErr> {
+pub fn atom(a: &Allocator, n: NodePtr, code: ValidationErr) -> Result<Atom<'_>, ValidationErr> {
     match a.sexp(n) {
         SExp::Atom => Ok(a.atom(n)),
-        SExp::Pair(..) => Err(ValidationErr::Err(code)),
+        SExp::Pair(..) => Err(code),
     }
 }
 
 pub fn check_nil(a: &Allocator, n: NodePtr) -> Result<(), ValidationErr> {
-    if atom(a, n, ErrorCode::InvalidCondition)?.as_ref().is_empty() {
+    if atom(a, n, ValidationErr::Err(ErrorCode::InvalidCondition))?
+        .as_ref()
+        .is_empty()
+    {
         Ok(())
     } else {
         Err(ValidationErr::Err(ErrorCode::InvalidCondition))
