@@ -67,8 +67,9 @@ pub struct InternedBlockBuilder {
     // large, we give up
     num_skipped: u32,
 
-    // cost_per_byte from consensus constants, set at construction
+    // from consensus constants, set at construction
     cost_per_byte: u64,
+    max_block_cost: u64,
 }
 
 fn result(num_skipped: u32) -> BuildBlockResult {
@@ -80,27 +81,27 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 }
 
 impl InternedBlockBuilder {
-    pub fn new(cost_per_byte: u64) -> Result<Self> {
+    fn new_with(cost_per_byte: u64, max_block_cost: u64) -> Result<Self> {
         let a = Allocator::new();
-
-        // the generator we produce is just a quoted list. Nothing fancy.
-        // Its format is as follows:
-        // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
-
-        // spends are prepended to this list as they are added
         let spend_list = a.nil();
-
         Ok(Self {
             allocator: a,
             signature: Signature::default(),
             spend_list,
-            // This is the cost of executing a quote. we quote the list of
-            // spends
             block_cost: 20,
             byte_cost_ub: 0,
             num_skipped: 0,
             cost_per_byte,
+            max_block_cost,
         })
+    }
+
+    pub fn new(constants: &ConsensusConstants) -> Result<Self> {
+        // the generator we produce is just a quoted list. Nothing fancy.
+        // Its format is as follows:
+        // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
+
+        Self::new_with(constants.cost_per_byte, constants.max_block_cost_clvm)
     }
 
     /// Compute the interned vbyte cost of a single spend in isolation.
@@ -139,7 +140,6 @@ impl InternedBlockBuilder {
         &mut self,
         bundles: T,
         cost: u64,
-        constants: &ConsensusConstants,
     ) -> Result<(bool, BuildBlockResult)>
     where
         T: IntoIterator<Item = S>,
@@ -150,14 +150,13 @@ impl InternedBlockBuilder {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
-            > constants.max_block_cost_clvm
+            > self.max_block_cost
         {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost_ub + wrapper_cost + self.block_cost + cost > constants.max_block_cost_clvm
-        {
+        if self.byte_cost_ub + wrapper_cost + self.block_cost + cost > self.max_block_cost {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -170,6 +169,7 @@ impl InternedBlockBuilder {
         for bundle in bundles {
             for spend in &bundle.borrow().coin_spends {
                 new_byte_cost += Self::spend_vbytes(spend)? * self.cost_per_byte;
+
                 // solution
                 let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
                 let item = a.new_pair(solution, NodePtr::NIL)?;
@@ -189,9 +189,7 @@ impl InternedBlockBuilder {
         }
 
         let new_total_byte_cost = self.byte_cost_ub + new_byte_cost;
-        if new_total_byte_cost + wrapper_cost + self.block_cost + cost
-            > constants.max_block_cost_clvm
-        {
+        if new_total_byte_cost + wrapper_cost + self.block_cost + cost > self.max_block_cost {
             // It might be tempting to reset the allocator as well, however,
             // the nodes we just added remain cached. It's more expensive to
             // reset this cache, so we leave the Allocator untouched instead.
@@ -206,7 +204,7 @@ impl InternedBlockBuilder {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         let result = if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
-            > constants.max_block_cost_clvm
+            > self.max_block_cost
         {
             BuildBlockResult::Done
         } else {
@@ -220,7 +218,7 @@ impl InternedBlockBuilder {
     }
 
     // returns generator, sig, cost
-    pub fn finalize(mut self, constants: &ConsensusConstants) -> Result<(Vec<u8>, Signature, u64)> {
+    pub fn finalize(mut self) -> Result<(Vec<u8>, Signature, u64)> {
         let inner = self
             .allocator
             .new_pair(self.spend_list, self.allocator.nil())?;
@@ -229,9 +227,9 @@ impl InternedBlockBuilder {
 
         // Intern from root (same tree the validator sees) to get the exact cost.
         let interned = intern_tree(&self.allocator, root)?;
-        let total_cost = interned_vbytes(&interned) * constants.cost_per_byte + self.block_cost;
+        let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
 
-        assert!(total_cost <= constants.max_block_cost_clvm);
+        assert!(total_cost <= self.max_block_cost);
         Ok((serialized, self.signature, total_cost))
     }
 }
@@ -240,9 +238,8 @@ impl InternedBlockBuilder {
 #[pymethods]
 impl InternedBlockBuilder {
     #[new]
-    #[pyo3(signature = (cost_per_byte))]
-    pub fn py_new(cost_per_byte: u64) -> PyResult<Self> {
-        Ok(Self::new(cost_per_byte)?)
+    pub fn py_new(constants: &ConsensusConstants) -> PyResult<Self> {
+        Ok(Self::new(constants)?)
     }
 
     /// the first bool indicates whether the bundles was added.
@@ -252,7 +249,6 @@ impl InternedBlockBuilder {
         &mut self,
         bundles: &Bound<'_, PyList>,
         cost: u64,
-        constants: &ConsensusConstants,
     ) -> PyResult<(bool, bool)> {
         let (added, result) = self.add_spend_bundles(
             bundles.iter().map(|item| {
@@ -267,7 +263,6 @@ impl InternedBlockBuilder {
                     .clone()
             }),
             cost,
-            constants,
         )?;
         let done = matches!(result, BuildBlockResult::Done);
         Ok((added, done))
@@ -280,13 +275,12 @@ impl InternedBlockBuilder {
 
     /// generate the block generator
     #[pyo3(name = "finalize")]
-    pub fn py_finalize(
-        &mut self,
-        constants: &ConsensusConstants,
-    ) -> PyResult<(Vec<u8>, Signature, u64)> {
-        let mut temp = InternedBlockBuilder::new(self.cost_per_byte)?;
+    pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
+        // PyO3 doesn't allow consuming self, so we swap in a dummy and finalize
+        // the original.
+        let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost)?;
         std::mem::swap(self, &mut temp);
-        let (generator, sig, cost) = temp.finalize(constants)?;
+        let (generator, sig, cost) = temp.finalize()?;
         Ok((generator, sig, cost))
     }
 }
@@ -313,8 +307,7 @@ mod tests {
     fn test_generator_cost_accuracy() {
         // Verify that the upper-bound estimate is always >= the exact cost,
         // and that finalize() returns the correct exact cost.
-        let mut builder =
-            InternedBlockBuilder::new(TEST_CONSTANTS.cost_per_byte).expect("new builder");
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
 
         let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
         if !std::path::Path::new(file).exists() {
@@ -340,12 +333,12 @@ mod tests {
                 * TEST_CONSTANTS.cost_per_byte;
 
         let (added, _) = builder
-            .add_spend_bundles([&bundle], cost, &TEST_CONSTANTS)
+            .add_spend_bundles([&bundle], cost)
             .expect("add_spend_bundles");
         assert!(added);
 
         let upper_bound = builder.cost();
-        let (_, _, exact_total) = builder.finalize(&TEST_CONSTANTS).expect("finalize");
+        let (_, _, exact_total) = builder.finalize().expect("finalize");
 
         assert!(
             upper_bound >= exact_total,
@@ -356,14 +349,14 @@ mod tests {
     #[test]
     fn test_basic_functionality() {
         // Test basic add and finalize flow
-        let builder = InternedBlockBuilder::new(TEST_CONSTANTS.cost_per_byte).expect("new builder");
+        let builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
 
         assert_eq!(
             builder.cost(),
             WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte + 20
         );
 
-        let (generator, sig, cost) = builder.finalize(&TEST_CONSTANTS).expect("finalize");
+        let (generator, sig, cost) = builder.finalize().expect("finalize");
 
         assert!(!generator.is_empty());
         assert_eq!(sig, Signature::default());
@@ -489,7 +482,7 @@ mod tests {
                 bundles.shuffle(&mut rng);
 
                 let start = Instant::now();
-                let mut builder = InternedBlockBuilder::new(TEST_CONSTANTS.cost_per_byte).expect("InternedBlockBuilder");
+                let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("InternedBlockBuilder");
                 let mut skipped = 0;
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
@@ -498,7 +491,7 @@ mod tests {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
                     let (added, result) = builder
-                        .add_spend_bundles([bundle], *cost, &TEST_CONSTANTS)
+                        .add_spend_bundles([bundle], *cost)
                         .expect("add_spend_bundle");
 
                     max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
@@ -514,7 +507,7 @@ mod tests {
                 }
                 let upper_bound_cost = builder.cost();
                 let (generator, signature, cost) =
-                    builder.finalize(&TEST_CONSTANTS).expect("finalize()");
+                    builder.finalize().expect("finalize()");
 
                 // cost() is an upper-bound estimate (no deduplication); finalize() returns
                 // the exact interned cost. The upper bound must be >= the exact cost.
