@@ -19,8 +19,8 @@ use pyo3::types::PyType;
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "SpendConditions", get_all, frozen),
-    derive(PyJsonDict, PyStreamable)
+    pyo3::pyclass(name = "SpendConditions"),
+    derive(PyJsonDict, PyStreamable, chia_py_streamable_macro::PyGetters)
 )]
 pub struct OwnedSpendConditions {
     pub coin_id: Bytes32,
@@ -51,8 +51,8 @@ pub struct OwnedSpendConditions {
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "SpendBundleConditions", get_all, frozen),
-    derive(PyJsonDict, PyStreamable)
+    pyo3::pyclass(name = "SpendBundleConditions"),
+    derive(PyJsonDict, PyStreamable, chia_py_streamable_macro::PyGetters)
 )]
 pub struct OwnedSpendBundleConditions {
     pub spends: Vec<OwnedSpendConditions>,

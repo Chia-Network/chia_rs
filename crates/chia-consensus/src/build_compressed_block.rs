@@ -227,7 +227,7 @@ impl BlockBuilder {
                 // here
                 item.extract::<Bound<'_, SpendBundle>>()
                     .expect("spend bundle")
-                    .get()
+                    .borrow()
                     .clone()
             }),
             cost,
