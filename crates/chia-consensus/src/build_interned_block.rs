@@ -31,14 +31,6 @@ pub enum BuildBlockResult {
     Done,
 }
 
-fn result(num_skipped: u32) -> BuildBlockResult {
-    if num_skipped > MAX_SKIPPED_ITEMS {
-        BuildBlockResult::Done
-    } else {
-        BuildBlockResult::KeepGoing
-    }
-}
-
 /// This takes a list of spends, highest priority first, and returns a
 /// block generator with as many spends as possible, that fit within the
 /// specified maximum block cost. The priority of spends is typically the
@@ -68,6 +60,14 @@ pub struct InternedBlockBuilder {
 
     // cached cost_per_byte for use in cost(); set on first add_spend_bundles call
     cost_per_byte: u64,
+}
+
+fn result(num_skipped: u32) -> BuildBlockResult {
+    if num_skipped > MAX_SKIPPED_ITEMS {
+        BuildBlockResult::Done
+    } else {
+        BuildBlockResult::KeepGoing
+    }
 }
 
 impl InternedBlockBuilder {
