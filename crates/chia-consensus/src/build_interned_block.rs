@@ -21,6 +21,15 @@ const MAX_SKIPPED_ITEMS: u32 = 6;
 /// determine how close to the block size limit we're willing to go.
 const MIN_COST_THRESHOLD: u64 = 6_000_000;
 
+/// Interned vbyte weight of the generator wrapper `(q . ((spend_list)))`:
+///   q atom (1 byte):           1 + 2 = 3
+///   outer pair (q . ...):              3
+///   inner pair (spend_list . nil):     3
+///   nil terminator:            0 + 2 = 2
+///                                   ----
+///                                     11
+const WRAPPER_VBYTES: u64 = 11;
+
 /// Returned from add_spend_bundle(), indicating whether more bundles can be
 /// added or not.
 #[derive(PartialEq)]
@@ -56,6 +65,9 @@ pub struct InternedBlockBuilder {
     // the number of spend bundles we've failed to add. Once this grows too
     // large, we give up
     num_skipped: u32,
+
+    // cached cost_per_byte for use in cost(); set on first add_spend_bundles call
+    cost_per_byte: u64,
 }
 
 fn result(num_skipped: u32) -> BuildBlockResult {
@@ -86,6 +98,7 @@ impl InternedBlockBuilder {
             block_cost: 20,
             byte_cost: 0,
             num_skipped: 0,
+            cost_per_byte: 0,
         })
     }
 
@@ -131,14 +144,19 @@ impl InternedBlockBuilder {
         T: IntoIterator<Item = S>,
         S: Borrow<SpendBundle>,
     {
+        self.cost_per_byte = constants.cost_per_byte;
+        let wrapper_cost = WRAPPER_VBYTES * constants.cost_per_byte;
+
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm {
+        if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+            > constants.max_block_cost_clvm
+        {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+        if self.byte_cost + wrapper_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -170,7 +188,9 @@ impl InternedBlockBuilder {
         }
 
         let new_total_byte_cost = self.byte_cost + new_byte_cost;
-        if new_total_byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+        if new_total_byte_cost + wrapper_cost + self.block_cost + cost
+            > constants.max_block_cost_clvm
+        {
             // It might be tempting to reset the allocator as well, however,
             // the nodes we just added remain cached. It's more expensive to
             // reset this cache, so we leave the Allocator untouched instead.
@@ -185,7 +205,8 @@ impl InternedBlockBuilder {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         let result =
-            if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm
+            if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+                > constants.max_block_cost_clvm
             {
                 BuildBlockResult::Done
             } else {
@@ -195,7 +216,7 @@ impl InternedBlockBuilder {
     }
 
     pub fn cost(&self) -> u64 {
-        self.byte_cost + self.block_cost
+        self.byte_cost + WRAPPER_VBYTES * self.cost_per_byte + self.block_cost
     }
 
     // returns generator, sig, cost
