@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::generator_cost::interned_vbytes;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
-use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::serde::{intern_tree_limited, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use std::borrow::Borrow;
 
@@ -36,10 +36,10 @@ pub enum BuildBlockResult {
 /// specified maximum block cost. The priority of spends is typically the
 /// fee-per-cost (higher is better). The cost of the generated block is computed
 /// incrementally, based on the interned vbyte size of the generator tree, the
-/// execution cost and conditions cost of each spend. An upper-bound on the
-/// interned vbyte cost is maintained incrementally (triangle inequality); the
-/// exact cost is only computed when the upper bound approaches the limit or at
-/// finalize time.
+/// execution cost and conditions cost of each spend. Each spend's vbyte
+/// contribution is computed by interning it in an isolated allocator (triangle
+/// inequality: vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), giving an upper bound
+/// that is exact within a single spend.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct InternedBlockBuilder {
     allocator: Allocator,
@@ -47,19 +47,15 @@ pub struct InternedBlockBuilder {
     spend_list: NodePtr,
 
     // the cost of the block we've built up so far, not including the byte-cost.
-    // That's separated out into the upper_bound_vbytes member.
+    // That's separated out into the byte_cost member.
     block_cost: u64,
 
-    // running upper bound on interned vbytes (raw, non-deduplicated).
-    // Already accounts for the wrapper; multiplied by cost_per_byte gives cost.
-    upper_bound_vbytes: u64,
+    // the upper-bound byte cost, so far, from per-spend isolated interning
+    byte_cost: u64,
 
     // the number of spend bundles we've failed to add. Once this grows too
     // large, we give up
     num_skipped: u32,
-
-    // cached cost_per_byte for use in cost(); set on first add_spend_bundles call
-    cost_per_byte: u64,
 }
 
 fn result(num_skipped: u32) -> BuildBlockResult {
@@ -71,14 +67,16 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 }
 
 impl InternedBlockBuilder {
-    /// Wrapper constant: (q . ((spend_list))) adds 2 pairs plus the q atom
-    /// and nil. Using 11 as a conservative upper bound (treats q and nil as
-    /// not already present in the tree).
-    const WRAPPER_VBYTES: u64 = 11;
-
     pub fn new() -> Result<Self> {
         let a = Allocator::new();
+
+        // the generator we produce is just a quoted list. Nothing fancy.
+        // Its format is as follows:
+        // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
+
+        // spends are prepended to this list as they are added
         let spend_list = a.nil();
+
         Ok(Self {
             allocator: a,
             signature: Signature::default(),
@@ -86,59 +84,44 @@ impl InternedBlockBuilder {
             // This is the cost of executing a quote. we quote the list of
             // spends
             block_cost: 20,
-            upper_bound_vbytes: Self::WRAPPER_VBYTES,
+            byte_cost: 0,
             num_skipped: 0,
-            cost_per_byte: 0,
         })
     }
 
-    /// Non-deduplicating weight of a node: `atom_bytes + 2*atoms + 3*pairs`.
-    /// This is an upper bound on the interned contribution of new spend data.
-    fn raw_vbytes(allocator: &Allocator, node: NodePtr) -> u64 {
-        let mut stack = vec![node];
-        let mut atom_bytes = 0u64;
-        let mut atom_count = 0u64;
-        let mut pair_count = 0u64;
-        while let Some(n) = stack.pop() {
-            match allocator.sexp(n) {
-                SExp::Atom => {
-                    atom_bytes += allocator.atom_len(n) as u64;
-                    atom_count += 1;
-                }
-                SExp::Pair(left, right) => {
-                    pair_count += 1;
-                    stack.push(left);
-                    stack.push(right);
-                }
-            }
-        }
-        atom_bytes + 2 * atom_count + 3 * pair_count
-    }
+    /// Compute the interned vbyte cost of a single spend in isolation.
+    /// Interns the spend tuple in a scratch allocator and measures its
+    /// interned_vbytes, which is an upper bound on this spend's contribution
+    /// when added to the full generator (triangle inequality).
+    fn spend_vbytes(spend: &chia_protocol::CoinSpend) -> Result<u64> {
+        let mut a = Allocator::new();
+        // solution
+        let solution = node_from_bytes_backrefs(&mut a, spend.solution.as_ref())?;
+        let item = a.new_pair(solution, NodePtr::NIL)?;
+        // amount
+        let amount = a.new_number(spend.coin.amount.into())?;
+        let item = a.new_pair(amount, item)?;
+        // puzzle reveal
+        let puzzle = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref())?;
+        let item = a.new_pair(puzzle, item)?;
+        // parent-id
+        let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
+        let item = a.new_pair(parent_id, item)?;
 
-    /// Exact generator cost, matching the validator exactly.
-    ///
-    /// Builds the `(q . ((spend_list)))` wrapper and interns from the root so
-    /// that shared atoms (q, nil) are deduplicated the same way the validator
-    /// does when it calls `intern_tree_limited` on the deserialized program.
-    /// The two wrapper nodes are dead after this call but harmless.
-    fn exact_generator_cost(
-        allocator: &mut Allocator,
-        spend_list: NodePtr,
-        cost_per_byte: u64,
-    ) -> Result<u64> {
-        let inner = allocator.new_pair(spend_list, NodePtr::NIL)?;
-        let outer = allocator.new_pair(allocator.one(), inner)?;
-        let interned = intern_tree_limited(allocator, outer, u32::MAX as usize)?;
-        Ok(interned_vbytes(&interned) * cost_per_byte)
+        let interned = intern_tree_limited(&a, item, u32::MAX as usize)
+            .map_err(|e| crate::error::Error::Custom(e.to_string()))?;
+        // +3 for the cons cell linking this spend into the spend list
+        Ok(interned_vbytes(&interned) + 3)
     }
 
     /// add a batch of spend bundles to the generator. The cost for each bundle
     /// must be *only* the CLVM execution cost + the cost of the conditions.
     /// It must not include the byte cost of the bundle. The byte cost is
-    /// computed by this function via interned vbytes. Returns true if the
-    /// bundles could be added to the generator, false otherwise. Note that
-    /// either all bundles are added, or none of them. If the resulting block
-    /// exceeds the cost limit, none of the bundles are added
+    /// unpredictable as the generator is being compressed. The true byte cost
+    /// is computed by this function. Returns true if the bundles could be added
+    /// to the generator, false otherwise. Note that either all bundles are
+    /// added, or none of them. If the resulting block exceeds the cost limit,
+    /// none of the bundles are added
     pub fn add_spend_bundles<T, S>(
         &mut self,
         bundles: T,
@@ -149,31 +132,26 @@ impl InternedBlockBuilder {
         T: IntoIterator<Item = S>,
         S: Borrow<SpendBundle>,
     {
-        self.cost_per_byte = constants.cost_per_byte;
-
         // if we're very close to a full block, we're done. It's very unlikely
-        // any transaction will be smaller than MIN_COST_THRESHOLD
-        if self.upper_bound_vbytes * constants.cost_per_byte + self.block_cost + MIN_COST_THRESHOLD
-            > constants.max_block_cost_clvm
-        {
-            // Block is full regardless of what bundle we try next.
+        // any transaction will be smallar than MIN_COST_THRESHOLD
+        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm {
+            self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.block_cost + cost > constants.max_block_cost_clvm {
+        if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
 
-        let saved_spend_list = self.spend_list;
-        let saved_upper_bound_vbytes = self.upper_bound_vbytes;
-
         let a = &mut self.allocator;
-        let mut local_spend_list = saved_spend_list;
-        let mut local_upper_bound_vbytes = saved_upper_bound_vbytes;
+
+        let mut spend_list = self.spend_list;
+        let mut new_byte_cost = 0u64;
         let mut cumulative_signature = Signature::default();
         for bundle in bundles {
             for spend in &bundle.borrow().coin_spends {
+                new_byte_cost += Self::spend_vbytes(spend)? * constants.cost_per_byte;
                 // solution
                 let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
                 let item = a.new_pair(solution, NodePtr::NIL)?;
@@ -186,73 +164,39 @@ impl InternedBlockBuilder {
                 // parent-id
                 let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
                 let item = a.new_pair(parent_id, item)?;
-                // raw_vbytes(item) + 3 for the list cons cell
-                local_upper_bound_vbytes += Self::raw_vbytes(a, item) + 3;
-                local_spend_list = a.new_pair(item, local_spend_list)?;
+
+                spend_list = a.new_pair(item, spend_list)?;
             }
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
 
-        // Fast path: upper bound still within limit — no intern call needed.
-        if local_upper_bound_vbytes * constants.cost_per_byte + self.block_cost + cost
-            <= constants.max_block_cost_clvm
-        {
-            self.spend_list = local_spend_list;
-            self.upper_bound_vbytes = local_upper_bound_vbytes;
-            self.block_cost += cost;
-            self.signature.aggregate(&cumulative_signature);
-            // if we're very close to a full block, we're done. It's very unlikely
-            // any transaction will be smaller than MIN_COST_THRESHOLD
-            let done = local_upper_bound_vbytes * constants.cost_per_byte
-                + self.block_cost
-                + MIN_COST_THRESHOLD
-                > constants.max_block_cost_clvm;
-            return Ok((
-                true,
-                if done {
-                    BuildBlockResult::Done
-                } else {
-                    BuildBlockResult::KeepGoing
-                },
-            ));
-        }
-
-        // Slow path: upper bound exceeded — compute exact cost to see if it fits.
-        let exact_cost = Self::exact_generator_cost(
-            &mut self.allocator,
-            local_spend_list,
-            constants.cost_per_byte,
-        )?;
-
-        if exact_cost + self.block_cost + cost > constants.max_block_cost_clvm {
-            // Doesn't fit even exactly. Restore state (allocator nodes are dead but harmless).
-            self.spend_list = saved_spend_list;
-            self.upper_bound_vbytes = saved_upper_bound_vbytes;
+        let new_total_byte_cost = self.byte_cost + new_byte_cost;
+        if new_total_byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+            // It might be tempting to reset the allocator as well, however,
+            // the nodes we just added remain cached. It's more expensive to
+            // reset this cache, so we leave the Allocator untouched instead.
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
-
-        self.spend_list = local_spend_list;
-        self.upper_bound_vbytes = local_upper_bound_vbytes;
+        self.byte_cost = new_total_byte_cost;
+        self.spend_list = spend_list;
         self.block_cost += cost;
         self.signature.aggregate(&cumulative_signature);
 
         // if we're very close to a full block, we're done. It's very unlikely
-        // any transaction will be smaller than MIN_COST_THRESHOLD
-        let done =
-            exact_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm;
-        Ok((
-            true,
-            if done {
+        // any transaction will be smallar than MIN_COST_THRESHOLD
+        let result =
+            if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm
+            {
                 BuildBlockResult::Done
             } else {
                 BuildBlockResult::KeepGoing
-            },
-        ))
+            };
+        Ok((true, result))
     }
 
     pub fn cost(&self) -> u64 {
-        self.upper_bound_vbytes * self.cost_per_byte + self.block_cost
+        self.byte_cost + self.block_cost
     }
 
     // returns generator, sig, cost
@@ -264,7 +208,8 @@ impl InternedBlockBuilder {
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
         // Intern from root (same tree the validator sees) to get the exact cost.
-        let interned = intern_tree_limited(&self.allocator, root, u32::MAX as usize)?;
+        let interned = intern_tree_limited(&self.allocator, root, u32::MAX as usize)
+            .map_err(|e| crate::error::Error::Custom(e.to_string()))?;
         let total_cost = interned_vbytes(&interned) * constants.cost_per_byte + self.block_cost;
 
         assert!(total_cost <= constants.max_block_cost_clvm);
