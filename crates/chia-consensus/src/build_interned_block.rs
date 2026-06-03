@@ -57,11 +57,11 @@ pub struct InternedBlockBuilder {
     spend_list: NodePtr,
 
     // the cost of the block we've built up so far, not including the byte-cost.
-    // That's separated out into the byte_cost member.
+    // That's separated out into the byte_cost_ub member.
     block_cost: u64,
 
     // the upper-bound byte cost, so far, from per-spend isolated interning
-    byte_cost: u64,
+    byte_cost_ub: u64,
 
     // the number of spend bundles we've failed to add. Once this grows too
     // large, we give up
@@ -97,7 +97,7 @@ impl InternedBlockBuilder {
             // This is the cost of executing a quote. we quote the list of
             // spends
             block_cost: 20,
-            byte_cost: 0,
+            byte_cost_ub: 0,
             num_skipped: 0,
             cost_per_byte,
         })
@@ -149,14 +149,15 @@ impl InternedBlockBuilder {
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+        if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
             > constants.max_block_cost_clvm
         {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost + wrapper_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+        if self.byte_cost_ub + wrapper_cost + self.block_cost + cost > constants.max_block_cost_clvm
+        {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -187,7 +188,7 @@ impl InternedBlockBuilder {
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
 
-        let new_total_byte_cost = self.byte_cost + new_byte_cost;
+        let new_total_byte_cost = self.byte_cost_ub + new_byte_cost;
         if new_total_byte_cost + wrapper_cost + self.block_cost + cost
             > constants.max_block_cost_clvm
         {
@@ -197,14 +198,14 @@ impl InternedBlockBuilder {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
-        self.byte_cost = new_total_byte_cost;
+        self.byte_cost_ub = new_total_byte_cost;
         self.spend_list = spend_list;
         self.block_cost += cost;
         self.signature.aggregate(&cumulative_signature);
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        let result = if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+        let result = if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
             > constants.max_block_cost_clvm
         {
             BuildBlockResult::Done
@@ -215,7 +216,7 @@ impl InternedBlockBuilder {
     }
 
     pub fn cost(&self) -> u64 {
-        self.byte_cost + WRAPPER_VBYTES * self.cost_per_byte + self.block_cost
+        self.byte_cost_ub + WRAPPER_VBYTES * self.cost_per_byte + self.block_cost
     }
 
     // returns generator, sig, cost
