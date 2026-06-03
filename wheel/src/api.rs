@@ -4,8 +4,8 @@ use crate::run_generator::{
     run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
-use chia_consensus::build_interned_block::InternedBlockBuilder;
 use chia_consensus::build_compressed_block::BlockBuilder;
+use chia_consensus::build_interned_block::InternedBlockBuilder;
 use chia_consensus::check_time_locks::py_check_time_locks;
 use chia_consensus::consensus_constants::ConsensusConstants;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};

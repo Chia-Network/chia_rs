@@ -203,14 +203,13 @@ impl InternedBlockBuilder {
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        let result =
-            if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
-                > constants.max_block_cost_clvm
-            {
-                BuildBlockResult::Done
-            } else {
-                BuildBlockResult::KeepGoing
-            };
+        let result = if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+            > constants.max_block_cost_clvm
+        {
+            BuildBlockResult::Done
+        } else {
+            BuildBlockResult::KeepGoing
+        };
         Ok((true, result))
     }
 
@@ -312,7 +311,8 @@ mod tests {
     fn test_generator_cost_accuracy() {
         // Verify that the upper-bound estimate is always >= the exact cost,
         // and that finalize() returns the correct exact cost.
-        let mut builder = InternedBlockBuilder::new(TEST_CONSTANTS.cost_per_byte).expect("new builder");
+        let mut builder =
+            InternedBlockBuilder::new(TEST_CONSTANTS.cost_per_byte).expect("new builder");
 
         let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
         if !std::path::Path::new(file).exists() {
