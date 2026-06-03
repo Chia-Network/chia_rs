@@ -66,7 +66,7 @@ pub struct InternedBlockBuilder {
     // large, we give up
     num_skipped: u32,
 
-    // cached cost_per_byte for use in cost(); set on first add_spend_bundles call
+    // cost_per_byte from consensus constants, set at construction
     cost_per_byte: u64,
 }
 
