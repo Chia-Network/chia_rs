@@ -46,9 +46,10 @@ pub enum BuildBlockResult {
 /// fee-per-cost (higher is better). The cost of the generated block is computed
 /// incrementally, based on the interned vbyte size of the generator tree, the
 /// execution cost and conditions cost of each spend. Each spend's vbyte
-/// contribution is computed by interning it in an isolated allocator (triangle
-/// inequality: vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), giving an upper bound
-/// that is exact within a single spend.
+/// contribution is estimated by interning it in an isolated scratch allocator.
+/// By the triangle inequality (vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), the
+/// running sum is an upper bound on the true interned cost of all spends
+/// combined. finalize() computes the exact cost.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct InternedBlockBuilder {
     allocator: Allocator,
