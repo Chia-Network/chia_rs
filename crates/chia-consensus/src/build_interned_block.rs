@@ -13,7 +13,7 @@ pub enum BuildBlockResult {
     Done,
 }
 
-fn skip_result(num_skipped: u32) -> BuildBlockResult {
+fn result(num_skipped: u32) -> BuildBlockResult {
     if num_skipped > MAX_SKIPPED_ITEMS {
         BuildBlockResult::Done
     } else {
@@ -137,7 +137,7 @@ impl InternedBlockBuilder {
 
         if self.block_cost + cost > constants.max_block_cost_clvm {
             self.num_skipped += 1;
-            return Ok((false, skip_result(self.num_skipped)));
+            return Ok((false, result(self.num_skipped)));
         }
 
         let saved_spend_list = self.spend_list;
@@ -198,7 +198,7 @@ impl InternedBlockBuilder {
             self.spend_list = saved_spend_list;
             self.upper_bound_vbytes = saved_upper_bound_vbytes;
             self.num_skipped += 1;
-            return Ok((false, skip_result(self.num_skipped)));
+            return Ok((false, result(self.num_skipped)));
         }
 
         self.spend_list = local_spend_list;
