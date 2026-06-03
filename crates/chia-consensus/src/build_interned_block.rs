@@ -4,7 +4,7 @@ use crate::generator_cost::interned_vbytes;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{intern_tree_limited, node_from_bytes_backrefs, node_to_bytes_backrefs};
+use clvmr::serde::{intern_tree, node_from_bytes_backrefs, node_to_bytes_backrefs};
 use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
@@ -108,8 +108,7 @@ impl InternedBlockBuilder {
         let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
         let item = a.new_pair(parent_id, item)?;
 
-        let interned = intern_tree_limited(&a, item, u32::MAX as usize)
-            .map_err(|e| crate::error::Error::Custom(e.to_string()))?;
+        let interned = intern_tree(&a, item)?;
         // +3 for the cons cell linking this spend into the spend list
         Ok(interned_vbytes(&interned) + 3)
     }
@@ -208,8 +207,7 @@ impl InternedBlockBuilder {
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
         // Intern from root (same tree the validator sees) to get the exact cost.
-        let interned = intern_tree_limited(&self.allocator, root, u32::MAX as usize)
-            .map_err(|e| crate::error::Error::Custom(e.to_string()))?;
+        let interned = intern_tree(&self.allocator, root)?;
         let total_cost = interned_vbytes(&interned) * constants.cost_per_byte + self.block_cost;
 
         assert!(total_cost <= constants.max_block_cost_clvm);
