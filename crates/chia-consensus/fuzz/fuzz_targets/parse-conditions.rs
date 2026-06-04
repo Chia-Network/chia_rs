@@ -82,6 +82,7 @@ fuzz_target!(|data: &[u8]| {
             &mut max_cost,
             &TEST_CONSTANTS,
             &mut visitor,
+            None,
         );
     }
 });

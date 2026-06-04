@@ -16,7 +16,7 @@ pub const PARENTAMOUNT: u8 = 0b101;
 pub const PARENTPUZZLE: u8 = 0b110;
 pub const COINID: u8 = 0b111;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SpendId {
     OwnedCoinId(Arc<Bytes32>),
     CoinId(NodePtr),

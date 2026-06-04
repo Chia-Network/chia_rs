@@ -127,6 +127,7 @@ pub fn run_spendbundle(
             &mut cost_left,
             clvm_cost,
             constants,
+            None,
         )?;
 
         if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0

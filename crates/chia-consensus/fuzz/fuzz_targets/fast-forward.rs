@@ -120,6 +120,7 @@ fn run_puzzle(
         &mut cost_left,
         &TEST_CONSTANTS,
         &mut visitor,
+        None,
     )?;
     ret.cost = max_cost - cost_left;
     Ok(ret)
