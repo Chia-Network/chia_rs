@@ -262,10 +262,10 @@ where
 
     let mut state = ParseState::default();
     let mut cache = TreeCache::default();
-    let mut conditions_cache = if flags.contains(ConsensusFlags::COST_CONDITIONS) {
-        None
-    } else {
+    let mut conditions_cache = if flags.contains(ConsensusFlags::CONDITIONS_CACHE) {
         Some(ConditionsCache::default())
+    } else {
+        None
     };
 
     // first iterate over all puzzle reveals to find duplicate nodes, to know

@@ -142,3 +142,17 @@ path = "fuzz_targets/puzzle-fingerprint.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "run-generator-cache"
+path = "fuzz_targets/run-generator-cache.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "conditions-cache"
+path = "fuzz_targets/conditions-cache.rs"
+test = false
+doc = false
+bench = false
