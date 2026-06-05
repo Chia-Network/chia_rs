@@ -10,7 +10,7 @@ use crate::RewardChainBlock;
 use crate::VDFProof;
 use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::Streamable;
-use chia_traits::chia_error::Result;
+use chia_traits::chia_error::{Error, Result};
 use std::io::Cursor;
 
 // Similar to ProofOfSpace, we use unused bits in the Optional<> prefix byte
@@ -58,7 +58,7 @@ impl Streamable for FullBlock {
         if self.version == 0 {
             self.transactions_generator.update_digest(digest);
             self.transactions_generator_ref_list.update_digest(digest);
-        } else {
+        } else if self.version == 1 {
             match &self.transactions_generator_buffer {
                 None => {
                     0b10_u8.update_digest(digest);
@@ -69,6 +69,8 @@ impl Streamable for FullBlock {
                     digest.update(buf);
                 }
             }
+        } else {
+            panic!("version field must be 0 or 1, but it's {}", self.version);
         }
     }
 
@@ -87,7 +89,7 @@ impl Streamable for FullBlock {
         if self.version == 0 {
             self.transactions_generator.stream(out)?;
             self.transactions_generator_ref_list.stream(out)?;
-        } else {
+        } else if self.version == 1 {
             match &self.transactions_generator_buffer {
                 None => {
                     0b10_u8.stream(out)?;
@@ -98,6 +100,8 @@ impl Streamable for FullBlock {
                     out.extend_from_slice(buf);
                 }
             }
+        } else {
+            return Err(Error::InvalidFullBlock);
         }
         Ok(())
     }
@@ -145,7 +149,7 @@ impl Streamable for FullBlock {
                 transactions_generator_buffer: None,
                 version,
             })
-        } else {
+        } else if version == 1 {
             let transactions_generator_buffer = if has_generator {
                 let bytes = <Bytes as Streamable>::parse::<TRUSTED>(input)?;
                 Some(bytes.into_inner())
@@ -169,6 +173,8 @@ impl Streamable for FullBlock {
                 transactions_generator_buffer,
                 version,
             })
+        } else {
+            Err(Error::InvalidFullBlock)
         }
     }
 }
