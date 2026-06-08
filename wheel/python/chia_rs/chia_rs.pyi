@@ -1982,8 +1982,9 @@ class FullBlock:
     foliage: Foliage
     foliage_transaction_block: Optional[FoliageTransactionBlock]
     transactions_info: Optional[TransactionsInfo]
-    # NOTE: transactions_generator is actually Option3<Program, Bytes> in Rust.
+    # NOTE: transactions_generator is actually Option3<Program, Bytes, Vec<u32>> in Rust.
     # From Python: None or a Program accesses the v0 case; use the Rust API for v1 raw bytes.
+    # transactions_generator_ref_list is a computed property extracted from the Option3 tail.
     transactions_generator: Optional[Program]
     transactions_generator_ref_list: list[uint32]
     prev_header_hash: bytes32
@@ -2008,8 +2009,7 @@ class FullBlock:
         foliage: Foliage,
         foliage_transaction_block: Optional[FoliageTransactionBlock],
         transactions_info: Optional[TransactionsInfo],
-        transactions_generator: Optional[Program],
-        transactions_generator_ref_list: Sequence[uint32]
+        transactions_generator: Optional[Program]
     ) -> Self: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
@@ -2038,8 +2038,7 @@ class FullBlock:
         foliage: Union[ Foliage, _Unspec] = _Unspec(),
         foliage_transaction_block: Union[ Optional[FoliageTransactionBlock], _Unspec] = _Unspec(),
         transactions_info: Union[ Optional[TransactionsInfo], _Unspec] = _Unspec(),
-        transactions_generator: Union[ Optional[Program], _Unspec] = _Unspec(),
-        transactions_generator_ref_list: Union[ list[uint32], _Unspec] = _Unspec()) -> FullBlock: ...
+        transactions_generator: Union[ Optional[Program], _Unspec] = _Unspec()) -> FullBlock: ...
 
 @final
 class HeaderBlock:

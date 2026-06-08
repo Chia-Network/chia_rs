@@ -11,13 +11,12 @@ use crate::{Foliage, FoliageTransactionBlock, TransactionsInfo};
 use chia_traits::{Option3, Streamable};
 
 // Wire encoding uses Option3 for the generator prefix byte:
-//   0x00  None       → no generator (v0, backward-compatible with pre-HF blocks)
-//   0x01  Some1(P)   → Program generator (v0, backward-compatible with pre-HF blocks)
-//   0x02  Some2(B)   → raw-bytes generator (v1, new post-HF format)
+//   0x00  None(ref_list)       → no generator (v0, backward-compatible with pre-HF blocks)
+//   0x01  Some1(P, ref_list)   → Program generator (v0, backward-compatible with pre-HF blocks)
+//   0x02  Some2(B)             → raw-bytes generator (v1, new post-HF format, NO ref_list)
 //
-// transactions_generator_ref_list is always present on the wire as Vec<u32>.
-// For v1 blocks it is empty; this is 4 bytes of overhead vs omitting it, but
-// allows #[streamable] to derive all serialization automatically.
+// For v0 blocks (None/Some1), transactions_generator_ref_list is embedded in the Option3 tail.
+// For v1 blocks (Some2), the ref_list is completely absent from the wire format.
 #[streamable]
 pub struct FullBlock {
     finished_sub_slots: Vec<EndOfSubSlotBundle>,
@@ -30,8 +29,7 @@ pub struct FullBlock {
     foliage: Foliage,                                   // # Reward chain foliage data
     foliage_transaction_block: Option<FoliageTransactionBlock>, // # Reward chain foliage data (tx block)
     transactions_info: Option<TransactionsInfo>, // Reward chain foliage data (tx block additional)
-    transactions_generator: Option3<Program, Bytes>, // Program that generates transactions (v0) or raw bytes (v1)
-    transactions_generator_ref_list: Vec<u32>, // List of block heights of previous generators referenced in this block
+    transactions_generator: Option3<Program, Bytes, Vec<u32>>, // Program (v0) or raw bytes (v1), with ref_list for v0
 }
 
 impl FullBlock {
@@ -164,6 +162,24 @@ impl FullBlock {
     fn py_is_v1(&self) -> bool {
         self.is_v1()
     }
+
+    #[getter]
+    #[pyo3(name = "transactions_generator_ref_list")]
+    fn py_transactions_generator_ref_list(&self) -> Vec<u32> {
+        match &self.transactions_generator {
+            Option3::None(refs) | Option3::Some1(_, refs) => refs.clone(),
+            Option3::Some2(_) => vec![],
+        }
+    }
+
+    #[getter]
+    #[pyo3(name = "transactions_generator")]
+    fn py_transactions_generator(&self) -> Option<Program> {
+        match &self.transactions_generator {
+            Option3::Some1(prog, _) => Some(prog.clone()),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -234,7 +250,7 @@ mod tests {
         )
     }
 
-    fn make_v0_block(generator: Option3<Program, Bytes>, ref_list: Vec<u32>) -> FullBlock {
+    fn make_v0_block(generator: Option3<Program, Bytes, Vec<u32>>) -> FullBlock {
         FullBlock::new(
             vec![],
             make_reward_chain_block(),
@@ -247,13 +263,12 @@ mod tests {
             None,
             None,
             generator,
-            ref_list,
         )
     }
 
     fn make_v1_block(buffer: Option<Vec<u8>>) -> FullBlock {
         let generator = match buffer {
-            None => Option3::None,
+            None => Option3::None(vec![]),
             Some(buf) => Option3::Some2(Bytes::from(buf)),
         };
         FullBlock::new(
@@ -268,35 +283,35 @@ mod tests {
             None,
             None,
             generator,
-            vec![],
         )
     }
 
     #[test]
     fn v0_no_generator_roundtrip() {
-        let block = make_v0_block(Option3::None, vec![]);
+        let block = make_v0_block(Option3::None(vec![]));
         let buf = block.to_bytes().unwrap();
         let block2 = FullBlock::from_bytes(&buf).unwrap();
 
         assert!(block2.is_v0());
-        assert!(matches!(block2.transactions_generator, Option3::None));
-        assert_eq!(block2.transactions_generator_ref_list, Vec::<u32>::new());
+        assert!(matches!(block2.transactions_generator, Option3::None(_)));
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
 
     #[test]
     fn v0_with_generator_roundtrip() {
         let generator = Program::from(vec![0xff, 0x01, 0x80]);
-        let block = make_v0_block(Option3::Some1(generator.clone()), vec![100, 200]);
+        let block = make_v0_block(Option3::Some1(generator.clone(), vec![100, 200]));
         let buf = block.to_bytes().unwrap();
         let block2 = FullBlock::from_bytes(&buf).unwrap();
 
         assert!(block2.is_v0());
         match &block2.transactions_generator {
-            Option3::Some1(prog) => assert_eq!(prog.as_ref(), generator.as_ref()),
+            Option3::Some1(prog, refs) => {
+                assert_eq!(prog.as_ref(), generator.as_ref());
+                assert_eq!(refs, &vec![100, 200]);
+            }
             _ => panic!("Expected Some1"),
         }
-        assert_eq!(block2.transactions_generator_ref_list, vec![100, 200]);
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
 
@@ -305,12 +320,12 @@ mod tests {
         // v1 "no generator" is represented as Option3::None with empty ref_list on wire;
         // is_v1() is false here — a block with no generator at all is just a non-tx block.
         // True v1 blocks always carry Some2(Bytes).
-        let block = make_v0_block(Option3::None, vec![]);
+        let block = make_v0_block(Option3::None(vec![]));
         let buf = block.to_bytes().unwrap();
         let block2 = FullBlock::from_bytes(&buf).unwrap();
 
         assert!(block2.is_v0());
-        assert!(matches!(block2.transactions_generator, Option3::None));
+        assert!(matches!(block2.transactions_generator, Option3::None(_)));
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
 
@@ -326,16 +341,15 @@ mod tests {
             Option3::Some2(bytes) => assert_eq!(bytes.as_ref(), &raw),
             _ => panic!("Expected Some2"),
         }
-        assert_eq!(block2.transactions_generator_ref_list, Vec::<u32>::new());
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
 
     #[test]
     fn v0_prefix_byte_encoding() {
-        let block_none = make_v0_block(Option3::None, vec![]);
+        let block_none = make_v0_block(Option3::None(vec![]));
         let buf_none = block_none.to_bytes().unwrap();
 
-        let block_some = make_v0_block(Option3::Some1(Program::from(vec![0x80])), vec![]);
+        let block_some = make_v0_block(Option3::Some1(Program::from(vec![0x80]), vec![]));
         let buf_some = block_some.to_bytes().unwrap();
 
         let prefix_offset = buf_none
@@ -395,27 +409,26 @@ mod tests {
         // Verify the data is correct
         assert_eq!(&buf[prefix_offset + 5..prefix_offset + 5 + raw.len()], &raw);
 
-        // Verify the data is immediately followed by the (empty) ref_list: 4 zero bytes
-        assert_eq!(buf.len(), prefix_offset + 5 + raw.len() + 4);
+        // v1 blocks (Some2) have NO ref_list, so the data should end immediately after the bytes
+        assert_eq!(buf.len(), prefix_offset + 5 + raw.len());
     }
 
     #[test]
-    fn v1_ref_list_always_present() {
-        // v1 blocks always write an empty ref_list (4 zero bytes) so #[streamable]
-        // can derive all serialization automatically without conditional logic.
+    fn v1_ref_list_absent() {
+        // v1 blocks (Some2) do NOT write a ref_list — the Option3 tail is only present for None/Some1.
         let block_v1 = make_v1_block(Some(vec![0x80]));
         let buf_v1 = block_v1.to_bytes().unwrap();
 
         // Find where 0x02 prefix byte is
         let prefix_offset = buf_v1.iter().position(|&b| b == 0x02).unwrap();
-        // After 0x02 + 4-byte length + 1 byte data, expect 4 zero bytes for empty Vec<u32>
-        let after_data = prefix_offset + 1 + 4 + 1;
-        assert_eq!(&buf_v1[after_data..after_data + 4], &[0, 0, 0, 0]);
+        // After 0x02 + 4-byte length + 1 byte data, the buffer should end (no ref_list)
+        let expected_len = prefix_offset + 1 + 4 + 1;
+        assert_eq!(buf_v1.len(), expected_len);
     }
 
     #[test]
     fn v0_and_v1_same_hash_fields_before_generator() {
-        let block_v0 = make_v0_block(Option3::None, vec![]);
+        let block_v0 = make_v0_block(Option3::None(vec![]));
         let block_v1 = make_v1_block(None);
 
         assert_eq!(block_v0.header_hash(), block_v1.header_hash());
@@ -445,13 +458,15 @@ mod tests {
     #[test]
     fn old_format_interop_no_generator() {
         let ref_list = vec![10u32, 20, 30];
-        let block = make_v0_block(Option3::None, ref_list.clone());
+        let block = make_v0_block(Option3::None(ref_list.clone()));
         let bytes = block.to_bytes().unwrap();
 
         // New code parses it correctly.
         let parsed = FullBlock::from_bytes(&bytes).unwrap();
-        assert!(matches!(parsed.transactions_generator, Option3::None));
-        assert_eq!(parsed.transactions_generator_ref_list, ref_list);
+        match &parsed.transactions_generator {
+            Option3::None(refs) => assert_eq!(refs, &ref_list),
+            _ => panic!("Expected None"),
+        }
 
         // Tail bytes are byte-for-byte identical to old Option<Program> + Vec<u32>.
         assert!(bytes.ends_with(&old_format_tail(None, &ref_list)));
@@ -461,16 +476,18 @@ mod tests {
     fn old_format_interop_with_generator() {
         let program = Program::from(vec![0xff, 0x01, 0x80]);
         let ref_list = vec![100u32, 200];
-        let block = make_v0_block(Option3::Some1(program.clone()), ref_list.clone());
+        let block = make_v0_block(Option3::Some1(program.clone(), ref_list.clone()));
         let bytes = block.to_bytes().unwrap();
 
         // New code parses it correctly.
         let parsed = FullBlock::from_bytes(&bytes).unwrap();
         match &parsed.transactions_generator {
-            Option3::Some1(p) => assert_eq!(p.as_ref(), program.as_ref()),
+            Option3::Some1(p, refs) => {
+                assert_eq!(p.as_ref(), program.as_ref());
+                assert_eq!(refs, &ref_list);
+            }
             _ => panic!("Expected Some1"),
         }
-        assert_eq!(parsed.transactions_generator_ref_list, ref_list);
 
         // Tail bytes are byte-for-byte identical to old Option<Program> + Vec<u32>.
         assert!(bytes.ends_with(&old_format_tail(Some(program), &ref_list)));
@@ -485,7 +502,7 @@ mod tests {
         let ref_list = vec![42u32];
 
         // New-format block to get the prefix bytes (everything before the generator)
-        let new_block = make_v0_block(Option3::Some1(program.clone()), ref_list.clone());
+        let new_block = make_v0_block(Option3::Some1(program.clone(), ref_list.clone()));
         let new_bytes = new_block.to_bytes().unwrap();
 
         // The new tail (0x01 + program + ref_list) is identical to the old tail.
@@ -505,10 +522,12 @@ mod tests {
         // Parse with new code — must succeed and produce correct values.
         let parsed = FullBlock::from_bytes(&old_format_bytes).unwrap();
         match &parsed.transactions_generator {
-            Option3::Some1(p) => assert_eq!(p.as_ref(), program.as_ref()),
+            Option3::Some1(p, refs) => {
+                assert_eq!(p.as_ref(), program.as_ref());
+                assert_eq!(refs, &ref_list);
+            }
             _ => panic!("Expected Some1"),
         }
-        assert_eq!(parsed.transactions_generator_ref_list, ref_list);
     }
 
     #[test]
