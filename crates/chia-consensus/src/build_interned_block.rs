@@ -81,10 +81,10 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 }
 
 impl InternedBlockBuilder {
-    fn new_with(cost_per_byte: u64, max_block_cost: u64) -> Result<Self> {
+    fn new_with(cost_per_byte: u64, max_block_cost: u64) -> Self {
         let a = Allocator::new();
         let spend_list = a.nil();
-        Ok(Self {
+        Self {
             allocator: a,
             signature: Signature::default(),
             spend_list,
@@ -93,10 +93,10 @@ impl InternedBlockBuilder {
             num_skipped: 0,
             cost_per_byte,
             max_block_cost,
-        })
+        }
     }
 
-    pub fn new(constants: &ConsensusConstants) -> Result<Self> {
+    pub fn new(constants: &ConsensusConstants) -> Self {
         // the generator we produce is just a quoted list. Nothing fancy.
         // Its format is as follows:
         // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
@@ -239,7 +239,7 @@ impl InternedBlockBuilder {
 impl InternedBlockBuilder {
     #[new]
     pub fn py_new(constants: &ConsensusConstants) -> PyResult<Self> {
-        Ok(Self::new(constants)?)
+        Ok(Self::new(constants))
     }
 
     /// the first bool indicates whether the bundles was added.
@@ -278,7 +278,7 @@ impl InternedBlockBuilder {
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
         // PyO3 doesn't allow consuming self, so we swap in a dummy and finalize
         // the original.
-        let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost)?;
+        let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost);
         std::mem::swap(self, &mut temp);
         let (generator, sig, cost) = temp.finalize()?;
         Ok((generator, sig, cost))
@@ -307,7 +307,7 @@ mod tests {
     fn test_generator_cost_accuracy() {
         // Verify that the upper-bound estimate is always >= the exact cost,
         // and that finalize() returns the correct exact cost.
-        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
         let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
         if !std::path::Path::new(file).exists() {
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn test_basic_functionality() {
         // Test basic add and finalize flow
-        let builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
+        let builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
         assert_eq!(
             builder.cost(),
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_single_spend_bundle() {
-        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
         let coin_spend = make_test_coin_spend([1u8; 32], 1000);
         let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_cost_accounting() {
-        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
         let initial_cost = builder.cost();
 
@@ -441,8 +441,7 @@ mod tests {
     #[test]
     fn test_block_full_overflow() {
         let small_max = 100_000;
-        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max)
-            .expect("new builder");
+        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max);
 
         let coin_spend = make_test_coin_spend([1u8; 32], 1000);
         let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
@@ -469,8 +468,7 @@ mod tests {
     #[test]
     fn test_num_skipped() {
         let small_max = 50_000;
-        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max)
-            .expect("new builder");
+        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max);
 
         let mut num_rejected = 0;
 
@@ -500,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_byte_cost_ub_tracking() {
-        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
         assert_eq!(builder.byte_cost_ub, 0, "byte_cost_ub should start at 0");
 
@@ -658,7 +656,7 @@ mod tests {
                 bundles.shuffle(&mut rng);
 
                 let start = Instant::now();
-                let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("InternedBlockBuilder");
+                let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
                 let mut skipped = 0;
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
