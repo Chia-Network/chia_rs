@@ -367,11 +367,11 @@ mod tests {
 
     fn make_test_coin_spend(parent: [u8; 32], amount: u64) -> chia_protocol::CoinSpend {
         use chia_protocol::{Coin, Program};
-        
+
         let puzzle_hash = [2u8; 32];
         let puzzle = Program::from(vec![0x01]); // (q)
         let solution = Program::from(vec![0x80]); // nil
-        
+
         chia_protocol::CoinSpend::new(
             Coin::new(parent.into(), puzzle_hash.into(), amount),
             puzzle,
@@ -382,141 +382,163 @@ mod tests {
     #[test]
     fn test_single_spend_bundle() {
         let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
-        
+
         let coin_spend = make_test_coin_spend([1u8; 32], 1000);
         let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
-        
+
         let (added, result) = builder
             .add_spend_bundles([&bundle], 1000)
             .expect("add_spend_bundles");
-        
+
         assert!(added, "bundle should be added");
         assert_eq!(result, BuildBlockResult::KeepGoing);
-        
+
         let (generator, sig, cost) = builder.finalize().expect("finalize");
-        
+
         assert!(!generator.is_empty(), "generator should not be empty");
         assert_eq!(sig, Signature::default());
-        assert!(cost > 11 * TEST_CONSTANTS.cost_per_byte + 20, "cost should increase from base");
+        assert!(
+            cost > 11 * TEST_CONSTANTS.cost_per_byte + 20,
+            "cost should increase from base"
+        );
     }
 
     #[test]
     fn test_cost_accounting() {
         let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
-        
+
         let initial_cost = builder.cost();
-        
+
         let coin_spend1 = make_test_coin_spend([1u8; 32], 1000);
         let bundle1 = SpendBundle::new(vec![coin_spend1], Signature::default());
-        
+
         let (added, _) = builder
             .add_spend_bundles([&bundle1], 5000)
             .expect("add_spend_bundles");
         assert!(added);
-        
+
         let cost_after_first = builder.cost();
-        assert!(cost_after_first > initial_cost, "cost should increase after adding bundle");
-        
+        assert!(
+            cost_after_first > initial_cost,
+            "cost should increase after adding bundle"
+        );
+
         let coin_spend2 = make_test_coin_spend([2u8; 32], 2000);
         let bundle2 = SpendBundle::new(vec![coin_spend2], Signature::default());
-        
+
         let (added, _) = builder
             .add_spend_bundles([&bundle2], 7000)
             .expect("add_spend_bundles");
         assert!(added);
-        
+
         let cost_after_second = builder.cost();
-        assert!(cost_after_second > cost_after_first, "cost should increase after adding second bundle");
+        assert!(
+            cost_after_second > cost_after_first,
+            "cost should increase after adding second bundle"
+        );
     }
 
     #[test]
     fn test_block_full_overflow() {
         let small_max = 100_000;
-        let mut builder = InternedBlockBuilder::new_with(
-            TEST_CONSTANTS.cost_per_byte,
-            small_max,
-        ).expect("new builder");
-        
+        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max)
+            .expect("new builder");
+
         let coin_spend = make_test_coin_spend([1u8; 32], 1000);
         let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
-        
+
         let (added, result) = builder
             .add_spend_bundles([&bundle], small_max - 5000)
             .expect("add_spend_bundles");
-        
+
         if added {
-            assert_eq!(result, BuildBlockResult::Done, "should signal Done when close to limit");
+            assert_eq!(
+                result,
+                BuildBlockResult::Done,
+                "should signal Done when close to limit"
+            );
         } else {
-            assert_eq!(result, BuildBlockResult::Done, "should be Done if bundle doesn't fit");
+            assert_eq!(
+                result,
+                BuildBlockResult::Done,
+                "should be Done if bundle doesn't fit"
+            );
         }
     }
 
     #[test]
     fn test_num_skipped() {
         let small_max = 50_000;
-        let mut builder = InternedBlockBuilder::new_with(
-            TEST_CONSTANTS.cost_per_byte,
-            small_max,
-        ).expect("new builder");
-        
+        let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max)
+            .expect("new builder");
+
         let mut num_rejected = 0;
-        
+
         for i in 0..10 {
             let coin_spend = make_test_coin_spend([i; 32], 1000);
             let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
-            
+
             let (added, result) = builder
                 .add_spend_bundles([&bundle], 10_000)
                 .expect("add_spend_bundles");
-            
+
             if !added {
                 num_rejected += 1;
             }
-            
+
             if result == BuildBlockResult::Done {
                 break;
             }
         }
-        
+
         assert!(num_rejected > 0, "some bundles should have been skipped");
-        assert!(num_rejected <= MAX_SKIPPED_ITEMS as usize + 1, 
-                "should stop after MAX_SKIPPED_ITEMS");
+        assert!(
+            num_rejected <= MAX_SKIPPED_ITEMS as usize + 1,
+            "should stop after MAX_SKIPPED_ITEMS"
+        );
     }
 
     #[test]
     fn test_byte_cost_ub_tracking() {
         let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS).expect("new builder");
-        
+
         assert_eq!(builder.byte_cost_ub, 0, "byte_cost_ub should start at 0");
-        
+
         let coin_spend = make_test_coin_spend([1u8; 32], 1000);
         let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
-        
+
         let (added, _) = builder
             .add_spend_bundles([&bundle], 5000)
             .expect("add_spend_bundles");
         assert!(added);
-        
-        assert!(builder.byte_cost_ub > 0, "byte_cost_ub should increase after adding bundle");
-        
+
+        assert!(
+            builder.byte_cost_ub > 0,
+            "byte_cost_ub should increase after adding bundle"
+        );
+
         let initial_byte_cost = builder.byte_cost_ub;
-        
+
         let coin_spend2 = make_test_coin_spend([2u8; 32], 2000);
         let bundle2 = SpendBundle::new(vec![coin_spend2], Signature::default());
-        
+
         let (added, _) = builder
             .add_spend_bundles([&bundle2], 7000)
             .expect("add_spend_bundles");
         assert!(added);
-        
-        assert!(builder.byte_cost_ub > initial_byte_cost, 
-                "byte_cost_ub should increase with each bundle");
-        
+
+        assert!(
+            builder.byte_cost_ub > initial_byte_cost,
+            "byte_cost_ub should increase with each bundle"
+        );
+
         let upper_bound = builder.cost();
         let (_, _, exact_cost) = builder.finalize().expect("finalize");
-        
-        assert!(upper_bound >= exact_cost, 
-                "upper bound ({upper_bound}) should be >= exact cost ({exact_cost})");
+
+        assert!(
+            upper_bound >= exact_cost,
+            "upper bound ({upper_bound}) should be >= exact cost ({exact_cost})"
+        );
     }
 
     #[ignore = "expensive test, only run in release mode (--include-ignored)"]
