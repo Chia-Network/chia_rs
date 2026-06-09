@@ -226,6 +226,8 @@ impl InternedBlockBuilder {
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
         // Intern from root (same tree the validator sees) to get the exact cost.
+        // Must match run_block_generator2(..., INTERNED_GENERATOR) base cost;
+        // see test_finalize_cost_matches_consensus.
         let interned = intern_tree(&self.allocator, root)?;
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
 
@@ -367,16 +369,84 @@ mod tests {
 
     fn make_test_coin_spend(parent: [u8; 32], amount: u64) -> chia_protocol::CoinSpend {
         use chia_protocol::{Coin, Program};
+        use clvm_utils::tree_hash_from_bytes;
 
-        let puzzle_hash = [2u8; 32];
-        let puzzle = Program::from(vec![0x01]); // (q)
+        let puzzle = Program::from(vec![0x01]); // CLVM atom 1
         let solution = Program::from(vec![0x80]); // nil
+        let puzzle_hash = tree_hash_from_bytes(puzzle.as_ref())
+            .expect("puzzle hash")
+            .into();
 
         chia_protocol::CoinSpend::new(
-            Coin::new(parent.into(), puzzle_hash.into(), amount),
+            Coin::new(parent.into(), puzzle_hash, amount),
             puzzle,
             solution,
         )
+    }
+
+    /// CLVM execution + conditions cost only (excludes generator byte cost).
+    fn clvm_execution_cost(bundle: &SpendBundle) -> u64 {
+        let mut a = Allocator::new();
+        let conds = run_spendbundle(
+            &mut a,
+            bundle,
+            11_000_000_000,
+            ConsensusFlags::empty(),
+            &TEST_CONSTANTS,
+        )
+        .expect("run_spendbundle")
+        .0;
+        conds.cost
+            - (calculate_generator_length(&bundle.coin_spends) as u64 - 2)
+                * TEST_CONSTANTS.cost_per_byte
+    }
+
+    /// finalize() must agree with run_block_generator2(..., INTERNED_GENERATOR).
+    #[test]
+    fn test_finalize_cost_matches_consensus() {
+        let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+
+        // Five spends: same puzzle bytes (shared subtree) with different coins.
+        let bundles: Vec<SpendBundle> = (0..5)
+            .map(|i| {
+                SpendBundle::new(
+                    vec![make_test_coin_spend([i + 1; 32], 1000 + i as u64)],
+                    Signature::default(),
+                )
+            })
+            .collect();
+
+        for bundle in &bundles {
+            let exec_cost = clvm_execution_cost(bundle);
+            let (added, _) = builder
+                .add_spend_bundles([bundle], exec_cost)
+                .expect("add_spend_bundles");
+            assert!(added, "bundle should fit");
+        }
+
+        let upper_bound = builder.cost();
+        let (generator, signature, finalize_cost) = builder.finalize().expect("finalize");
+
+        assert!(
+            upper_bound >= finalize_cost,
+            "upper bound {upper_bound} must be >= finalize cost {finalize_cost}"
+        );
+
+        let (_, conds) = run_block_generator2::<&[u8], _>(
+            generator.as_slice(),
+            [],
+            TEST_CONSTANTS.max_block_cost_clvm,
+            MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+            &signature,
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_block_generator2");
+
+        assert_eq!(
+            conds.cost, finalize_cost,
+            "finalize() cost must match consensus INTERNED_GENERATOR path"
+        );
     }
 
     #[test]
