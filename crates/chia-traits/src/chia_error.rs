@@ -22,6 +22,8 @@ pub enum Error {
     InvalidPotIteration,
     #[error("Invalid ProofOfSpace")]
     InvalidPoS,
+    #[error("Invalid FullBlock")]
+    InvalidFullBlock,
     #[error("{0}")]
     Custom(String),
 }
