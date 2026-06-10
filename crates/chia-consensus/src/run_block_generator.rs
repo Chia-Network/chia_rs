@@ -1,8 +1,8 @@
 use crate::allocator::make_allocator;
 use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
-    EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions, parse_spends,
-    process_single_spend, validate_conditions, validate_signature,
+    ConditionsCache, EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions,
+    parse_spends, process_single_spend, validate_conditions, validate_signature,
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
@@ -262,6 +262,11 @@ where
 
     let mut state = ParseState::default();
     let mut cache = TreeCache::default();
+    let mut conditions_cache = if flags.contains(ConsensusFlags::CONDITIONS_CACHE) {
+        Some(ConditionsCache::default())
+    } else {
+        None
+    };
 
     // first iterate over all puzzle reveals to find duplicate nodes, to know
     // what to memoize during tree hash computations. This is managed by
@@ -286,7 +291,6 @@ where
             return Err(ValidationErr::Err(ErrorCode::TooManySpends));
         }
         spends_left -= 1;
-        // process the spend
         let [parent_id, puzzle, amount, solution, _spend_level_extra] =
             extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)?;
 
@@ -311,6 +315,7 @@ where
             &mut cost_left,
             clvm_cost,
             constants,
+            conditions_cache.as_mut(),
         )?;
     }
     if a.atom_len(iter) != 0 {
