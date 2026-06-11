@@ -288,4 +288,211 @@ impl InternedBlockBuilder {
 }
 
 #[cfg(test)]
-mod tests;
+mod unit_tests;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::consensus_constants::TEST_CONSTANTS;
+    use crate::flags::ConsensusFlags;
+    use crate::flags::MEMPOOL_MODE;
+    use crate::owned_conditions::OwnedSpendBundleConditions;
+    use crate::run_block_generator::run_block_generator2;
+    use crate::solution_generator::calculate_generator_length;
+    use crate::spendbundle_conditions::run_spendbundle;
+    use chia_protocol::{Bytes, Coin};
+    use chia_traits::Streamable;
+    use rand::rngs::StdRng;
+    use rand::{SeedableRng, prelude::SliceRandom};
+    use std::collections::HashSet;
+    use std::fs;
+    use std::time::Instant;
+
+    #[ignore = "expensive test, only run in release mode (--include-ignored)"]
+    #[test]
+    fn test_build_block() {
+        let mut all_bundles = vec![];
+        println!("loading spend bundles from disk");
+        let mut seen_spends = HashSet::new();
+        for entry in fs::read_dir("../../test-bundles").expect("listing test-bundles directory") {
+            let file = entry.expect("list dir").path();
+            if file.extension().map(|s| s.to_str()) != Some(Some("bundle")) {
+                continue;
+            }
+            // only use 32 byte hex encoded filenames
+            if file.file_stem().map(std::ffi::OsStr::len) != Some(64_usize) {
+                continue;
+            }
+            let buf = fs::read(file.clone()).expect("read bundle file");
+            let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parsing SpendBundle");
+
+            let mut a = Allocator::new();
+            let conds = run_spendbundle(
+                &mut a,
+                &bundle,
+                11_000_000_000,
+                ConsensusFlags::empty(),
+                &TEST_CONSTANTS,
+            )
+            .expect("run_spendbundle")
+            .0;
+
+            if conds
+                .spends
+                .iter()
+                .any(|s| seen_spends.contains(&*s.coin_id))
+            {
+                // We can't have conflicting spend bundles, since we combine
+                // them randomly. In this case two spend bundles spend the same
+                // coin
+                panic!(
+                    "conflict in {}",
+                    file.file_name().unwrap().to_str().unwrap()
+                );
+            }
+            if conds.spends.iter().any(|s| {
+                s.create_coin.iter().any(|c| {
+                    seen_spends.contains(&Coin::new(*s.coin_id, c.puzzle_hash, c.amount).coin_id())
+                })
+            }) {
+                // We can't have conflicting spend bundles, since we combine
+                // them randomly. In this case one spend bundle spends the coin
+                // created by another. This is probably OK in most cases, but
+                // not in the general case. We have restrictions on ephemeral
+                // spends (they cannot have relative time-lock conditions).
+                // Since the combination is random, we may end up with an
+                // invalid block.
+                panic!(
+                    "conflict in {}",
+                    file.file_name().unwrap().to_str().unwrap()
+                );
+            }
+            for spend in &conds.spends {
+                seen_spends.insert(*spend.coin_id);
+                for coin in &spend.create_coin {
+                    seen_spends
+                        .insert(Coin::new(*spend.coin_id, coin.puzzle_hash, coin.amount).coin_id());
+                }
+            }
+
+            // cost is supposed to not include byte-cost, so we have to subtract
+            // it here
+            let cost = conds.cost
+                - (calculate_generator_length(&bundle.coin_spends) as u64 - 2)
+                    * TEST_CONSTANTS.cost_per_byte;
+
+            let mut conds = OwnedSpendBundleConditions::from(&a, conds);
+            for s in &mut conds.spends {
+                // when running a block in consensus mode, we don't bother
+                // establishing whether a spend is eligible for dedup or not.
+                // So, to compare with the generator output later, we need to clear
+                // this field
+                s.flags = 0;
+                s.fingerprint = Bytes::default();
+                // when parsing conditions, create coin conditions are stored in
+                // a hash set to cheaply check for double spends. This means the
+                // order of this collection is not deterministic. In order to
+                // compare to the generator output later, we need to sort both.
+                s.create_coin.sort();
+            }
+            all_bundles.push(Box::new((bundle, cost, conds)));
+        }
+        all_bundles.sort_by_key(|x| x.1);
+        /*
+        let mut last_cost = 0;
+        for entry in &all_bundles {
+            let (cond, cost, _) = entry.as_ref();
+            if *cost != last_cost {
+                println!("\n== {cost}");
+                last_cost = *cost;
+            }
+            print!("{}.bundle ", cond.name());
+        }
+        println!("\n");
+        */
+        println!("loaded {} spend bundles", all_bundles.len());
+
+        let num_cores: usize = std::thread::available_parallelism().unwrap().into();
+        let pool = blocking_threadpool::Builder::new()
+            .num_threads(num_cores)
+            .queue_len(num_cores + 1)
+            .build();
+
+        for seed in 0..30 {
+            let mut bundles = all_bundles.clone();
+            let mut rng = StdRng::seed_from_u64(seed);
+            pool.execute(move || {
+                bundles.shuffle(&mut rng);
+
+                let start = Instant::now();
+                let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+                let mut skipped = 0;
+                let mut num_tx = 0;
+                let mut max_call_time = 0.0f32;
+                let mut spends = vec![];
+                for entry in &bundles {
+                    let (bundle, cost, conds) = entry.as_ref();
+                    let start_call = Instant::now();
+                    let (added, result) = builder
+                        .add_spend_bundles([bundle], *cost)
+                        .expect("add_spend_bundle");
+
+                    max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
+                    if added {
+                        num_tx += 1;
+                        spends.extend(conds.spends.iter());
+                    } else {
+                        skipped += 1;
+                    }
+                    if result == BuildBlockResult::Done {
+                        break;
+                    }
+                }
+                let upper_bound_cost = builder.cost();
+                let (generator, signature, cost) =
+                    builder.finalize().expect("finalize()");
+
+                // cost() is an upper-bound estimate (no deduplication); finalize() returns
+                // the exact interned cost. The upper bound must be >= the exact cost.
+                assert!(
+                    upper_bound_cost >= cost,
+                    "upper bound {upper_bound_cost} must be >= exact cost {cost}"
+                );
+
+                println!(
+                    "idx: {seed:3} built block in {:>5.2} seconds, cost: {cost:11} skipped: {skipped:2} longest-call: {max_call_time:>5.2}s TX: {num_tx}",
+                    start.elapsed().as_secs_f32()
+                );
+
+                //fs::write(format!("../../{seed}.generator"), generator.as_slice())
+                //    .expect("write generator");
+
+                let (a, conds) = run_block_generator2::<&[u8], _>(
+                    generator.as_slice(),
+                    [],
+                    TEST_CONSTANTS.max_block_cost_clvm,
+                    MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+                    &signature,
+                    None,
+                    &TEST_CONSTANTS,
+                )
+                .expect("run_block_generator2");
+                assert_eq!(conds.cost, cost);
+                let mut conds = OwnedSpendBundleConditions::from(&a, conds);
+
+                assert_eq!(conds.spends.len(), spends.len());
+                conds.spends.sort_by_key(|s| s.coin_id);
+                spends.sort_by_key(|s| s.coin_id);
+                for (mut generator, tx) in conds.spends.into_iter().zip(spends) {
+                    generator.create_coin.sort();
+                    generator.flags = 0;
+                    generator.fingerprint = Bytes::default();
+                    assert_eq!(&generator, tx);
+                }
+            });
+            assert_eq!(pool.panic_count(), 0);
+        }
+        pool.join();
+        assert_eq!(pool.panic_count(), 0);
+    }
+}
