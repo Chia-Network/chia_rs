@@ -164,7 +164,7 @@ fn test_single_spend_bundle() {
         .expect("add_spend_bundles");
 
     assert!(added, "bundle should be added");
-    assert_eq!(result, BuildBlockResult::KeepGoing);
+    assert!(result == BuildBlockResult::KeepGoing);
 
     let (generator, sig, cost) = builder.finalize().expect("finalize");
 
@@ -224,15 +224,13 @@ fn test_block_full_overflow() {
         .expect("add_spend_bundles");
 
     if added {
-        assert_eq!(
-            result,
-            BuildBlockResult::Done,
+        assert!(
+            result == BuildBlockResult::Done,
             "should signal Done when close to limit"
         );
     } else {
-        assert_eq!(
-            result,
-            BuildBlockResult::Done,
+        assert!(
+            result == BuildBlockResult::Done,
             "should be Done if bundle doesn't fit"
         );
     }
@@ -270,10 +268,10 @@ fn test_num_skipped() {
 }
 
 #[test]
-fn test_byte_cost_ub_tracking() {
+fn test_byte_cost_tracking() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
-    assert_eq!(builder.byte_cost_ub, 0, "byte_cost_ub should start at 0");
+    assert_eq!(builder.byte_cost, 0, "byte_cost should start at 0");
 
     let coin_spend = make_test_coin_spend([1u8; 32], 1000);
     let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
@@ -284,11 +282,11 @@ fn test_byte_cost_ub_tracking() {
     assert!(added);
 
     assert!(
-        builder.byte_cost_ub > 0,
-        "byte_cost_ub should increase after adding bundle"
+        builder.byte_cost > 0,
+        "byte_cost should increase after adding bundle"
     );
 
-    let initial_byte_cost = builder.byte_cost_ub;
+    let initial_byte_cost = builder.byte_cost;
 
     let coin_spend2 = make_test_coin_spend([2u8; 32], 2000);
     let bundle2 = SpendBundle::new(vec![coin_spend2], Signature::default());
@@ -299,8 +297,8 @@ fn test_byte_cost_ub_tracking() {
     assert!(added);
 
     assert!(
-        builder.byte_cost_ub > initial_byte_cost,
-        "byte_cost_ub should increase with each bundle"
+        builder.byte_cost > initial_byte_cost,
+        "byte_cost should increase with each bundle"
     );
 
     let upper_bound = builder.cost();

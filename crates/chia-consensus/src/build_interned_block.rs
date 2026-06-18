@@ -21,18 +21,12 @@ const MAX_SKIPPED_ITEMS: u32 = 6;
 /// determine how close to the block size limit we're willing to go.
 const MIN_COST_THRESHOLD: u64 = 6_000_000;
 
-/// Interned vbyte weight of the generator wrapper `(q . ((spend_list)))`:
-///   q atom (1 byte):           1 + 2 = 3
-///   outer pair (q . ...):              3
-///   inner pair (spend_list . nil):     3
-///   nil terminator:            0 + 2 = 2
-///                                   ----
-///                                     11
+/// Interned vbyte weight of the `(q . ((spend_list)))` wrapper.
 const WRAPPER_VBYTES: u64 = 11;
 
 /// Returned from add_spend_bundle(), indicating whether more bundles can be
 /// added or not.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq)]
 pub enum BuildBlockResult {
     /// More spend bundles can be added
     KeepGoing,
@@ -57,11 +51,11 @@ pub struct InternedBlockBuilder {
     spend_list: NodePtr,
 
     // the cost of the block we've built up so far, not including the byte-cost.
-    // That's separated out into the byte_cost_ub member.
+    // That's seprated out into the byte_cost member.
     block_cost: u64,
 
-    // the upper-bound byte cost, so far, from per-spend isolated interning
-    byte_cost_ub: u64,
+    // the byte cost, so for, of what's in the generator (upper-bound estimate)
+    byte_cost: u64,
 
     // the number of spend bundles we've failed to add. Once this grows too
     // large, we give up
@@ -89,7 +83,7 @@ impl InternedBlockBuilder {
             signature: Signature::default(),
             spend_list,
             block_cost: 20,
-            byte_cost_ub: 0,
+            byte_cost: 0,
             num_skipped: 0,
             cost_per_byte,
             max_block_cost,
@@ -131,8 +125,8 @@ impl InternedBlockBuilder {
     /// add a batch of spend bundles to the generator. The cost for each bundle
     /// must be *only* the CLVM execution cost + the cost of the conditions.
     /// It must not include the byte cost of the bundle. The byte cost is
-    /// unpredictable as the generator is being compressed. The true byte cost
-    /// is computed by this function. Returns true if the bundles could be added
+    /// unpredictible as the generator is being / compressed. The true byte cost
+    /// is computed by this function. / returns true if the bundles could be added
     /// to the generator, false otherwise. Note that either all bundles are
     /// added, or none of them. If the resulting block exceeds the cost limit,
     /// none of the bundles are added
@@ -149,14 +143,14 @@ impl InternedBlockBuilder {
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+        if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
             > self.max_block_cost
         {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost_ub + wrapper_cost + self.block_cost + cost > self.max_block_cost {
+        if self.byte_cost + wrapper_cost + self.block_cost + cost > self.max_block_cost {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -188,22 +182,25 @@ impl InternedBlockBuilder {
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
 
-        let new_total_byte_cost = self.byte_cost_ub + new_byte_cost;
+        let new_total_byte_cost = self.byte_cost + new_byte_cost;
         if new_total_byte_cost + wrapper_cost + self.block_cost + cost > self.max_block_cost {
+            // Undo the last add() call.
             // It might be tempting to reset the allocator as well, however,
-            // the nodes we just added remain cached. It's more expensive to
-            // reset this cache, so we leave the Allocator untouched instead.
+            // the incremental serializer will have already cached the tree we
+            // just added and it will remain cached when we restore the
+            // serializer state. It's more expensive to reset this cache, so we
+            // leave the Allocator untouched instead.
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
-        self.byte_cost_ub = new_total_byte_cost;
+        self.byte_cost = new_total_byte_cost;
         self.spend_list = spend_list;
         self.block_cost += cost;
         self.signature.aggregate(&cumulative_signature);
 
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        let result = if self.byte_cost_ub + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
+        let result = if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
             > self.max_block_cost
         {
             BuildBlockResult::Done
@@ -214,7 +211,7 @@ impl InternedBlockBuilder {
     }
 
     pub fn cost(&self) -> u64 {
-        self.byte_cost_ub + WRAPPER_VBYTES * self.cost_per_byte + self.block_cost
+        self.byte_cost + WRAPPER_VBYTES * self.cost_per_byte + self.block_cost
     }
 
     // returns generator, sig, cost
@@ -225,9 +222,6 @@ impl InternedBlockBuilder {
         let root = self.allocator.new_pair(self.allocator.one(), inner)?;
         let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
 
-        // Intern from root (same tree the validator sees) to get the exact cost.
-        // Must match run_block_generator2(..., INTERNED_GENERATOR) base cost;
-        // see test_finalize_cost_matches_consensus.
         let interned = intern_tree(&self.allocator, root)?;
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
 
@@ -278,8 +272,6 @@ impl InternedBlockBuilder {
     /// generate the block generator
     #[pyo3(name = "finalize")]
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
-        // PyO3 doesn't allow consuming self, so we swap in a dummy and finalize
-        // the original.
         let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost);
         std::mem::swap(self, &mut temp);
         let (generator, sig, cost) = temp.finalize()?;
@@ -288,7 +280,7 @@ impl InternedBlockBuilder {
 }
 
 #[cfg(test)]
-mod unit_tests;
+mod additional_tests;
 
 #[cfg(test)]
 mod tests {
