@@ -1,0 +1,20 @@
+name: 🚨 actionlint
+
+on:
+  push:
+    branches:
+      - long_lived/**
+      - main
+      - release/**
+    tags:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    uses: chia-network/actions/.github/workflows/reflow-actionlint.yml@reflow-actionlint
