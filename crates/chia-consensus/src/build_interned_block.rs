@@ -24,6 +24,9 @@ const MIN_COST_THRESHOLD: u64 = 6_000_000;
 /// Interned vbyte weight of the `(q . ((spend_list)))` wrapper.
 const WRAPPER_VBYTES: u64 = 11;
 
+/// The cost of a cons cell in the generator tree
+const COST_CONS: u64 = 3;
+
 /// Returned from add_spend_bundle(), indicating whether more bundles can be
 /// added or not.
 #[derive(PartialEq)]
@@ -118,8 +121,8 @@ impl InternedBlockBuilder {
         let item = a.new_pair(parent_id, item)?;
 
         let interned = intern_tree(&a, item)?;
-        // +3 for the cons cell linking this spend into the spend list
-        Ok(interned_vbytes(&interned) + 3)
+        // account for the cons cell linking this spend into the spend list
+        Ok(interned_vbytes(&interned) + COST_CONS)
     }
 
     /// add a batch of spend bundles to the generator. The cost for each bundle
@@ -160,6 +163,7 @@ impl InternedBlockBuilder {
         let mut spend_list = self.spend_list;
         let mut new_byte_cost = 0u64;
         let mut cumulative_signature = Signature::default();
+        let checkpoint = a.checkpoint();
         for bundle in bundles {
             for spend in &bundle.borrow().coin_spends {
                 new_byte_cost += Self::spend_vbytes(spend)? * self.cost_per_byte;
@@ -185,11 +189,7 @@ impl InternedBlockBuilder {
         let new_total_byte_cost = self.byte_cost + new_byte_cost;
         if new_total_byte_cost + wrapper_cost + self.block_cost + cost > self.max_block_cost {
             // Undo the last add() call.
-            // It might be tempting to reset the allocator as well, however,
-            // the incremental serializer will have already cached the tree we
-            // just added and it will remain cached when we restore the
-            // serializer state. It's more expensive to reset this cache, so we
-            // leave the Allocator untouched instead.
+            self.allocator.restore_checkpoint(&checkpoint);
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
