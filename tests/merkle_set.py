@@ -45,7 +45,7 @@ TERMINAL = bytes([1])
 MIDDLE = bytes([2])
 TRUNCATED = bytes([3])
 
-BLANK = bytes32([0] * 32)
+BLANK = bytes32.zeros
 
 prehashed: dict[bytes, _Hash] = {}
 
