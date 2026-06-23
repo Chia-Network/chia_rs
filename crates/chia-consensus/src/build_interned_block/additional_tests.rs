@@ -14,7 +14,9 @@ fn test_generator_cost_accuracy() {
     // and that finalize() returns the correct exact cost.
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
-    let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
+    // Real fixture from test-bundles/ (same pool as test_build_block); signatures
+    // validate under run_block_generator2 unlike e.g. 3000253.bundle.
+    let file = "../../test-bundles/037e680ae8fe9cfdac4ff2257d07f70c602da7e9b9066b31521d442eee83a001.bundle";
     assert!(
         std::path::Path::new(file).exists(),
         "test bundle file not found: {file}"
