@@ -130,6 +130,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "interned-block-builder"
+path = "fuzz_targets/interned-block-builder.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "additions-and-removals"
 path = "fuzz_targets/additions-and-removals.rs"
 test = false

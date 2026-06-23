@@ -15,9 +15,10 @@ fn test_generator_cost_accuracy() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
     let file = "../../test-bundles/e003f780f1bf036bfa3df7eed6b0e480c2dc3e9d6b1f8c3aeeb542e9da08e8d4.bundle";
-    if !std::path::Path::new(file).exists() {
-        return;
-    }
+    assert!(
+        std::path::Path::new(file).exists(),
+        "test bundle file not found: {file}"
+    );
 
     let buf = fs::read(file).expect("read bundle file");
     let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parse SpendBundle");
@@ -43,11 +44,27 @@ fn test_generator_cost_accuracy() {
     assert!(added);
 
     let upper_bound = builder.cost();
-    let (_, _, exact_total) = builder.finalize().expect("finalize");
+    let (generator, signature, exact_total) = builder.finalize().expect("finalize");
 
     assert!(
         upper_bound >= exact_total,
         "upper bound {upper_bound} should be >= exact {exact_total}"
+    );
+
+    let (_, conds) = run_block_generator2::<&[u8], _>(
+        generator.as_slice(),
+        [],
+        TEST_CONSTANTS.max_block_cost_clvm,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        &signature,
+        None,
+        &TEST_CONSTANTS,
+    )
+    .expect("run_block_generator2");
+
+    assert_eq!(
+        conds.cost, exact_total,
+        "finalize() cost must match consensus INTERNED_GENERATOR path"
     );
 }
 
