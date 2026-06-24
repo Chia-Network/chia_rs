@@ -7,28 +7,15 @@ use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_conditions::run_spendbundle;
 use chia_traits::Streamable;
 use std::fs;
+use std::path::Path;
 
-#[test]
-fn test_generator_cost_accuracy() {
-    // Verify that the upper-bound estimate is always >= the exact cost,
-    // and that finalize() returns the correct exact cost.
-    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
-
-    // Real fixture from test-bundles/ (same pool as test_build_block); signatures
-    // validate under run_block_generator2 unlike e.g. 3000253.bundle.
-    let file = "../../test-bundles/037e680ae8fe9cfdac4ff2257d07f70c602da7e9b9066b31521d442eee83a001.bundle";
-    assert!(
-        std::path::Path::new(file).exists(),
-        "test bundle file not found: {file}"
-    );
-
-    let buf = fs::read(file).expect("read bundle file");
-    let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parse SpendBundle");
-
+/// For a single spend bundle: upper bound >= finalize cost, and finalize cost matches
+/// `run_block_generator2(..., INTERNED_GENERATOR)` (block header cost).
+fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
     let mut a = Allocator::new();
     let conds = run_spendbundle(
         &mut a,
-        &bundle,
+        bundle,
         11_000_000_000,
         ConsensusFlags::empty(),
         &TEST_CONSTANTS,
@@ -40,10 +27,11 @@ fn test_generator_cost_accuracy() {
         - (calculate_generator_length(&bundle.coin_spends) as u64 - 2)
             * TEST_CONSTANTS.cost_per_byte;
 
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
     let (added, _) = builder
-        .add_spend_bundles([&bundle], cost)
+        .add_spend_bundles([bundle], cost)
         .expect("add_spend_bundles");
-    assert!(added);
+    assert!(added, "bundle should fit in block");
 
     let upper_bound = builder.cost();
     let (generator, signature, exact_total) = builder.finalize().expect("finalize");
@@ -68,6 +56,30 @@ fn test_generator_cost_accuracy() {
         conds.cost, exact_total,
         "finalize() cost must match consensus INTERNED_GENERATOR path"
     );
+}
+
+#[test]
+fn test_generator_cost_accuracy() {
+    // Same hex-named fixtures as test_build_block (90 bundles). Each is checked as a
+    // single-bundle block so aggregate signatures validate under run_block_generator2.
+    let dir = Path::new("../../test-bundles");
+    let mut count = 0;
+    for entry in fs::read_dir(dir).expect("listing test-bundles directory") {
+        let file = entry.expect("list dir").path();
+        if file.extension().and_then(|s| s.to_str()) != Some("bundle") {
+            continue;
+        }
+        // only use 32 byte hex encoded filenames
+        if file.file_stem().map(std::ffi::OsStr::len) != Some(64_usize) {
+            continue;
+        }
+
+        let buf = fs::read(&file).expect("read bundle file");
+        let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parse SpendBundle");
+        assert_generator_cost_accuracy(&bundle);
+        count += 1;
+    }
+    assert_eq!(count, 90, "expected 90 hex-named test bundles");
 }
 
 #[test]
