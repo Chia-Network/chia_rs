@@ -207,7 +207,7 @@ impl ProofOfSpace {
 // ProofOfSpace was updated in Chia 3.0 to support v2 proofs. In order to stay
 // backwards compatible with the network protocol and the block hashes of
 // previous versions, for v1 proofs, some care has to be taken.
-// Optional fields are serialized with a 1-byte prefix indicating whether the
+// Option fields are serialized with a 1-byte prefix indicating whether the
 // field is set or not. This byte is either 0 or 1. This leaves 7 unused bits.
 // We use bit 2 in the byte prefix for the pool_contract_puzzle_hash field to
 // indicate whether this is a v2 proof or not. v1 proofs leave this bit as 0,
@@ -368,7 +368,7 @@ mod tests {
         )
     }
 
-    // Locate the pool_contract_puzzle_hash Optional prefix byte (which also
+    // Locate the pool_contract_puzzle_hash Option prefix byte (which also
     // encodes the version) by finding where a contract-present and a
     // contract-absent serialization first differ.
     fn prefix_offset() -> usize {
@@ -495,7 +495,7 @@ mod tests {
     }
 
     // Round-trip every accepted prefix-byte combination. For v0 (legacy v1
-    // proofs) the pool_contract Optional is lenient and accepts any of
+    // proofs) the pool_contract Option is lenient and accepts any of
     // {neither, pool_pk, contract, both}, exactly like the original plain
     // Option<> derive. For v1 (v2 proofs) the size field is not stored and
     // collapses to 0 on parse.
@@ -547,10 +547,10 @@ mod tests {
         }
     }
 
-    // The version flag is packed into the pool_contract_puzzle_hash Optional
-    // prefix byte. Only bit 0 (the Optional flag) and bit 1 (the version) carry
+    // The version flag is packed into the pool_contract_puzzle_hash Option
+    // prefix byte. Only bit 0 (the Option flag) and bit 1 (the version) carry
     // meaning. The high bits (2..=7) must be rejected for both versions,
-    // matching the strictness of a plain Optional<> prefix in earlier protocol
+    // matching the strictness of a plain Option<> prefix in earlier protocol
     // versions where this byte could only ever be 0 or 1.
     #[rstest]
     fn high_prefix_bits_rejected(#[values(0, 1)] version: u8, #[values(2, 3, 4, 5, 6, 7)] bit: u8) {

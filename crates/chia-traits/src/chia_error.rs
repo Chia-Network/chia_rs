@@ -24,6 +24,8 @@ pub enum Error {
     InvalidPoS,
     #[error("Invalid FullBlock")]
     InvalidFullBlock,
+    #[error("Invalid UnfinishedBlock")]
+    InvalidUnfinishedBlock,
     #[error("{0}")]
     Custom(String),
 }

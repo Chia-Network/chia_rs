@@ -364,7 +364,7 @@ impl Program {
         // and it being treated as the CLVM structure it represents. In python's
         // SerializedProgram, we have a hack where we interpret the first
         // "layer" of SerializedProgram, or lists of SerializedProgram this way.
-        // But if we encounter an Optional or tuple, we defer to the clvm
+        // But if we encounter an Option or tuple, we defer to the clvm
         // wheel's conversion function to SExp. This level does not have any
         // special treatment for SerializedProgram (as that would cause a
         // circular dependency).
