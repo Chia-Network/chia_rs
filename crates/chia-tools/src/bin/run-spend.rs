@@ -258,7 +258,7 @@ fn print_puzzle_info(a: &Allocator, puzzle: NodePtr, solution: NodePtr) {
 
         // Unknown puzzle
         n => {
-            println!("  Unknown puzzle {}", &hex::encode(n));
+            println!("  Unknown puzzle {}", hex::encode(n));
         }
     }
 }
@@ -287,7 +287,7 @@ fn main() {
         .to_clvm(&mut a)
         .expect("deserialize solution");
 
-    println!("Spending {:?}", &spend.coin);
+    println!("Spending {:?}", spend.coin);
     println!("   coin-id: {}\n", hex::encode(spend.coin.coin_id()));
     let dialect = ChiaDialect::new(ClvmFlags::empty());
     let Reduction(_clvm_cost, conditions) =
@@ -306,7 +306,7 @@ fn main() {
         iter = next;
         let op_ptr = first(&a, c).expect("parsing conditions");
         let Some(op) = parse_opcode(&a, op_ptr, ConsensusFlags::empty()) else {
-            println!("  UNKNOWN CONDITION [{}]", &hex::encode(a.atom(op_ptr)));
+            println!("  UNKNOWN CONDITION [{}]", hex::encode(a.atom(op_ptr)));
             continue;
         };
 

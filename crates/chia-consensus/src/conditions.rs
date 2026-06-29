@@ -2379,7 +2379,7 @@ fn test_extra_arg(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+    assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
     test(&conds, spend);
 }
@@ -2433,7 +2433,7 @@ fn test_single_condition(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+    assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
     test(&conds, spend);
 }
@@ -2576,7 +2576,7 @@ fn test_multiple_conditions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+    assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
     test(&conds, spend);
 }
@@ -3639,7 +3639,7 @@ fn test_agg_sig_extra_arg(#[case] condition: ConditionOpcode) {
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+    assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
     if condition != AGG_SIG_UNSAFE {
         let agg_sigs = agg_sig_vec(condition, spend);
@@ -4462,7 +4462,7 @@ fn test_impossible_constraints_single_spend(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+        assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
     }
 }
 
@@ -4559,13 +4559,13 @@ fn test_impossible_constraints_separate_spends(
         assert_eq!(*spend.coin_id, test_coin_id(H1, H1, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+        assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
         let spend = &conds.spends[1];
         assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 123));
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+        assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
     }
 }
 
@@ -4607,7 +4607,7 @@ fn test_multiple_my_birth_assertions(
     let spend = &conds.spends[0];
     assert_eq!(*spend.coin_id, test_coin_id(H1, H2, 1234));
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
-    assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+    assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
 
     test(spend);
 }
@@ -4885,7 +4885,7 @@ fn test_relative_condition_on_ephemeral(
         );
         assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
         assert_eq!(spend.agg_sig_me.len(), 0);
-        assert!((spend.flags & ELIGIBLE_FOR_DEDUP) == 0);
+        assert_eq!(spend.flags & ELIGIBLE_FOR_DEDUP, 0);
     }
 }
 

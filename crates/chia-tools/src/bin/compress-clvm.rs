@@ -32,5 +32,5 @@ fn main() {
     let input = node_from_bytes(&mut a, &input[..]).expect("failed to parse input file");
 
     let compressed = node_to_bytes_backrefs(&a, input).expect("failed to compress input file");
-    write!(output, "{}", &hex::encode(compressed)).expect("failed to write to output file");
+    write!(output, "{}", hex::encode(compressed)).expect("failed to write to output file");
 }

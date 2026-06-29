@@ -509,8 +509,8 @@ mod tests {
         rng.fill(data.as_mut_slice());
         let sk3 = SecretKey::from_seed(&data);
 
-        assert!(hash(&sk1) == hash(&sk2));
-        assert!(hash(&sk1) != hash(&sk3));
+        assert_eq!(hash(&sk1), hash(&sk2));
+        assert_ne!(hash(&sk1), hash(&sk3));
     }
 
     #[test]

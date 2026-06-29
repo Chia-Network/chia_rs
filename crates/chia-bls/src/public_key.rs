@@ -271,10 +271,7 @@ impl Add<&PublicKey> for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_fmt(format_args!(
-            "<G1Element {}>",
-            &hex::encode(self.to_bytes())
-        ))
+        formatter.write_fmt(format_args!("<G1Element {}>", hex::encode(self.to_bytes())))
     }
 }
 
@@ -625,8 +622,11 @@ mod tests {
         let pk2 = pk1.derive_unhardened(1);
         let pk3 = pk1.derive_unhardened(2);
 
-        assert!(hash(pk2) != hash(pk3));
-        assert!(hash(pk1.derive_unhardened(42)) == hash(pk1.derive_unhardened(42)));
+        assert_ne!(hash(pk2), hash(pk3));
+        assert_eq!(
+            hash(pk1.derive_unhardened(42)),
+            hash(pk1.derive_unhardened(42))
+        );
     }
 
     #[test]
@@ -702,10 +702,10 @@ mod tests {
             let g1 = PublicKey::from_integer(&data);
             let mut g1_neg = g1;
             g1_neg.negate();
-            assert!(g1_neg != g1);
+            assert_ne!(g1_neg, g1);
 
             g1_neg.negate();
-            assert!(g1_neg == g1);
+            assert_eq!(g1_neg, g1);
         }
     }
 
@@ -715,7 +715,7 @@ mod tests {
         let mut g1_neg = g1;
         // negate on infinity is a no-op
         g1_neg.negate();
-        assert!(g1_neg == g1);
+        assert_eq!(g1_neg, g1);
     }
 
     #[test]
@@ -734,9 +734,9 @@ mod tests {
             let mut g1_double = g1;
             // adding the negative undoes adding the positive
             g1_double += &g1;
-            assert!(g1_double != g1);
+            assert_ne!(g1_double, g1);
             g1_double += &g1_neg;
-            assert!(g1_double == g1);
+            assert_eq!(g1_double, g1);
         }
     }
 
@@ -752,10 +752,10 @@ mod tests {
             let mut g1 = PublicKey::from_integer(&data);
             let mut g1_double = g1;
             g1_double += &g1;
-            assert!(g1_double != g1);
+            assert_ne!(g1_double, g1);
             // scalar multiply by 2 is the same as adding oneself
             g1.scalar_multiply(&[2]);
-            assert!(g1_double == g1);
+            assert_eq!(g1_double, g1);
         }
     }
 
@@ -770,7 +770,7 @@ mod tests {
             rng.fill(&mut msg);
             let default_hash = hash_to_g1(&msg);
             assert_eq!(default_hash, hash_to_g1_with_dst(&msg, DEFAULT_DST));
-            assert!(default_hash != hash_to_g1_with_dst(&msg, CUSTOM_DST));
+            assert_ne!(default_hash, hash_to_g1_with_dst(&msg, CUSTOM_DST));
         }
     }
 

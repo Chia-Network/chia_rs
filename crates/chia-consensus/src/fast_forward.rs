@@ -310,7 +310,10 @@ mod tests {
         )
         .expect("run_puzzle");
 
-        assert!(conditions1.spends[0].create_coin == conditions2.spends[0].create_coin);
+        assert_eq!(
+            conditions1.spends[0].create_coin,
+            conditions2.spends[0].create_coin
+        );
     }
 
     #[allow(clippy::needless_pass_by_value)]

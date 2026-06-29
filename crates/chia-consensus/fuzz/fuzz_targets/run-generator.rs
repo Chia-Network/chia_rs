@@ -49,8 +49,8 @@ fuzz_target!(|data: &[u8]| {
         }
         (r1, r2) => {
             println!("mismatching result");
-            println!(" run_block_generator: {:?}", &r1);
-            println!("run_block_generator2: {:?}", &r2);
+            println!(" run_block_generator: {r1:?}");
+            println!("run_block_generator2: {r2:?}");
             panic!("failed");
         }
     }

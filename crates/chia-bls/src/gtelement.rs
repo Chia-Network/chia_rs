@@ -83,10 +83,7 @@ impl Mul<&GTElement> for &GTElement {
 
 impl fmt::Debug for GTElement {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_fmt(format_args!(
-            "<GTElement {}>",
-            &hex::encode(self.to_bytes())
-        ))
+        formatter.write_fmt(format_args!("<GTElement {}>", hex::encode(self.to_bytes())))
     }
 }
 

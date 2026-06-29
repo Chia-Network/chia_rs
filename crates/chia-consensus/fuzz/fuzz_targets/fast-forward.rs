@@ -213,7 +213,7 @@ fn test_ff(
             // rebased/fast-forwarded, it should at least not be considered
             // eligible.
             let msg2 = e2.error_code();
-            assert!((conditions1.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+            assert_eq!(conditions1.spends[0].flags & ELIGIBLE_FOR_FF, 0);
             assert!(discrepancy_errors.contains(&msg2));
         }
         (Err(e1), Ok(conditions2)) => {
@@ -223,7 +223,7 @@ fn test_ff(
             // happen if there's an ASSERT_MY_COINID that's only valid after the
             // fast-forward
             let msg1 = e1.error_code();
-            assert!((conditions2.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+            assert_eq!(conditions2.spends[0].flags & ELIGIBLE_FOR_FF, 0);
             assert!(discrepancy_errors.contains(&msg1));
         }
     }
