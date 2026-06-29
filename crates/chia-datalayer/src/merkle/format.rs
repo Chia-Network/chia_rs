@@ -11,7 +11,11 @@ use std::ops::Range;
 
 pub type TreeIndexType = u32;
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyJsonDict, PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(from_py_object),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
 //        being found with a cfg_attr
@@ -58,7 +62,11 @@ pub struct Hash(pub Bytes32);
 /// Key and value ids are provided from outside of this code and are implemented as
 /// the row id from sqlite which is a signed 8 byte integer.  The actual key and
 /// value data bytes will not be handled within this code, only outside.
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyJsonDict, PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(from_py_object),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
@@ -81,7 +89,11 @@ impl KeyId {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass, derive(PyJsonDict, PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(from_py_object),
+    derive(PyJsonDict, PyStreamable)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Streamable)]
 // ISSUE: this cfg()/cfg(not()) is terrible, but there's an issue with pyo3
@@ -155,7 +167,7 @@ pub struct NodeMetadata {
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(get_all),
+    pyclass(get_all, from_py_object),
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]
@@ -190,7 +202,7 @@ impl InternalNode {
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(get_all),
+    pyclass(get_all, from_py_object),
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Streamable)]

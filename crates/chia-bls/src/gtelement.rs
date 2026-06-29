@@ -16,7 +16,7 @@ use std::ops::{Mul, MulAssign};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass,
+    pyo3::pyclass(from_py_object),
     derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(Clone)]

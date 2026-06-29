@@ -19,7 +19,7 @@ use pyo3::types::PyType;
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "SpendConditions"),
+    pyo3::pyclass(name = "SpendConditions", from_py_object),
     derive(PyJsonDict, PyStreamable, chia_py_streamable_macro::PyGetters)
 )]
 pub struct OwnedSpendConditions {
@@ -51,7 +51,7 @@ pub struct OwnedSpendConditions {
 #[derive(Streamable, Hash, Debug, Clone, Eq, PartialEq, Default)]
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "SpendBundleConditions"),
+    pyo3::pyclass(name = "SpendBundleConditions", from_py_object),
     derive(PyJsonDict, PyStreamable, chia_py_streamable_macro::PyGetters)
 )]
 pub struct OwnedSpendBundleConditions {

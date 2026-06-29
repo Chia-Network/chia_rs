@@ -20,7 +20,7 @@ pub(crate) const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_AUG_";
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "G2Element"),
+    pyo3::pyclass(name = "G2Element", from_py_object),
     derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(Clone, Default)]

@@ -7,7 +7,7 @@ use pyo3::{pyclass, pymethods};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(get_all),
+    pyclass(get_all, from_py_object),
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Clone, Debug, std::hash::Hash, Eq, PartialEq, Streamable)]
@@ -19,7 +19,7 @@ pub struct ProofOfInclusionLayer {
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyclass(get_all),
+    pyclass(get_all, from_py_object),
     derive(PyJsonDict, PyStreamable)
 )]
 #[derive(Clone, Debug, std::hash::Hash, Eq, PartialEq, Streamable)]

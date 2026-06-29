@@ -36,7 +36,10 @@ impl BlsCacheData {
     }
 }
 
-#[cfg_attr(feature = "py-bindings", pyo3::pyclass(name = "BLSCache"))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyo3::pyclass(name = "BLSCache", from_py_object)
+)]
 #[derive(Debug)]
 pub struct BlsCache {
     cache: Mutex<BlsCacheData>,

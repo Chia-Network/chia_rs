@@ -69,7 +69,7 @@ pub enum Side {
     Right = 1,
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass)]
+#[cfg_attr(feature = "py-bindings", pyclass(from_py_object))]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum InsertLocation {
     // error: Unit variant `Auto` is not yet supported in a complex enum
@@ -85,7 +85,7 @@ pub fn block_range(index: TreeIndex) -> Range<usize> {
     block_start..block_start + BLOCK_SIZE
 }
 
-#[cfg_attr(feature = "py-bindings", pyclass)]
+#[cfg_attr(feature = "py-bindings", pyclass(from_py_object))]
 #[derive(Clone, Debug)]
 pub struct BlockStatusCache {
     free_indexes: IndexSet<TreeIndex>,
@@ -302,7 +302,7 @@ pub type LeafNodesMap = HashMap<Hash, (KeyId, ValueId)>;
 /// do not hold the DataLayer key and value data but instead an id for each of the key and value
 /// such that the code using a merkle blob can store the key and value as they see fit.  Each node
 /// stores the hash for the merkle aspect of the tree.
-#[cfg_attr(feature = "py-bindings", pyclass(get_all))]
+#[cfg_attr(feature = "py-bindings", pyclass(get_all, from_py_object))]
 #[derive(Clone, Debug)]
 pub struct MerkleBlob {
     pub(crate) blob: Vec<u8>,
