@@ -274,8 +274,13 @@ impl InternedBlockBuilder {
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
         let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost);
         std::mem::swap(self, &mut temp);
-        let (generator, sig, cost) = temp.finalize()?;
-        Ok((generator, sig, cost))
+        match temp.finalize() {
+           Ok(x) => x,
+           Err(err) => {
+              std::mem::swap(self, &mut temp);
+              Err(err)
+           }
+        }
     }
 }
 
