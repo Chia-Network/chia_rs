@@ -279,7 +279,7 @@ impl Streamable for ProofOfSpace {
         let pool_public_key = <Option<G1Element> as Streamable>::parse::<TRUSTED>(input)?;
 
         let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
-        let version = u8::from((prefix & 0b10) != 0);
+        let version = prefix >> 1;
         let pool_contract_puzzle_hash = if (prefix & 1) != 0 {
             Some(<Bytes32 as Streamable>::parse::<TRUSTED>(input)?)
         } else {
@@ -351,6 +351,34 @@ mod tests {
             "ac6e995e0f9c307853fa5c79e571de5ec2f2d45e5c2641c0847fef8041916e4d07d5a9200d5aa92ceac3b1bf41ce93b2"
         );
         G1Element::from_bytes(&POOL_PK_BYTES).expect("POOL_PK_BYTES is valid")
+    }
+
+    fn make_pos(version: u8, has_pool_pk: bool, has_contract: bool, size: u8) -> ProofOfSpace {
+        ProofOfSpace::new(
+            Bytes32::default(),
+            has_pool_pk.then(pool_pk),
+            has_contract.then(Bytes32::default),
+            plot_pk(),
+            version,
+            0,
+            0,
+            0,
+            size,
+            Bytes::from(vec![0x80]),
+        )
+    }
+
+    // Locate the pool_contract_puzzle_hash Optional prefix byte (which also
+    // encodes the version) by finding where a contract-present and a
+    // contract-absent serialization first differ.
+    fn prefix_offset() -> usize {
+        let absent = make_pos(0, true, false, 32).to_bytes().unwrap();
+        let present = make_pos(0, true, true, 32).to_bytes().unwrap();
+        absent
+            .iter()
+            .zip(present.iter())
+            .position(|(a, b)| a != b)
+            .unwrap()
     }
 
     // these are regression tests and test vectors for plot ID computations
@@ -466,37 +494,76 @@ mod tests {
         assert_eq!(quality, Bytes32::new(expect_quality));
     }
 
+    // Round-trip every accepted prefix-byte combination. For v0 (legacy v1
+    // proofs) the pool_contract Optional is lenient and accepts any of
+    // {neither, pool_pk, contract, both}, exactly like the original plain
+    // Option<> derive. For v1 (v2 proofs) the size field is not stored and
+    // collapses to 0 on parse.
     #[rstest]
-    #[case(0, 18, Ok(18))]
-    #[case(0, 28, Ok(28))]
-    #[case(0, 38, Ok(38))]
-    #[case(1, 18, Ok(0))]
-    #[case(1, 28, Ok(0))]
-    #[case(1, 38, Ok(0))]
-    #[case(2, 18, Err(Error::InvalidPoS))]
-    fn proof_of_space_size(#[case] version: u8, #[case] size: u8, #[case] expect: Result<u8>) {
-        let pos = ProofOfSpace::new(
-            Bytes32::from(b"abababababababababababababababab"),
-            Some(G1Element::default()),
-            None,
-            G1Element::default(),
-            version,
-            0,
-            0,
-            0,
-            size,
-            Bytes::from(vec![]),
-        );
+    #[case::v0_pool(0, true, false, 18, 18)]
+    #[case::v0_contract(0, false, true, 28, 28)]
+    #[case::v0_both_lenient(0, true, true, 38, 38)]
+    #[case::v0_neither_lenient(0, false, false, 10, 10)]
+    #[case::v1_pool(1, true, false, 18, 0)]
+    #[case::v1_contract(1, false, true, 28, 0)]
+    fn roundtrip(
+        #[case] version: u8,
+        #[case] has_pool_pk: bool,
+        #[case] has_contract: bool,
+        #[case] size: u8,
+        #[case] expected_size: u8,
+    ) {
+        let buf = make_pos(version, has_pool_pk, has_contract, size)
+            .to_bytes()
+            .unwrap();
+        let parsed = ProofOfSpace::parse::<false>(&mut Cursor::<&[u8]>::new(&buf)).unwrap();
 
+        assert_eq!(parsed.version, version);
+        assert_eq!(parsed.pool_public_key.is_some(), has_pool_pk);
+        assert_eq!(parsed.pool_contract_puzzle_hash.is_some(), has_contract);
+        assert_eq!(parsed.size, expected_size);
+        // re-serialization must be byte-for-byte stable
+        assert_eq!(parsed.to_bytes().unwrap(), buf);
+    }
+
+    // Inputs that must be rejected. The v2 (version 1) format requires exactly
+    // one of pool_public_key / pool_contract_puzzle_hash to be set, so both-set
+    // and neither-set are rejected at parse time. An unknown version (>= 2) is
+    // rejected at serialize time. The exact error code is unimportant, only
+    // that it fails.
+    #[rstest]
+    #[case::v1_both_set(1, true, true)]
+    #[case::v1_neither_set(1, false, false)]
+    #[case::unknown_version(2, true, false)]
+    fn parse_rejects(#[case] version: u8, #[case] has_pool_pk: bool, #[case] has_contract: bool) {
+        let pos = make_pos(version, has_pool_pk, has_contract, 0);
         match pos.to_bytes() {
             Ok(buf) => {
-                let new_pos =
-                    ProofOfSpace::parse::<false>(&mut Cursor::<&[u8]>::new(&buf)).expect("parse()");
-                assert_eq!(new_pos.size, expect.unwrap());
+                let err = ProofOfSpace::parse::<false>(&mut Cursor::<&[u8]>::new(&buf))
+                    .expect_err("must fail to parse");
+                assert_eq!(err, Error::InvalidPoS);
             }
-            Err(e) => {
-                assert_eq!(e, expect.unwrap_err());
-            }
+            Err(e) => assert_eq!(e, Error::InvalidPoS),
         }
+    }
+
+    // The version flag is packed into the pool_contract_puzzle_hash Optional
+    // prefix byte. Only bit 0 (the Optional flag) and bit 1 (the version) carry
+    // meaning. The high bits (2..=7) must be rejected for both versions,
+    // matching the strictness of a plain Optional<> prefix in earlier protocol
+    // versions where this byte could only ever be 0 or 1.
+    #[rstest]
+    fn high_prefix_bits_rejected(#[values(0, 1)] version: u8, #[values(2, 3, 4, 5, 6, 7)] bit: u8) {
+        let offset = prefix_offset();
+        let size = if version == 0 { 32 } else { 0 };
+        let mut buf = make_pos(version, true, false, size).to_bytes().unwrap();
+
+        let expected_prefix = if version == 0 { 0b00 } else { 0b10 };
+        assert_eq!(buf[offset], expected_prefix);
+
+        buf[offset] |= 1u8 << bit;
+        let err = ProofOfSpace::parse::<false>(&mut Cursor::<&[u8]>::new(&buf))
+            .expect_err("high prefix bit must be rejected");
+        assert_eq!(err, Error::InvalidPoS);
     }
 }
