@@ -54,7 +54,7 @@ pub struct InternedBlockBuilder {
     spend_list: NodePtr,
 
     // the cost of the block we've built up so far, not including the byte-cost.
-    // That's seprated out into the byte_cost member.
+    // That's separated out into the byte_cost member.
     block_cost: u64,
 
     // the byte cost, so for, of what's in the generator (upper-bound estimate)
