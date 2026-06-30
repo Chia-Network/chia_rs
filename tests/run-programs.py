@@ -57,7 +57,9 @@ for hexname in sorted(glob.glob("programs/*.hex")):
     end = time.perf_counter()
 
     if "FAIL: " not in output or (
-        "cost exceeded" not in output and "too many pairs" not in output
+        "cost exceeded" not in output
+        and "too many pairs" not in output
+        and "InvalidOperatorArg" not in output
     ):
         ret += 1
         print(
