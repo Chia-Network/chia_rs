@@ -18,7 +18,7 @@ use std::ops::{Add, AddAssign, Neg, SubAssign};
 
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(name = "G1Element"),
+    pyo3::pyclass(name = "G1Element", from_py_object),
     derive(chia_py_streamable_macro::PyStreamable)
 )]
 #[derive(Clone, Copy, Default)]

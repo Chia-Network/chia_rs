@@ -9,7 +9,7 @@ use hex_literal::hex;
 /// tests, simulations and testnets.
 #[cfg_attr(
     feature = "py-bindings",
-    pyo3::pyclass(module = "chia_rs"),
+    pyo3::pyclass(module = "chia_rs", from_py_object),
     derive(PyJsonDict, PyStreamable, PyGetters),
     py_uppercase,
     py_pickle

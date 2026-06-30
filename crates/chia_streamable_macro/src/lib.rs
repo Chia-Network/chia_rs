@@ -130,7 +130,7 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         quote! {
             #[cfg_attr(
-                feature = "py-bindings", pyo3::pyclass(#class_attrs), derive(
+                feature = "py-bindings", pyo3::pyclass(from_py_object, #class_attrs), derive(
                     chia_py_streamable_macro::PyStreamable,
                     chia_py_streamable_macro::PyGetters
                 )

@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::rc::Rc;
 
-#[pyclass(subclass, unsendable, frozen)]
+#[pyclass(subclass, unsendable, frozen, from_py_object)]
 #[derive(Clone)]
 pub struct LazyNode {
     allocator: Rc<Allocator>,

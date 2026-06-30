@@ -27,7 +27,11 @@ use std::rc::Rc;
 #[cfg(feature = "py-bindings")]
 use clvm_utils::CurriedProgram;
 
-#[cfg_attr(feature = "py-bindings", pyclass(subclass), derive(PyStreamable))]
+#[cfg_attr(
+    feature = "py-bindings",
+    pyclass(subclass, from_py_object),
+    derive(PyStreamable)
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Program(Bytes);
