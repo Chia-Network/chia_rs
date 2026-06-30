@@ -128,11 +128,11 @@ impl InternedBlockBuilder {
     /// add a batch of spend bundles to the generator. The cost for each bundle
     /// must be *only* the CLVM execution cost + the cost of the conditions.
     /// It must not include the byte cost of the bundle. The byte cost is
-    /// unpredictible as the generator is being / compressed. The true byte cost
-    /// is computed by this function. / returns true if the bundles could be added
-    /// to the generator, false otherwise. Note that either all bundles are
-    /// added, or none of them. If the resulting block exceeds the cost limit,
-    /// none of the bundles are added
+    /// unpredictible as the generator is being
+    /// built. The true byte cost is computed by this function.
+    /// returns true if the bundles could be added to the generator, false otherwise.
+    /// Note that either all bundles are added, or none of them. If the resulting
+    /// block exceeds the cost limit, none of the bundles are added
     pub fn add_spend_bundles<T, S>(
         &mut self,
         bundles: T,
@@ -149,7 +149,6 @@ impl InternedBlockBuilder {
         if self.byte_cost + wrapper_cost + self.block_cost + MIN_COST_THRESHOLD
             > self.max_block_cost
         {
-            self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
@@ -215,7 +214,7 @@ impl InternedBlockBuilder {
     }
 
     // returns generator, sig, cost
-    pub fn finalize(mut self) -> Result<(Vec<u8>, Signature, u64)> {
+    pub fn finalize(&mut self) -> Result<(Vec<u8>, Signature, u64)> {
         let inner = self
             .allocator
             .new_pair(self.spend_list, self.allocator.nil())?;
@@ -226,7 +225,7 @@ impl InternedBlockBuilder {
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
 
         assert!(total_cost <= self.max_block_cost);
-        Ok((serialized, self.signature, total_cost))
+        Ok((serialized, std::mem::take(&mut self.signature), total_cost))
     }
 }
 
@@ -272,14 +271,14 @@ impl InternedBlockBuilder {
     /// generate the block generator
     #[pyo3(name = "finalize")]
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
-        let mut temp = InternedBlockBuilder::new_with(self.cost_per_byte, self.max_block_cost);
-        std::mem::swap(self, &mut temp);
-        match temp.finalize() {
-           Ok(x) => x,
-           Err(err) => {
-              std::mem::swap(self, &mut temp);
-              Err(err)
-           }
+        let cost_per_byte = self.cost_per_byte;
+        let max_block_cost = self.max_block_cost;
+        match self.finalize() {
+            Ok(x) => {
+                *self = InternedBlockBuilder::new_with(cost_per_byte, max_block_cost);
+                Ok(x)
+            }
+            Err(err) => Err(err.into()),
         }
     }
 }

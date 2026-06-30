@@ -85,7 +85,7 @@ fn test_generator_cost_accuracy() {
 #[test]
 fn test_basic_functionality() {
     // Test basic add and finalize flow
-    let builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
     assert_eq!(
         builder.cost(),
@@ -254,17 +254,8 @@ fn test_block_full_overflow() {
         .add_spend_bundles([&bundle], small_max - 5000)
         .expect("add_spend_bundles");
 
-    if added {
-        assert!(
-            result == BuildBlockResult::Done,
-            "should signal Done when close to limit"
-        );
-    } else {
-        assert!(
-            result == BuildBlockResult::Done,
-            "should be Done if bundle doesn't fit"
-        );
-    }
+    assert!(!added, "bundle should not fit when block is near full");
+    assert!(result == BuildBlockResult::Done);
 }
 
 #[test]
