@@ -483,7 +483,7 @@ impl FromJsonDict for Program {
             // If the bytes in the JSON string is not a valid CLVM
             // serialization, or if it has garbage at the end of the string,
             // reject it
-            return Err(Error::InvalidClvm)?;
+            Err(Error::InvalidClvm)?;
         }
         Ok(Self(bytes))
     }

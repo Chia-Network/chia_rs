@@ -170,10 +170,7 @@ impl Hash for Signature {
 
 impl fmt::Debug for Signature {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_fmt(format_args!(
-            "<G2Element {}>",
-            &hex::encode(self.to_bytes())
-        ))
+        formatter.write_fmt(format_args!("<G2Element {}>", hex::encode(self.to_bytes())))
     }
 }
 
@@ -1142,7 +1139,7 @@ mod tests {
         let sig1 = sign(&sk, [0, 1, 2]);
         let sig2 = sign(&sk, [0, 1, 2, 3]);
 
-        assert!(hash(sig1) != hash(sig2));
+        assert_ne!(hash(sig1), hash(sig2));
         assert_eq!(hash(sign(&sk, [0, 1, 2])), hash(sign(&sk, [0, 1, 2])));
     }
 
@@ -1199,10 +1196,10 @@ mod tests {
 
             let mut g2_neg = g2.clone();
             g2_neg.negate();
-            assert!(g2_neg != g2);
+            assert_ne!(g2_neg, g2);
 
             g2_neg.negate();
-            assert!(g2_neg == g2);
+            assert_eq!(g2_neg, g2);
         }
     }
 
@@ -1212,7 +1209,7 @@ mod tests {
         let mut g2_neg = g2.clone();
         // negate on infinity is a no-op
         g2_neg.negate();
-        assert!(g2_neg == g2);
+        assert_eq!(g2_neg, g2);
     }
 
     #[test]
@@ -1231,9 +1228,9 @@ mod tests {
             let mut g2_double = g2.clone();
             // adding the negative undoes adding the positive
             g2_double += &g2;
-            assert!(g2_double != g2);
+            assert_ne!(g2_double, g2);
             g2_double += &g2_neg;
-            assert!(g2_double == g2);
+            assert_eq!(g2_double, g2);
         }
     }
 
@@ -1249,10 +1246,10 @@ mod tests {
             let mut g2 = sign(&sk, msg);
             let mut g2_double = g2.clone();
             g2_double += &g2;
-            assert!(g2_double != g2);
+            assert_ne!(g2_double, g2);
             // scalar multiply by 2 is the same as adding oneself
             g2.scalar_multiply(&[2]);
-            assert!(g2_double == g2);
+            assert_eq!(g2_double, g2);
         }
     }
 
@@ -1267,7 +1264,7 @@ mod tests {
             rng.fill(&mut msg);
             let default_hash = hash_to_g2(&msg);
             assert_eq!(default_hash, hash_to_g2_with_dst(&msg, DEFAULT_DST));
-            assert!(default_hash != hash_to_g2_with_dst(&msg, CUSTOM_DST));
+            assert_ne!(default_hash, hash_to_g2_with_dst(&msg, CUSTOM_DST));
         }
     }
 

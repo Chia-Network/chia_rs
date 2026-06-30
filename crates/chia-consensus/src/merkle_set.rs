@@ -96,7 +96,7 @@ fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
             // duplicate values are collapsed (since this is a set)
             // so just return one of the duplicates as if there was only one
             debug_assert!(range.len() > 1);
-            debug_assert!(range[0] == range[1]);
+            debug_assert_eq!(range[0], range[1]);
             (range[0], NodeType::Term)
         } else {
             // this means either the left or right bucket/sub tree was empty.

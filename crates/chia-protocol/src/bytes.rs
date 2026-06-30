@@ -551,8 +551,8 @@ mod tests {
                 assert_eq!(lhs, rhs);
                 assert_eq!(rhs, lhs);
             } else {
-                assert!(lhs != rhs);
-                assert!(rhs != lhs);
+                assert_ne!(lhs, rhs);
+                assert_ne!(rhs, lhs);
             }
         } else {
             let lhs = Bytes::from(lhs_vec.clone());
@@ -568,8 +568,8 @@ mod tests {
                 assert_eq!(lhs, rhs);
                 assert_eq!(rhs, lhs);
             } else {
-                assert!(lhs != rhs);
-                assert!(rhs != lhs);
+                assert_ne!(lhs, rhs);
+                assert_ne!(rhs, lhs);
             }
         }
     }

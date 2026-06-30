@@ -308,8 +308,8 @@ ff843B9ACA00\
         )
         .expect("SpendBundle should be valid for this test");
 
-        assert!((conds.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
-        assert!(conds.spends[0].fingerprint != Bytes::default());
+        assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+        assert_ne!(conds.spends[0].fingerprint, Bytes::default());
     }
 
     #[test]

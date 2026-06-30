@@ -250,7 +250,7 @@ pub fn tree_hash(a: &Allocator, node: NodePtr) -> TreeHash {
         }
     }
 
-    assert!(hashes.len() == 1);
+    assert_eq!(hashes.len(), 1);
     hashes[0]
 }
 
@@ -303,7 +303,7 @@ pub fn tree_hash_cached(a: &Allocator, node: NodePtr, cache: &mut TreeCache) -> 
         }
     }
 
-    assert!(hashes.len() == 1);
+    assert_eq!(hashes.len(), 1);
     hashes[0]
 }
 

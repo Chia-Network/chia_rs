@@ -472,7 +472,7 @@ impl MerkleSet {
                 // duplicate values are collapsed (since this is a set)
                 // so just return one of the duplicates as if there was only one
                 debug_assert!(range.len() > 1);
-                debug_assert!(range[0] == range[1]);
+                debug_assert_eq!(range[0], range[1]);
                 self.nodes_vec.push((ArrayTypes::Leaf, range[0]));
                 (range[0], NodeType::Term)
             } else {

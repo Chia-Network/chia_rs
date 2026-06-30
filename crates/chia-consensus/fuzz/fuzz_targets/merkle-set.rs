@@ -31,8 +31,9 @@ fuzz_target!(|leafs_: Vec::<[u8; 32]>| -> Corpus {
             .expect("failed to validate proof");
         assert_eq!(rebuilt.get_root(), root);
         assert_eq!(included, expect_included);
-        assert!(
-            validate_merkle_proof(&proof, item, &root).expect("proof failed") == expect_included
+        assert_eq!(
+            validate_merkle_proof(&proof, item, &root).expect("proof failed"),
+            expect_included
         );
     }
     Corpus::Keep

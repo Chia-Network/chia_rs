@@ -17,17 +17,17 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::Ok(_)) => {
             assert!(data.len() <= 9);
             if data.len() == 9 {
-                assert!(data[0] == 0);
+                assert_eq!(data[0], 0);
             }
         }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
+            assert_ne!(data[0] & 0x80, 0);
         }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 8);
         }
         Err(ValidationErr::Err(c)) => {
-            assert!(c == ErrorCode::InvalidCoinAmount);
+            assert_eq!(c, ErrorCode::InvalidCoinAmount);
         }
         _ => {
             panic!("invalid state");
@@ -43,17 +43,17 @@ fuzz_target!(|data: &[u8]| {
         Ok(SanitizedUint::Ok(_)) => {
             assert!(data.len() <= 5);
             if data.len() == 5 {
-                assert!(data[0] == 0);
+                assert_eq!(data[0], 0);
             }
         }
         Ok(SanitizedUint::NegativeOverflow) => {
-            assert!(!data.is_empty() && (data[0] & 0x80) != 0);
+            assert_ne!(data[0] & 0x80, 0);
         }
         Ok(SanitizedUint::PositiveOverflow) => {
             assert!(data.len() > 4);
         }
         Err(ValidationErr::Err(c)) => {
-            assert!(c == ErrorCode::InvalidCoinAmount);
+            assert_eq!(c, ErrorCode::InvalidCoinAmount);
         }
         _ => {
             panic!("invalid state");
