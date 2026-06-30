@@ -260,33 +260,31 @@ fn test_block_full_overflow() {
 
 #[test]
 fn test_num_skipped() {
-    let small_max = 50_000;
-    let mut builder = InternedBlockBuilder::new_with(TEST_CONSTANTS.cost_per_byte, small_max);
+    let cost_per_byte = TEST_CONSTANTS.cost_per_byte;
+    // Room for MIN_COST_THRESHOLD, but individual bundles can still be rejected.
+    let max = MIN_COST_THRESHOLD + WRAPPER_VBYTES * cost_per_byte + 20 + 1_000_000;
 
-    let mut num_rejected = 0;
+    let mut builder = InternedBlockBuilder::new_with(cost_per_byte, max);
 
-    for i in 0..10 {
-        let coin_spend = make_test_coin_spend([i; 32], 1000);
-        let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
+    let coin_spend = make_test_coin_spend([1u8; 32], 1000);
+    let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
 
+    // Declared CLVM cost alone exceeds max (rejected before parsing spends).
+    let declared_cost = max - WRAPPER_VBYTES * cost_per_byte - 20 + 1;
+
+    for _ in 0..MAX_SKIPPED_ITEMS {
         let (added, result) = builder
-            .add_spend_bundles([&bundle], 10_000)
+            .add_spend_bundles([&bundle], declared_cost)
             .expect("add_spend_bundles");
-
-        if !added {
-            num_rejected += 1;
-        }
-
-        if result == BuildBlockResult::Done {
-            break;
-        }
+        assert!(!added);
+        assert!(result == BuildBlockResult::KeepGoing);
     }
 
-    assert!(num_rejected > 0, "some bundles should have been skipped");
-    assert!(
-        num_rejected <= MAX_SKIPPED_ITEMS as usize + 1,
-        "should stop after MAX_SKIPPED_ITEMS"
-    );
+    let (added, result) = builder
+        .add_spend_bundles([&bundle], declared_cost)
+        .expect("add_spend_bundles");
+    assert!(!added);
+    assert!(result == BuildBlockResult::Done);
 }
 
 #[test]
