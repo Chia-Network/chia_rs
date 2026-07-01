@@ -384,9 +384,12 @@ where
         // This may fail for malicious generators, where the puzzle reveal or
         // solution reuses CLVM subtrees such that a plain serialization becomes
         // very large. from_clvm() fails if the resulting buffer is greater than
-        // 2 MB
-        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
-        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
+        // 2 MB. Treat this as an extraction failure instead of silently
+        // substituting Program::default().
+        let puzzle_program = Program::from_clvm(&a, puzzle)
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        let solution_program = Program::from_clvm(&a, solution)
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
         output.push(coinspend);
     }
@@ -480,9 +483,12 @@ where
             puzhash.into(),
             parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
         );
-        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
-        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
-
+        // Treat puzzle/solution serialization failure as an extraction failure
+        // instead of silently substituting Program::default().
+        let puzzle_program = Program::from_clvm(&a, puzzle)
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
+        let solution_program = Program::from_clvm(&a, solution)
+            .map_err(|_| ValidationErr(ErrorCode::GeneratorRuntimeError))?;
         let Reduction(_clvm_cost, res) = run_program(
             &mut a,
             &dialect,
