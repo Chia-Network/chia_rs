@@ -88,6 +88,8 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
             | ConsensusFlags::RELAXED_BLS;
+    } else {
+        flags |= ConsensusFlags::CONDITIONS_CACHE;
     }
 
     if prev_tx_height >= constants.soft_fork8_height {
@@ -214,9 +216,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case(0, 0)]
-    #[case(TEST_CONSTANTS.hard_fork_height, 0)]
-    #[case(5_716_000, 0)]
+    #[case(0, ConsensusFlags::CONDITIONS_CACHE.bits())]
+    #[case(TEST_CONSTANTS.hard_fork_height, ConsensusFlags::CONDITIONS_CACHE.bits())]
+    #[case(5_716_000, ConsensusFlags::CONDITIONS_CACHE.bits())]
     fn test_get_flags(#[case] prev_tx_height: u32, #[case] expected_bits: u32) {
         assert_eq!(
             get_flags_for_height_and_constants(prev_tx_height, &TEST_CONSTANTS).bits(),
