@@ -93,17 +93,13 @@ pub fn compute_plot_id_v1(
     ctx.finalize().into()
 }
 
-pub fn compute_plot_id_v2(
+pub fn compute_plot_group_id_v2(
     strength: u8,
     plot_pk: &G1Element,
     pool_pk: Option<&G1Element>,
     pool_contract: Option<&Bytes32>,
-    plot_index: u16,
-    meta_group: u8,
 ) -> Bytes32 {
-    let mut ctx = Sha256::new();
     // plot_group_id = sha256( strength + plot_pk + (pool_pk | contract_ph) )
-    // plot_id = sha256( plot_group_id + plot_index + meta_group)
     let mut group_ctx = Sha256::new();
     strength.update_digest(&mut group_ctx);
     plot_pk.update_digest(&mut group_ctx);
@@ -113,10 +109,23 @@ pub fn compute_plot_id_v2(
         contract_ph.update_digest(&mut group_ctx);
     } else {
         panic!(
-            "failed precondition of compute_plot_id_2(). Either pool-public-key or pool-contract-hash must be specified"
+            "failed precondition of compute_plot_group_id_v2(). Either pool-public-key or pool-contract-hash must be specified"
         );
     }
-    let plot_group_id: Bytes32 = group_ctx.finalize().into();
+    group_ctx.finalize().into()
+}
+
+pub fn compute_plot_id_v2(
+    strength: u8,
+    plot_pk: &G1Element,
+    pool_pk: Option<&G1Element>,
+    pool_contract: Option<&Bytes32>,
+    plot_index: u16,
+    meta_group: u8,
+) -> Bytes32 {
+    let mut ctx = Sha256::new();
+    // plot_id = sha256( plot_group_id + plot_index + meta_group)
+    let plot_group_id = compute_plot_group_id_v2(strength, plot_pk, pool_pk, pool_contract);
 
     plot_group_id.update_digest(&mut ctx);
     plot_index.update_digest(&mut ctx);
@@ -392,6 +401,30 @@ mod tests {
             _ => panic!("unknown v1 variant: {variant}"),
         };
         let result = compute_plot_id_v1(&plot_pk(), pool_pk.as_ref(), pool_contract.as_ref());
+        assert_eq!(result, Bytes32::new(expected));
+    }
+
+    #[rstest]
+    #[case(0, "pool_pk", hex!("5457cccc4cd79900da4235cf5ca7d978a1993581376e76dfb089c274225419d1"))]
+    #[case(10, "pool_pk", hex!("e9d517de0ccfa94baf9e94b39dd0e8afce0451ec27635f43f2aa9b2f429d0501"))]
+    #[case(0, "contract_ph", hex!("210d1a307d26acb3fcfa02208061fc6b80e3fbb9ca5f3e4a596b7521d87ccd79"))]
+    #[case(5, "contract_ph", hex!("824d7b67ab4269c91eb0a2fe10cb48a1c1ad8cfa8a642387d49d5c3c3acbc3bd"))]
+    fn test_compute_plot_group_id_v2(
+        #[case] strength: u8,
+        #[case] variant: &str,
+        #[case] expected: [u8; 32],
+    ) {
+        let (pool_pk, pool_contract) = match variant {
+            "pool_pk" => (Some(pool_pk()), None),
+            "contract_ph" => (None, Some(Bytes32::new([1u8; 32]))),
+            _ => panic!("unknown v2 variant: {variant}"),
+        };
+        let result = compute_plot_group_id_v2(
+            strength,
+            &plot_pk(),
+            pool_pk.as_ref(),
+            pool_contract.as_ref(),
+        );
         assert_eq!(result, Bytes32::new(expected));
     }
 

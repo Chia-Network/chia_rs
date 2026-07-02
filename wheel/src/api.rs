@@ -158,6 +158,21 @@ fn compute_plot_id_v2(
     )
 }
 
+#[pyfunction]
+fn compute_plot_group_id_v2(
+    strength: u8,
+    plot_pk: G1Element,
+    pool_pk: Option<G1Element>,
+    pool_contract: Option<Bytes32>,
+) -> Bytes32 {
+    chia_protocol::compute_plot_group_id_v2(
+        strength,
+        &plot_pk,
+        pool_pk.as_ref(),
+        pool_contract.as_ref(),
+    )
+}
+
 // there is an updated version of this function that doesn't require serializing
 // and deserializing the generator and arguments.
 #[allow(clippy::too_many_arguments)]
@@ -830,6 +845,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(compute_plot_id_v1, m)?)?;
     m.add_function(wrap_pyfunction!(compute_plot_id_v2, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_plot_group_id_v2, m)?)?;
 
     // flags affecting consensus
     m.add("NO_UNKNOWN_CONDS", ConsensusFlags::NO_UNKNOWN_CONDS.bits())?;
