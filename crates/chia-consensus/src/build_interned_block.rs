@@ -214,6 +214,12 @@ impl InternedBlockBuilder {
     }
 
     // returns generator, sig, cost
+    //
+    // On success, resets self to a fresh builder (same cost_per_byte /
+    // max_block_cost) so a subsequent finalize() or add_spend_bundles() call
+    // starts from an empty state, rather than emitting a generator that
+    // still contains spends the returned signature doesn't cover. On error,
+    // self is left unchanged so callers can inspect state or retry.
     pub fn finalize(&mut self) -> Result<(Vec<u8>, Signature, u64)> {
         let inner = self
             .allocator
@@ -225,7 +231,10 @@ impl InternedBlockBuilder {
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
 
         assert!(total_cost <= self.max_block_cost);
-        Ok((serialized, std::mem::take(&mut self.signature), total_cost))
+
+        let signature = std::mem::take(&mut self.signature);
+        *self = Self::new_with(self.cost_per_byte, self.max_block_cost);
+        Ok((serialized, signature, total_cost))
     }
 }
 
@@ -268,18 +277,11 @@ impl InternedBlockBuilder {
         self.cost()
     }
 
-    /// generate the block generator
+    /// generate the block generator. Resets the builder on success (see
+    /// `finalize()`), preserving its state on error.
     #[pyo3(name = "finalize")]
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
-        let cost_per_byte = self.cost_per_byte;
-        let max_block_cost = self.max_block_cost;
-        match self.finalize() {
-            Ok(x) => {
-                *self = InternedBlockBuilder::new_with(cost_per_byte, max_block_cost);
-                Ok(x)
-            }
-            Err(err) => Err(err.into()),
-        }
+        Ok(self.finalize()?)
     }
 }
 
