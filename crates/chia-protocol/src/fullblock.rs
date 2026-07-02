@@ -13,7 +13,7 @@ use chia_traits::Streamable;
 use chia_traits::chia_error::{Error, Result};
 use std::io::Cursor;
 
-// Similar to ProofOfSpace, we use unused bits in the Optional<> prefix byte
+// Similar to ProofOfSpace, we use unused bits in the Option<> prefix byte
 // for transactions_generator to encode a version flag. Bit 1 (0b10) indicates
 // the "raw bytes" format where the generator is serialized as length-prefixed
 // bytes (like Bytes) instead of a self-describing CLVM Program, and
@@ -121,7 +121,7 @@ impl Streamable for FullBlock {
         let transactions_info = <Option<TransactionsInfo> as Streamable>::parse::<TRUSTED>(input)?;
 
         let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
-        let version = u8::from((prefix & 0b10) != 0);
+        let version = prefix >> 1;
         let has_generator = (prefix & 1) != 0;
 
         if version == 0 {
@@ -546,5 +546,37 @@ mod tests {
         let buf = block.to_bytes().unwrap();
         let block2 = FullBlock::parse::<false>(&mut Cursor::new(&buf)).unwrap();
         assert_eq!(block2.transactions_generator_buffer.unwrap(), garbage);
+    }
+
+    // The version flag is packed into the transactions_generator Option prefix
+    // byte. Only bit 0 (the Option flag) and bit 1 (the version) carry
+    // meaning. The high bits (2..=7) must be rejected, matching the strictness
+    // of a plain Option<> prefix in earlier protocol versions where this byte
+    // could only ever be 0 or 1.
+    #[test]
+    fn high_prefix_bits_rejected() {
+        let v0_none = make_v0_block(None, vec![]).to_bytes().unwrap();
+        let v0_some = make_v0_block(Some(Program::from(vec![0x80])), vec![])
+            .to_bytes()
+            .unwrap();
+        let offset = v0_none
+            .iter()
+            .zip(v0_some.iter())
+            .position(|(a, b)| a != b)
+            .unwrap();
+        assert_eq!(v0_none[offset], 0b00);
+
+        let v1_none = make_v1_block(None).to_bytes().unwrap();
+        assert_eq!(v1_none[offset], 0b10);
+
+        for valid in [&v0_none, &v1_none] {
+            for bit in 2..8u8 {
+                let mut buf = valid.clone();
+                buf[offset] |= 1 << bit;
+                let err = FullBlock::parse::<false>(&mut Cursor::new(&buf))
+                    .expect_err("high prefix bit must be rejected");
+                assert_eq!(err, Error::InvalidFullBlock);
+            }
+        }
     }
 }

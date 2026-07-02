@@ -29,7 +29,7 @@ pub fn update_digest<T: Streamable, U: Streamable>(
 
 // we serialize these two optionals in a backwards compatible way, by
 // sharing the byte indicating whether the optional is set or not. A
-// normal Optional uses 8 bits to store 1 bit. We use two bits to store
+// normal Option uses 8 bits to store 1 bit. We use two bits to store
 // two optionals. As long as the second one isn't set, the data
 // strsucture is backward compatible with the previous RewardChainBlock
 pub fn stream<T: Streamable, U: Streamable>(
