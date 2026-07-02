@@ -287,6 +287,87 @@ fn test_num_skipped() {
     assert!(result == BuildBlockResult::Done);
 }
 
+/// finalize() must reset the builder to a fresh state on success: a second
+/// finalize() call (with no intervening add_spend_bundles()) must produce
+/// the same empty-spend-list generator, cost, and signature as a brand new
+/// builder — not a generator that still contains the first call's spends
+/// under a signature that no longer covers them.
+#[test]
+fn test_finalize_resets_builder() {
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+
+    let coin_spend = make_test_coin_spend([1u8; 32], 1000);
+    let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
+    let (added, _) = builder
+        .add_spend_bundles([&bundle], 5000)
+        .expect("add_spend_bundles");
+    assert!(added);
+
+    let (first_generator, _, first_cost) = builder.finalize().expect("finalize");
+    assert!(
+        first_cost > 11 * TEST_CONSTANTS.cost_per_byte + 20,
+        "first finalize should reflect the added spend"
+    );
+
+    // The builder was reset by the first finalize(), so this second call
+    // (with nothing added in between) must behave like a fresh builder.
+    let (second_generator, second_sig, second_cost) = builder.finalize().expect("finalize");
+    assert_eq!(second_sig, Signature::default());
+    assert_eq!(
+        second_cost,
+        11 * TEST_CONSTANTS.cost_per_byte + 20,
+        "second finalize should be the empty-spend-list cost"
+    );
+    assert_ne!(
+        first_generator, second_generator,
+        "second generator must not still contain the first call's spend"
+    );
+
+    let mut fresh = InternedBlockBuilder::new(&TEST_CONSTANTS);
+    let (fresh_generator, fresh_sig, fresh_cost) = fresh.finalize().expect("finalize");
+    assert_eq!(second_generator, fresh_generator);
+    assert_eq!(second_sig, fresh_sig);
+    assert_eq!(second_cost, fresh_cost);
+}
+
+/// add_spend_bundles() after finalize() must start from a clean slate: the
+/// resulting generator/signature/cost must be identical to a brand new
+/// builder that only ever saw the second bundle.
+#[test]
+fn test_add_after_finalize_starts_clean() {
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+
+    let coin_spend1 = make_test_coin_spend([1u8; 32], 1000);
+    let bundle1 = SpendBundle::new(vec![coin_spend1], Signature::default());
+    let (added, _) = builder
+        .add_spend_bundles([&bundle1], 5000)
+        .expect("add_spend_bundles");
+    assert!(added);
+    builder.finalize().expect("finalize");
+
+    let coin_spend2 = make_test_coin_spend([2u8; 32], 2000);
+    let bundle2 = SpendBundle::new(vec![coin_spend2], Signature::default());
+    let (added, _) = builder
+        .add_spend_bundles([&bundle2], 7000)
+        .expect("add_spend_bundles");
+    assert!(added);
+    let (generator, sig, cost) = builder.finalize().expect("finalize");
+
+    let mut fresh = InternedBlockBuilder::new(&TEST_CONSTANTS);
+    let (added, _) = fresh
+        .add_spend_bundles([&bundle2], 7000)
+        .expect("add_spend_bundles");
+    assert!(added);
+    let (fresh_generator, fresh_sig, fresh_cost) = fresh.finalize().expect("finalize");
+
+    assert_eq!(
+        generator, fresh_generator,
+        "generator should not carry over bundle1"
+    );
+    assert_eq!(sig, fresh_sig);
+    assert_eq!(cost, fresh_cost);
+}
+
 #[test]
 fn test_byte_cost_tracking() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
