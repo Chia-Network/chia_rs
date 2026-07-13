@@ -31,6 +31,13 @@ pub fn node_from_bytes_auto(allocator: &mut Allocator, bytes: &[u8]) -> Result<N
         return Err(EvalErr::SerializationError);
     }
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+        // strict = false is deliberate. Post-HF2 the generator's identity and
+        // cost come from the interned tree, not its byte encoding, so overlong
+        // (non-minimal) varints don't affect consensus — they only bloat the
+        // blob of whoever produced it. We accept such blobs rather than
+        // rejecting valid transactions over a self-inflicted encoding choice;
+        // a node is free to re-encode strictly before relaying, and to
+        // disconnect a peer that habitually sends non-minimal encodings.
         deserialize_2026(allocator, bytes, CONSENSUS_MAX_ATOM_LEN, false)
     } else {
         node_from_bytes_backrefs(allocator, bytes)
