@@ -35,6 +35,7 @@ fuzz_target!(|args: (ArbitraryClvmTree, [u8; 32], [u8; 32], u64)| {
             &mut cost_left,
             0, // clvm_cost
             &TEST_CONSTANTS,
+            None,
         );
     }
 });

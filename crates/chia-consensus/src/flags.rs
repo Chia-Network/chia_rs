@@ -51,6 +51,12 @@ bitflags! {
         /// Limit the number of spends per block.
         const LIMIT_SPENDS = 0x200_0000;
 
+        /// Enable the conditions cache, which deduplicates repeated parsing of
+        /// identical CLVM conditions-list tails shared across multiple spends.
+        /// Mutually exclusive with COST_CONDITIONS (hard fork 2), since the
+        /// cache uses the pre-hard-fork-2 cost model.
+        const CONDITIONS_CACHE = 0x0400_0000;
+
         /// After the generator-identity hard fork, generators must be validated from
         /// the INTERNED (canonical) tree so atom/pair limits and cost apply to the same
         /// structure independent of serialization.

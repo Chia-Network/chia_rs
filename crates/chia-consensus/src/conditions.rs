@@ -33,6 +33,9 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+#[cfg(test)]
+use crate::owned_conditions::OwnedSpendBundleConditions;
+
 // spend flags
 
 // If the CoinSpend is eligible for deduplication, this flag is set. A spend is
@@ -271,7 +274,7 @@ impl SpendVisitor for MempoolVisitor {
 //  )
 // )))
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Condition {
     // pubkey (48 bytes) and message (<= 1024 bytes)
     AggSigUnsafe(NodePtr, NodePtr),
@@ -972,6 +975,443 @@ pub struct ParseState {
     pub pkm_pairs: Vec<(PublicKey, Bytes)>,
 }
 
+/// Pre-computed effect of a conditions list suffix (from a given cons cell
+/// NodePtr to the end). Used to skip re-parsing identical CLVM tails when
+/// the same conditions structure is shared across multiple spends.
+#[derive(Clone, Default)]
+pub struct CachedConditionsTail {
+    /// Non-idempotent conditions that must be replayed per spend.
+    /// Shared across all suffix entries from the same list via Arc.
+    non_idempotent: Arc<Vec<Condition>>,
+    /// Index into `non_idempotent` where this suffix's conditions start.
+    non_idempotent_start: usize,
+
+    condition_cost: u64,
+    announce_decrements: u32,
+
+    // Per-spend idempotent fields (applied fresh to each new SpendConditions)
+    height_relative: Option<u32>,
+    seconds_relative: Option<u64>,
+    before_height_relative: Option<u32>,
+    before_seconds_relative: Option<u64>,
+    birth_height: Option<u32>,
+    birth_seconds: Option<u64>,
+    has_relative_condition: bool,
+    has_assert_ephemeral: bool,
+
+    // Accumulated per-spend scalars
+    reserve_fee: u64,
+    addition_amount: u128,
+
+    // Block-level idempotent (max/min)
+    height_absolute: u32,
+    seconds_absolute: u64,
+    before_height_absolute: Option<u32>,
+    before_seconds_absolute: Option<u64>,
+}
+
+pub type ConditionsCache = HashMap<NodePtr, CachedConditionsTail>;
+
+fn is_non_idempotent(cond: &Condition) -> bool {
+    matches!(
+        cond,
+        Condition::CreateCoin(..)
+            | Condition::AggSigUnsafe(..)
+            | Condition::AggSigMe(..)
+            | Condition::AggSigParent(..)
+            | Condition::AggSigPuzzle(..)
+            | Condition::AggSigAmount(..)
+            | Condition::AggSigPuzzleAmount(..)
+            | Condition::AggSigParentAmount(..)
+            | Condition::AggSigParentPuzzle(..)
+            | Condition::CreatePuzzleAnnouncement(_)
+            | Condition::CreateCoinAnnouncement(_)
+            | Condition::AssertMyCoinId(_)
+            | Condition::AssertMyParentId(_)
+            | Condition::AssertMyPuzzlehash(_)
+            | Condition::AssertMyAmount(_)
+            | Condition::SendMessage(..)
+            | Condition::ReceiveMessage(..)
+    )
+}
+
+/// Build the conditions cache from the list of conditions visited during the
+/// first parse. The cache is only active when `COST_CONDITIONS` is NOT set
+/// (pre-hard-fork-2), so the cost accounting here uses the original cost model:
+/// only `CreateCoin`, `AggSig*`, and `Softfork` have costs, and announcements/
+/// messages use a countdown rather than per-condition costs.
+fn build_conditions_cache(
+    visited: &[(NodePtr, Condition, usize)],
+    non_idempotent: Vec<Condition>,
+    cache: &mut ConditionsCache,
+    cached_suffix: Option<&CachedConditionsTail>,
+) {
+    if visited.is_empty() {
+        return;
+    }
+
+    let mut tail = if let Some(suffix) = cached_suffix {
+        let mut combined = non_idempotent;
+        combined.extend_from_slice(&suffix.non_idempotent[suffix.non_idempotent_start..]);
+        let mut t = suffix.clone();
+        t.non_idempotent = Arc::new(combined);
+        t
+    } else {
+        CachedConditionsTail {
+            non_idempotent: Arc::new(non_idempotent),
+            ..Default::default()
+        }
+    };
+
+    for (node, cond, prefix_count) in visited.iter().rev() {
+        match cond {
+            Condition::AssertHeightRelative(h) => {
+                tail.height_relative = Some(tail.height_relative.map_or(*h, |e| max(e, *h)));
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertHeightAbsolute(h) => {
+                tail.height_absolute = max(tail.height_absolute, *h);
+            }
+            Condition::AssertSecondsRelative(s) => {
+                tail.seconds_relative = Some(tail.seconds_relative.map_or(*s, |e| max(e, *s)));
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertSecondsAbsolute(s) => {
+                tail.seconds_absolute = max(tail.seconds_absolute, *s);
+            }
+            Condition::AssertBeforeHeightRelative(h) => {
+                tail.before_height_relative =
+                    Some(tail.before_height_relative.map_or(*h, |e| min(e, *h)));
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertBeforeHeightAbsolute(h) => {
+                tail.before_height_absolute =
+                    Some(tail.before_height_absolute.map_or(*h, |e| min(e, *h)));
+            }
+            Condition::AssertBeforeSecondsRelative(s) => {
+                tail.before_seconds_relative =
+                    Some(tail.before_seconds_relative.map_or(*s, |e| min(e, *s)));
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertBeforeSecondsAbsolute(s) => {
+                tail.before_seconds_absolute =
+                    Some(tail.before_seconds_absolute.map_or(*s, |e| min(e, *s)));
+            }
+            Condition::AssertMyBirthHeight(h) => {
+                tail.birth_height = Some(*h);
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertMyBirthSeconds(s) => {
+                tail.birth_seconds = Some(*s);
+                tail.has_relative_condition = true;
+            }
+            Condition::AssertEphemeral => {
+                tail.has_assert_ephemeral = true;
+            }
+            Condition::ReserveFee(limit) => {
+                tail.reserve_fee += limit;
+            }
+            Condition::CreateCoin(_, amount, _) => {
+                tail.condition_cost += CREATE_COIN_COST;
+                tail.addition_amount += *amount as u128;
+            }
+            Condition::AggSigUnsafe(..)
+            | Condition::AggSigMe(..)
+            | Condition::AggSigParent(..)
+            | Condition::AggSigPuzzle(..)
+            | Condition::AggSigAmount(..)
+            | Condition::AggSigPuzzleAmount(..)
+            | Condition::AggSigParentAmount(..)
+            | Condition::AggSigParentPuzzle(..) => {
+                tail.condition_cost += AGG_SIG_COST;
+            }
+            Condition::Softfork(cost) => {
+                tail.condition_cost += cost;
+            }
+            Condition::SkipRelativeCondition => {
+                tail.has_relative_condition = true;
+            }
+            Condition::CreateCoinAnnouncement(_)
+            | Condition::CreatePuzzleAnnouncement(_)
+            | Condition::AssertCoinAnnouncement(_)
+            | Condition::AssertPuzzleAnnouncement(_)
+            | Condition::AssertConcurrentSpend(_)
+            | Condition::AssertConcurrentPuzzle(_)
+            | Condition::SendMessage(..)
+            | Condition::ReceiveMessage(..) => {
+                tail.announce_decrements += 1;
+            }
+            _ => {}
+        }
+
+        tail.non_idempotent_start = *prefix_count;
+        cache.insert(*node, tail.clone());
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_cached_conditions_tail<V: SpendVisitor>(
+    a: &Allocator,
+    cached: &CachedConditionsTail,
+    ret: &mut SpendBundleConditions,
+    state: &mut ParseState,
+    spend: &mut SpendConditions,
+    announce_countdown: &mut u32,
+    max_cost: &mut Cost,
+    flags: ConsensusFlags,
+    constants: &ConsensusConstants,
+    visitor: &mut V,
+) -> Result<(), ValidationErr> {
+    if *max_cost < cached.condition_cost {
+        return Err(ValidationErr::Err(ErrorCode::CostExceeded));
+    }
+    *max_cost -= cached.condition_cost;
+    ret.condition_cost += cached.condition_cost;
+    spend.condition_cost += cached.condition_cost;
+
+    if *announce_countdown < cached.announce_decrements {
+        return Err(ValidationErr::Err(ErrorCode::TooManyAnnouncements));
+    }
+    *announce_countdown -= cached.announce_decrements;
+
+    // --- per-spend idempotent fields ---
+
+    if let Some(h) = cached.height_relative {
+        spend.height_relative = Some(spend.height_relative.map_or(h, |e| max(e, h)));
+        if spend
+            .before_height_relative
+            .is_some_and(|bh| bh <= spend.height_relative.unwrap())
+        {
+            return Err(ValidationErr::Err(
+                ErrorCode::ImpossibleHeightRelativeConstraints,
+            ));
+        }
+    }
+    if let Some(bh) = cached.before_height_relative {
+        spend.before_height_relative =
+            Some(spend.before_height_relative.map_or(bh, |e| min(e, bh)));
+        if spend
+            .height_relative
+            .is_some_and(|h| spend.before_height_relative.unwrap() <= h)
+        {
+            return Err(ValidationErr::Err(
+                ErrorCode::ImpossibleHeightRelativeConstraints,
+            ));
+        }
+    }
+
+    if let Some(s) = cached.seconds_relative {
+        spend.seconds_relative = Some(spend.seconds_relative.map_or(s, |e| max(e, s)));
+        if spend
+            .before_seconds_relative
+            .is_some_and(|bs| bs <= spend.seconds_relative.unwrap())
+        {
+            return Err(ValidationErr::Err(
+                ErrorCode::ImpossibleSecondsRelativeConstraints,
+            ));
+        }
+    }
+    if let Some(bs) = cached.before_seconds_relative {
+        spend.before_seconds_relative =
+            Some(spend.before_seconds_relative.map_or(bs, |e| min(e, bs)));
+        if spend
+            .seconds_relative
+            .is_some_and(|s| spend.before_seconds_relative.unwrap() <= s)
+        {
+            return Err(ValidationErr::Err(
+                ErrorCode::ImpossibleSecondsRelativeConstraints,
+            ));
+        }
+    }
+
+    if let Some(h) = cached.birth_height {
+        if spend.birth_height.is_some_and(|v| v != h) {
+            return Err(ValidationErr::Err(ErrorCode::AssertMyBirthHeightFailed));
+        }
+        spend.birth_height = Some(h);
+    }
+    if let Some(s) = cached.birth_seconds {
+        if spend.birth_seconds.is_some_and(|v| v != s) {
+            return Err(ValidationErr::Err(ErrorCode::AssertMyBirthSecondsFailed));
+        }
+        spend.birth_seconds = Some(s);
+    }
+
+    if cached.has_relative_condition {
+        assert_not_ephemeral(&mut spend.flags, state, ret.spends.len());
+    }
+    if cached.has_assert_ephemeral {
+        state.assert_ephemeral.insert(ret.spends.len());
+    }
+
+    // --- block-level idempotent ---
+
+    ret.height_absolute = max(ret.height_absolute, cached.height_absolute);
+    ret.seconds_absolute = max(ret.seconds_absolute, cached.seconds_absolute);
+    if let Some(h) = cached.before_height_absolute {
+        ret.before_height_absolute = Some(ret.before_height_absolute.map_or(h, |e| min(e, h)));
+    }
+    if let Some(s) = cached.before_seconds_absolute {
+        ret.before_seconds_absolute = Some(ret.before_seconds_absolute.map_or(s, |e| min(e, s)));
+    }
+
+    // --- accumulated scalars ---
+
+    ret.reserve_fee = ret
+        .reserve_fee
+        .checked_add(cached.reserve_fee)
+        .ok_or(ValidationErr::Err(ErrorCode::ReserveFeeConditionFailed))?;
+    ret.addition_amount += cached.addition_amount;
+
+    // --- replay non-idempotent conditions ---
+
+    for cond in &cached.non_idempotent[cached.non_idempotent_start..] {
+        visitor.condition(spend, cond);
+        match cond {
+            Condition::CreateCoin(ph, amount, hint) => {
+                let new_coin = NewCoin {
+                    puzzle_hash: a.atom(*ph).as_ref().try_into().unwrap(),
+                    amount: *amount,
+                    hint: *hint,
+                };
+                if !spend.create_coin.insert(new_coin) {
+                    return Err(ValidationErr::Err(ErrorCode::DuplicateOutput));
+                }
+            }
+            Condition::AggSigMe(pk, msg) => {
+                spend.agg_sig_me.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend((*spend.coin_id).as_slice());
+                    m.extend(constants.agg_sig_me_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigParent(pk, msg) => {
+                spend.agg_sig_parent.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(a.atom(spend.parent_id).as_ref());
+                    m.extend(constants.agg_sig_parent_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigPuzzle(pk, msg) => {
+                spend.agg_sig_puzzle.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(a.atom(spend.puzzle_hash).as_ref());
+                    m.extend(constants.agg_sig_puzzle_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigAmount(pk, msg) => {
+                spend.agg_sig_amount.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    m.extend(constants.agg_sig_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigPuzzleAmount(pk, msg) => {
+                spend.agg_sig_puzzle_amount.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(a.atom(spend.puzzle_hash).as_ref());
+                    m.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    m.extend(constants.agg_sig_puzzle_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigParentAmount(pk, msg) => {
+                spend.agg_sig_parent_amount.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(a.atom(spend.parent_id).as_ref());
+                    m.extend(u64_to_bytes(spend.coin_amount).as_slice());
+                    m.extend(constants.agg_sig_parent_amount_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigParentPuzzle(pk, msg) => {
+                spend.agg_sig_parent_puzzle.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    let mut m = a.atom(*msg).as_ref().to_vec();
+                    m.extend(a.atom(spend.parent_id).as_ref());
+                    m.extend(a.atom(spend.puzzle_hash).as_ref());
+                    m.extend(constants.agg_sig_parent_puzzle_additional_data.as_slice());
+                    state.pkm_pairs.push((to_key(a, *pk)?, m.into()));
+                }
+            }
+            Condition::AggSigUnsafe(pk, msg) => {
+                check_agg_sig_unsafe_message(a, *msg, constants)?;
+                ret.agg_sig_unsafe.push((to_key(a, *pk)?, *msg));
+                if !flags.contains(ConsensusFlags::DONT_VALIDATE_SIGNATURE) {
+                    state
+                        .pkm_pairs
+                        .push((to_key(a, *pk)?, a.atom(*msg).as_ref().to_vec().into()));
+                }
+            }
+            Condition::CreateCoinAnnouncement(msg) => {
+                state.announce_coin.insert((spend.coin_id.clone(), *msg));
+            }
+            Condition::AssertMyCoinId(id) => {
+                if a.atom(*id).as_ref() != (*spend.coin_id).as_ref() {
+                    return Err(ValidationErr::Err(ErrorCode::AssertMyCoinIdFailed));
+                }
+            }
+            Condition::AssertMyParentId(id) => {
+                if a.atom(*id).as_ref() != a.atom(spend.parent_id).as_ref() {
+                    return Err(ValidationErr::Err(ErrorCode::AssertMyParentIdFailed));
+                }
+            }
+            Condition::AssertMyPuzzlehash(hash) => {
+                if a.atom(*hash).as_ref() != a.atom(spend.puzzle_hash).as_ref() {
+                    return Err(ValidationErr::Err(ErrorCode::AssertMyPuzzleHashFailed));
+                }
+            }
+            Condition::AssertMyAmount(amount) => {
+                if *amount != spend.coin_amount {
+                    return Err(ValidationErr::Err(ErrorCode::AssertMyAmountFailed));
+                }
+            }
+            Condition::SendMessage(src_mode, dst, msg) => {
+                let src = SpendId::from_self(
+                    *src_mode,
+                    spend.parent_id,
+                    spend.puzzle_hash,
+                    spend.coin_amount,
+                    &spend.coin_id,
+                )?;
+                state.messages.push(Message {
+                    src,
+                    dst: dst.clone(),
+                    msg: *msg,
+                    counter: 1,
+                });
+            }
+            Condition::ReceiveMessage(src, dst_mode, msg) => {
+                let dst = SpendId::from_self(
+                    *dst_mode,
+                    spend.parent_id,
+                    spend.puzzle_hash,
+                    spend.coin_amount,
+                    &spend.coin_id,
+                )?;
+                state.messages.push(Message {
+                    src: src.clone(),
+                    dst,
+                    msg: *msg,
+                    counter: -1,
+                });
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 // returns (parent-id, puzzle-hash, amount, condition-list)
 pub(crate) fn parse_single_spend(
     a: &Allocator,
@@ -1001,6 +1441,7 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
     max_cost: &mut Cost,
     clvm_cost: Cost,
     constants: &ConsensusConstants,
+    conditions_cache: Option<&mut ConditionsCache>,
 ) -> Result<&'a mut SpendConditions, ValidationErr> {
     let parent_id = sanitize_hash(a, parent_id, 32, ErrorCode::InvalidParentId)?;
     let puzzle_hash = sanitize_hash(a, puzzle_hash, 32, ErrorCode::InvalidPuzzleHash)?;
@@ -1051,6 +1492,7 @@ pub fn process_single_spend<'a, V: SpendVisitor>(
         max_cost,
         constants,
         &mut visitor,
+        conditions_cache,
     )
 }
 
@@ -1093,10 +1535,39 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
     max_cost: &mut Cost,
     constants: &ConsensusConstants,
     visitor: &mut V,
+    conditions_cache: Option<&mut ConditionsCache>,
 ) -> Result<&'a mut SpendConditions, ValidationErr> {
     let mut announce_countdown: u32 = 1024;
 
-    while let Some((mut c, next)) = next(a, iter)? {
+    let mut visited: Option<Vec<(NodePtr, Condition, usize)>> =
+        conditions_cache.as_ref().map(|_| Vec::new());
+    let mut non_idempotent: Vec<Condition> = Vec::new();
+    let mut cached_suffix: Option<CachedConditionsTail> = None;
+
+    loop {
+        if let Some(cache) = conditions_cache.as_ref() {
+            if let Some(cached) = cache.get(&iter) {
+                cached_suffix = Some(cached.clone());
+                apply_cached_conditions_tail(
+                    a,
+                    cached,
+                    ret,
+                    state,
+                    &mut spend,
+                    &mut announce_countdown,
+                    max_cost,
+                    flags,
+                    constants,
+                    visitor,
+                )?;
+                break;
+            }
+        }
+
+        let Some((mut c, next)) = next(a, iter)? else {
+            break;
+        };
+        let current_node = iter;
         iter = next;
 
         let Some(op) = parse_opcode(a, first(a, c)?, flags) else {
@@ -1113,6 +1584,9 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
                 *max_cost -= GENERIC_CONDITION_COST;
                 ret.condition_cost += GENERIC_CONDITION_COST;
                 spend.condition_cost += GENERIC_CONDITION_COST;
+            }
+            if let Some(v) = visited.as_mut() {
+                v.push((current_node, Condition::Skip, non_idempotent.len()));
             }
             continue;
         };
@@ -1178,6 +1652,13 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         }
         c = rest(a, c)?;
         let cva = parse_args(a, c, op, flags)?;
+        if let Some(v) = visited.as_mut() {
+            let prefix_count = non_idempotent.len();
+            if is_non_idempotent(&cva) {
+                non_idempotent.push(cva.clone());
+            }
+            v.push((current_node, cva.clone(), prefix_count));
+        }
         visitor.condition(&mut spend, &cva);
         match cva {
             Condition::ReserveFee(limit) => {
@@ -1505,6 +1986,10 @@ pub fn parse_conditions<'a, V: SpendVisitor>(
         }
     }
 
+    if let (Some(v), Some(cache)) = (visited, conditions_cache) {
+        build_conditions_cache(&v, non_idempotent, cache, cached_suffix.as_ref());
+    }
+
     visitor.post_spend(a, &mut spend);
 
     ret.spends.push(spend);
@@ -1586,6 +2071,7 @@ pub fn parse_spends<V: SpendVisitor>(
             &mut cost_left,
             clvm_cost,
             constants,
+            None,
         )?;
     }
 
@@ -6252,6 +6738,1229 @@ fn test_dedup_reserve_fee_without_paying() {
 
     // Not eligible for dedup because the output is less than the input
     assert_eq!(cond.spends[1].flags & ELIGIBLE_FOR_DEDUP, 0);
+}
+
+/// Build a CLVM condition node: (opcode arg1 arg2 ...)
+#[cfg(test)]
+fn build_cond(a: &mut Allocator, opcode: u16, args: &[NodePtr]) -> NodePtr {
+    let mut node = a.nil();
+    for arg in args.iter().rev() {
+        node = a.new_pair(*arg, node).unwrap();
+    }
+    let op = a.new_number(opcode.into()).unwrap();
+    a.new_pair(op, node).unwrap()
+}
+
+/// Build a CLVM conditions list from individual condition nodes.
+#[cfg(test)]
+fn build_cond_list(a: &mut Allocator, conds: &[NodePtr]) -> NodePtr {
+    let mut node = a.nil();
+    for c in conds.iter().rev() {
+        node = a.new_pair(*c, node).unwrap();
+    }
+    node
+}
+
+/// Test helper: processes two spends sharing the same conditions NodePtr
+/// through the cache. The first spend (parent_id=H1) is a cache miss and
+/// populates the cache. The second spend (parent_id=H2) hits the cache.
+/// Returns (allocator, bundle_conditions) so callers can assert on both
+/// spends[0] (uncached) and spends[1] (cached).
+#[cfg(test)]
+fn cache_test_run(
+    a: &mut Allocator,
+    conds_node: NodePtr,
+) -> Result<SpendBundleConditions, ValidationErr> {
+    cache_test_run_flags(a, conds_node, ConsensusFlags::DONT_VALIDATE_SIGNATURE)
+}
+
+#[cfg(test)]
+fn cache_test_run_flags(
+    a: &mut Allocator,
+    conds_node: NodePtr,
+    flags: ConsensusFlags,
+) -> Result<SpendBundleConditions, ValidationErr> {
+    let parent1 = a.new_atom(H1).unwrap();
+    let parent2 = a.new_atom(H2).unwrap();
+    let puzzle_hash = a.new_atom(H2).unwrap();
+    let amount = a.new_number(123u64.into()).unwrap();
+
+    let mut ret = SpendBundleConditions::default();
+    let mut state = ParseState::default();
+    let mut cache = ConditionsCache::default();
+    let mut cost_left = 11_000_000_000u64;
+
+    process_single_spend::<EmptyVisitor>(
+        a,
+        &mut ret,
+        &mut state,
+        parent1,
+        puzzle_hash,
+        amount,
+        conds_node,
+        flags,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )?;
+
+    process_single_spend::<EmptyVisitor>(
+        a,
+        &mut ret,
+        &mut state,
+        parent2,
+        puzzle_hash,
+        amount,
+        conds_node,
+        flags,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )?;
+
+    Ok(ret)
+}
+
+// === Conditions cache: idempotent field collation ===
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_HEIGHT_RELATIVE, 100, 200, |c: &SpendBundleConditions| assert_eq!(c.spends[1].height_relative, Some(200)))]
+#[case(ASSERT_HEIGHT_RELATIVE, 300, 50, |c: &SpendBundleConditions| assert_eq!(c.spends[1].height_relative, Some(300)))]
+#[case(ASSERT_SECONDS_RELATIVE, 100, 500, |c: &SpendBundleConditions| assert_eq!(c.spends[1].seconds_relative, Some(500)))]
+#[case(ASSERT_HEIGHT_ABSOLUTE, 100, 200, |c: &SpendBundleConditions| assert_eq!(c.height_absolute, 200))]
+#[case(ASSERT_SECONDS_ABSOLUTE, 100, 500, |c: &SpendBundleConditions| assert_eq!(c.seconds_absolute, 500))]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 300, 100, |c: &SpendBundleConditions| assert_eq!(c.spends[1].before_height_relative, Some(100)))]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, 500, 200, |c: &SpendBundleConditions| assert_eq!(c.spends[1].before_seconds_relative, Some(200)))]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, 300, 100, |c: &SpendBundleConditions| assert_eq!(c.before_height_absolute, Some(100)))]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, 500, 200, |c: &SpendBundleConditions| assert_eq!(c.before_seconds_absolute, Some(200)))]
+fn test_cache_idempotent_collation(
+    #[case] opcode: ConditionOpcode,
+    #[case] val1: u64,
+    #[case] val2: u64,
+    #[case] check: fn(&SpendBundleConditions),
+) {
+    let mut a = Allocator::new();
+    let n1 = a.new_number(val1.into()).unwrap();
+    let n2 = a.new_number(val2.into()).unwrap();
+    let c1 = build_cond(&mut a, opcode, &[n1]);
+    let c2 = build_cond(&mut a, opcode, &[n2]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    check(&conds);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_MY_BIRTH_HEIGHT, 100, |c: &SpendBundleConditions| {
+    assert_eq!(c.spends[0].birth_height, Some(100));
+    assert_eq!(c.spends[1].birth_height, Some(100));
+})]
+#[case(ASSERT_MY_BIRTH_SECONDS, 1000, |c: &SpendBundleConditions| {
+    assert_eq!(c.spends[0].birth_seconds, Some(1000));
+    assert_eq!(c.spends[1].birth_seconds, Some(1000));
+})]
+fn test_cache_birth_assertions(
+    #[case] opcode: ConditionOpcode,
+    #[case] val: u64,
+    #[case] check: fn(&SpendBundleConditions),
+) {
+    let mut a = Allocator::new();
+    let v = a.new_number(val.into()).unwrap();
+    let c1 = build_cond(&mut a, opcode, &[v]);
+    let conds_node = build_cond_list(&mut a, &[c1]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    check(&conds);
+}
+
+#[test]
+fn test_cache_birth_height_duplicate() {
+    let mut a = Allocator::new();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let c1 = build_cond(&mut a, ASSERT_MY_BIRTH_HEIGHT, &[v100]);
+    let c2 = build_cond(&mut a, ASSERT_MY_BIRTH_HEIGHT, &[v100]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(conds.spends[1].birth_height, Some(100));
+}
+
+// === Conditions cache: accumulated scalars ===
+
+#[test]
+fn test_cache_reserve_fee_sums() {
+    let mut a = Allocator::new();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v200 = a.new_number(200u64.into()).unwrap();
+    let c1 = build_cond(&mut a, RESERVE_FEE, &[v100]);
+    let c2 = build_cond(&mut a, RESERVE_FEE, &[v200]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    // Two spends both contribute 300 each
+    assert_eq!(conds.reserve_fee, 600);
+}
+
+#[test]
+fn test_cache_addition_amount_sums() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let h2_node = a.new_atom(H2).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v23 = a.new_number(23u64.into()).unwrap();
+    let c1 = build_cond(&mut a, CREATE_COIN, &[h1_node, v100]);
+    let c2 = build_cond(&mut a, CREATE_COIN, &[h2_node, v23]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    // Each spend creates coins of 100+23=123, two spends = 246
+    assert_eq!(conds.addition_amount, 246);
+}
+
+// === Conditions cache: assert_ephemeral ===
+
+#[test]
+fn test_cache_assert_ephemeral() {
+    let mut a = Allocator::new();
+    let c1 = build_cond(&mut a, ASSERT_EPHEMERAL, &[]);
+    let conds_node = build_cond_list(&mut a, &[c1]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(conds.spends.len(), 2);
+}
+
+// === Conditions cache: non-idempotent replays ===
+
+#[test]
+fn test_cache_create_coin_replayed() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let c1 = build_cond(&mut a, CREATE_COIN, &[h1_node, v100]);
+    let conds_node = build_cond_list(&mut a, &[c1]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(conds.spends[0].create_coin.len(), 1);
+    assert_eq!(conds.spends[1].create_coin.len(), 1);
+    let coin0 = conds.spends[0].create_coin.iter().next().unwrap();
+    let coin1 = conds.spends[1].create_coin.iter().next().unwrap();
+    assert_eq!(coin0.amount, 100);
+    assert_eq!(coin1.amount, 100);
+    assert_eq!(coin0.puzzle_hash, coin1.puzzle_hash);
+}
+
+#[test]
+fn test_cache_multiple_create_coins() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let h2_node = a.new_atom(H2).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v23 = a.new_number(23u64.into()).unwrap();
+    let c1 = build_cond(&mut a, CREATE_COIN, &[h1_node, v100]);
+    let c2 = build_cond(&mut a, CREATE_COIN, &[h2_node, v23]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(conds.spends[0].create_coin.len(), 2);
+    assert_eq!(conds.spends[1].create_coin.len(), 2);
+}
+
+// === Conditions cache: costs ===
+
+#[cfg(test)]
+#[rstest]
+#[case(CREATE_COIN_COST, |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let v = a.new_number(1u64.into()).unwrap();
+    build_cond(a, CREATE_COIN, &[h, v])
+})]
+#[case(AGG_SIG_COST, |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    build_cond(a, AGG_SIG_ME, &[pk, msg])
+})]
+fn test_cache_condition_cost(
+    #[case] min_cost: u64,
+    #[case] make_cond: fn(&mut Allocator) -> NodePtr,
+) {
+    let mut a = Allocator::new();
+    let c1 = make_cond(&mut a);
+    let conds_node = build_cond_list(&mut a, &[c1]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(
+        conds.spends[0].condition_cost,
+        conds.spends[1].condition_cost
+    );
+    assert!(conds.spends[0].condition_cost >= min_cost);
+}
+
+// === Conditions cache: impossible constraint detection ===
+
+#[cfg(test)]
+#[rstest]
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    ErrorCode::ImpossibleHeightRelativeConstraints
+)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    ErrorCode::ImpossibleSecondsRelativeConstraints
+)]
+fn test_cache_impossible_constraints(
+    #[case] assert_op: ConditionOpcode,
+    #[case] before_op: ConditionOpcode,
+    #[case] expected: ErrorCode,
+) {
+    let mut a = Allocator::new();
+    let v_high = a.new_number(500u64.into()).unwrap();
+    let v_low = a.new_number(200u64.into()).unwrap();
+    let c1 = build_cond(&mut a, assert_op, &[v_high]);
+    let c2 = build_cond(&mut a, before_op, &[v_low]);
+    let conds_node = build_cond_list(&mut a, &[c1, c2]);
+    let err = cache_test_run(&mut a, conds_node).unwrap_err();
+    assert_eq!(err.error_code(), expected);
+}
+
+// === Conditions cache: mixed idempotent and non-idempotent ===
+
+#[test]
+fn test_cache_mixed_conditions() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v42 = a.new_number(42u64.into()).unwrap();
+    let v500 = a.new_number(500u64.into()).unwrap();
+    let v10 = a.new_number(10u64.into()).unwrap();
+    let c_hr = build_cond(&mut a, ASSERT_HEIGHT_RELATIVE, &[v100]);
+    let c_cc = build_cond(&mut a, CREATE_COIN, &[h1_node, v42]);
+    let c_ha = build_cond(&mut a, ASSERT_HEIGHT_ABSOLUTE, &[v500]);
+    let c_rf = build_cond(&mut a, RESERVE_FEE, &[v10]);
+    let conds_node = build_cond_list(&mut a, &[c_hr, c_cc, c_ha, c_rf]);
+    let conds = cache_test_run(&mut a, conds_node).unwrap();
+    assert_eq!(conds.spends[1].height_relative, Some(100));
+    assert_eq!(conds.height_absolute, 500);
+    assert_eq!(conds.spends[1].create_coin.len(), 1);
+    // reserve_fee accumulated: 10 per spend × 2
+    assert_eq!(conds.reserve_fee, 20);
+}
+
+// === Conditions cache: partial suffix hit ===
+
+/// First spend parses `shared` fully; second spend parses `(prefix_cond . shared)`.
+#[cfg(test)]
+fn cache_test_partial_suffix(
+    a: &mut Allocator,
+    prefix_opcode: ConditionOpcode,
+    prefix_val: u64,
+    shared: NodePtr,
+) -> SpendBundleConditions {
+    let parent1 = a.new_atom(H1).unwrap();
+    let parent2 = a.new_atom(H2).unwrap();
+    let puzzle_hash = a.new_atom(H2).unwrap();
+    let amount = a.new_number(123u64.into()).unwrap();
+
+    let mut ret = SpendBundleConditions::default();
+    let mut state = ParseState::default();
+    let mut cache = ConditionsCache::default();
+    let mut cost_left = 11_000_000_000u64;
+
+    process_single_spend::<EmptyVisitor>(
+        a,
+        &mut ret,
+        &mut state,
+        parent1,
+        puzzle_hash,
+        amount,
+        shared,
+        ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )
+    .unwrap();
+
+    let v = a.new_number(prefix_val.into()).unwrap();
+    let c_prefix = build_cond(a, prefix_opcode, &[v]);
+    let combined = a.new_pair(c_prefix, shared).unwrap();
+    process_single_spend::<EmptyVisitor>(
+        a,
+        &mut ret,
+        &mut state,
+        parent2,
+        puzzle_hash,
+        amount,
+        combined,
+        ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )
+    .unwrap();
+
+    ret
+}
+
+#[test]
+fn test_cache_partial_suffix_hit() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v42 = a.new_number(42u64.into()).unwrap();
+    let c_hr = build_cond(&mut a, ASSERT_HEIGHT_RELATIVE, &[v100]);
+    let c_cc = build_cond(&mut a, CREATE_COIN, &[h1_node, v42]);
+    let shared = build_cond_list(&mut a, &[c_hr, c_cc]);
+
+    let ret = cache_test_partial_suffix(&mut a, ASSERT_HEIGHT_ABSOLUTE, 999, shared);
+    assert_eq!(ret.spends[0].height_relative, Some(100));
+    assert_eq!(ret.spends[0].create_coin.len(), 1);
+    assert_eq!(ret.height_absolute, 999);
+    assert_eq!(ret.spends[1].height_relative, Some(100));
+    assert_eq!(ret.spends[1].create_coin.len(), 1);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(ASSERT_HEIGHT_RELATIVE, 200, ASSERT_HEIGHT_RELATIVE, 50, |r: &SpendBundleConditions| {
+    assert_eq!(r.spends[0].height_relative, Some(200));
+    assert_eq!(r.spends[1].height_relative, Some(200));
+})]
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, 100, ASSERT_BEFORE_HEIGHT_RELATIVE, 300, |r: &SpendBundleConditions| {
+    assert_eq!(r.spends[0].before_height_relative, Some(100));
+    assert_eq!(r.spends[1].before_height_relative, Some(100));
+})]
+fn test_cache_partial_suffix_merges(
+    #[case] shared_op: ConditionOpcode,
+    #[case] shared_val: u64,
+    #[case] prefix_op: ConditionOpcode,
+    #[case] prefix_val: u64,
+    #[case] check: fn(&SpendBundleConditions),
+) {
+    let mut a = Allocator::new();
+    let sv = a.new_number(shared_val.into()).unwrap();
+    let c_shared = build_cond(&mut a, shared_op, &[sv]);
+    let shared = build_cond_list(&mut a, &[c_shared]);
+    let ret = cache_test_partial_suffix(&mut a, prefix_op, prefix_val, shared);
+    check(&ret);
+}
+
+/// Three spends where the third hits a cache entry that was built from a
+/// partial suffix (prefix + cached tail). Verifies that
+/// `build_conditions_cache` correctly incorporates the cached tail's effects
+/// into the prefix cache entries.
+///
+/// Spend 1: parses `shared` = [ASSERT_HEIGHT_RELATIVE(100), CREATE_COIN(H1, 42)]
+///          → populates cache for both shared nodes
+/// Spend 2: parses `combined` = [ASSERT_SECONDS_ABSOLUTE(500) | shared]
+///          → hits cache at `shared`, builds prefix cache entry for `combined`
+/// Spend 3: parses `combined` again (same NodePtr)
+///          → hits cache at `combined` prefix node. This entry must include
+///            both the prefix (seconds_absolute=500) and suffix (height_relative=100,
+///            create_coin) effects.
+#[test]
+fn test_cache_partial_suffix_three_spends() {
+    let mut a = Allocator::new();
+    let h1_node = a.new_atom(H1).unwrap();
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v42 = a.new_number(42u64.into()).unwrap();
+    let v500 = a.new_number(500u64.into()).unwrap();
+
+    let c_hr = build_cond(&mut a, ASSERT_HEIGHT_RELATIVE, &[v100]);
+    let c_cc = build_cond(&mut a, CREATE_COIN, &[h1_node, v42]);
+    let shared = build_cond_list(&mut a, &[c_hr, c_cc]);
+
+    let c_sa = build_cond(&mut a, ASSERT_SECONDS_ABSOLUTE, &[v500]);
+    let combined = a.new_pair(c_sa, shared).unwrap();
+
+    let parent1 = a.new_atom(H1).unwrap();
+    let parent2 = a.new_atom(H2).unwrap();
+    let parent3 = a.new_atom(&[3u8; 32]).unwrap();
+    let puzzle_hash = a.new_atom(H2).unwrap();
+    let amount = a.new_number(123u64.into()).unwrap();
+
+    let mut ret = SpendBundleConditions::default();
+    let mut state = ParseState::default();
+    let mut cache = ConditionsCache::default();
+    let mut cost_left = 11_000_000_000u64;
+    let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+
+    // Spend 1: parse `shared` fully, populates cache for shared nodes
+    process_single_spend::<EmptyVisitor>(
+        &a,
+        &mut ret,
+        &mut state,
+        parent1,
+        puzzle_hash,
+        amount,
+        shared,
+        flags,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )
+    .unwrap();
+
+    // Spend 2: parse `combined` = [seconds_abs(500) | shared], hits cache at
+    // `shared`, builds prefix cache entry for `combined`
+    process_single_spend::<EmptyVisitor>(
+        &a,
+        &mut ret,
+        &mut state,
+        parent2,
+        puzzle_hash,
+        amount,
+        combined,
+        flags,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )
+    .unwrap();
+
+    // Spend 3: parse `combined` again, hits cache at the prefix node
+    process_single_spend::<EmptyVisitor>(
+        &a,
+        &mut ret,
+        &mut state,
+        parent3,
+        puzzle_hash,
+        amount,
+        combined,
+        flags,
+        &mut cost_left,
+        0,
+        &TEST_CONSTANTS,
+        Some(&mut cache),
+    )
+    .unwrap();
+
+    // Spend 3 must see the full combined effects
+    assert_eq!(ret.spends[2].height_relative, Some(100));
+    assert_eq!(ret.spends[2].create_coin.len(), 1);
+    assert_eq!(ret.seconds_absolute, 500);
+    assert_eq!(
+        ret.spends[2].condition_cost, ret.spends[1].condition_cost,
+        "spend 3 (full cache hit) must have same cost as spend 2 (partial hit)"
+    );
+}
+
+// === Conditions cache: announce countdown ===
+
+#[test]
+fn test_cache_announce_countdown_enforced() {
+    let mut a = Allocator::new();
+    let mut conds = Vec::new();
+    for i in 0u16..1025 {
+        let msg = a.new_atom(&i.to_be_bytes()).unwrap();
+        conds.push(build_cond(&mut a, CREATE_COIN_ANNOUNCEMENT, &[msg]));
+    }
+    let conds_node = build_cond_list(&mut a, &conds);
+    let err = cache_test_run(&mut a, conds_node).unwrap_err();
+    assert_eq!(err.error_code(), ErrorCode::TooManyAnnouncements);
+}
+
+// === Conditions cache: cost tracking across cached and uncached ===
+
+#[test]
+fn test_cache_softfork_cost() {
+    let mut a = Allocator::new();
+    let v1 = a.new_number(1u64.into()).unwrap();
+    let c1 = build_cond(&mut a, SOFTFORK, &[v1]);
+    let conds_node = build_cond_list(&mut a, &[c1]);
+    let conds =
+        cache_test_run_flags(&mut a, conds_node, ConsensusFlags::DONT_VALIDATE_SIGNATURE).unwrap();
+    assert_eq!(
+        conds.spends[0].condition_cost,
+        conds.spends[1].condition_cost
+    );
+}
+
+// === apply_cached_conditions_tail unit tests ===
+
+#[cfg(test)]
+fn make_test_spend(a: &mut Allocator) -> SpendConditions {
+    let parent_id = a.new_atom(H1).unwrap();
+    let puzzle_hash = a.new_atom(H2).unwrap();
+    let coin_id = Arc::new(Bytes32::from([0xaa; 32]));
+    SpendConditions::new(parent_id, 123, puzzle_hash, coin_id, 0)
+}
+
+#[cfg(test)]
+fn apply_tail(
+    a: &Allocator,
+    cached: &CachedConditionsTail,
+    spend: &mut SpendConditions,
+    ret: &mut SpendBundleConditions,
+    max_cost: u64,
+) -> Result<(), ValidationErr> {
+    let mut state = ParseState::default();
+    let mut countdown = 1024u32;
+    let mut cost = max_cost;
+    let mut visitor = EmptyVisitor {};
+    apply_cached_conditions_tail::<EmptyVisitor>(
+        a,
+        cached,
+        ret,
+        &mut state,
+        spend,
+        &mut countdown,
+        &mut cost,
+        ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+        &TEST_CONSTANTS,
+        &mut visitor,
+    )
+}
+
+#[test]
+fn test_apply_tail_cost_exceeded() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        condition_cost: 1000,
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, 999).unwrap_err();
+    assert_eq!(err.error_code(), ErrorCode::CostExceeded);
+}
+
+#[test]
+fn test_apply_tail_cost_applied() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        condition_cost: 500,
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, 1000).unwrap();
+    assert_eq!(spend.condition_cost, 500);
+    assert_eq!(ret.condition_cost, 500);
+}
+
+#[test]
+fn test_apply_tail_announce_overflow() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        announce_decrements: 1025,
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(err.error_code(), ErrorCode::TooManyAnnouncements);
+}
+
+#[cfg(test)]
+#[rstest]
+// spend has assert_height_relative >= 200, cache adds before < 100
+#[case(Some(200), None, None, Some(100))]
+// cache has assert_height_relative >= 200, spend already has before < 100
+#[case(None, Some(200), Some(100), None)]
+// both contribute: spend has assert=50, cache has assert=200 (max=200) and cache has before=100
+#[case(Some(50), Some(200), None, Some(100))]
+fn test_apply_tail_impossible_height_relative(
+    #[case] spend_hr: Option<u32>,
+    #[case] cached_hr: Option<u32>,
+    #[case] spend_bhr: Option<u32>,
+    #[case] cached_bhr: Option<u32>,
+) {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.height_relative = spend_hr;
+    spend.before_height_relative = spend_bhr;
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        height_relative: cached_hr,
+        before_height_relative: cached_bhr,
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(
+        err.error_code(),
+        ErrorCode::ImpossibleHeightRelativeConstraints
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(Some(500), None, None, Some(200))]
+#[case(None, Some(500), Some(200), None)]
+#[case(Some(100), Some(500), None, Some(200))]
+fn test_apply_tail_impossible_seconds_relative(
+    #[case] spend_sr: Option<u64>,
+    #[case] cached_sr: Option<u64>,
+    #[case] spend_bsr: Option<u64>,
+    #[case] cached_bsr: Option<u64>,
+) {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.seconds_relative = spend_sr;
+    spend.before_seconds_relative = spend_bsr;
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        seconds_relative: cached_sr,
+        before_seconds_relative: cached_bsr,
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(
+        err.error_code(),
+        ErrorCode::ImpossibleSecondsRelativeConstraints
+    );
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(Some(100), 200, ErrorCode::AssertMyBirthHeightFailed)]
+fn test_apply_tail_birth_height_conflict(
+    #[case] spend_bh: Option<u32>,
+    #[case] cached_bh: u32,
+    #[case] expected: ErrorCode,
+) {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.birth_height = spend_bh;
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        birth_height: Some(cached_bh),
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(err.error_code(), expected);
+}
+
+#[cfg(test)]
+#[rstest]
+#[case(Some(100), 200, ErrorCode::AssertMyBirthSecondsFailed)]
+fn test_apply_tail_birth_seconds_conflict(
+    #[case] spend_bs: Option<u64>,
+    #[case] cached_bs: u64,
+    #[case] expected: ErrorCode,
+) {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.birth_seconds = spend_bs;
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        birth_seconds: Some(cached_bs),
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(err.error_code(), expected);
+}
+
+#[test]
+fn test_apply_tail_birth_height_same_ok() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.birth_height = Some(100);
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        birth_height: Some(100),
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(spend.birth_height, Some(100));
+}
+
+#[test]
+fn test_apply_tail_reserve_fee_overflow() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions {
+        reserve_fee: u64::MAX,
+        ..Default::default()
+    };
+    let cached = CachedConditionsTail {
+        reserve_fee: 1,
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(err.error_code(), ErrorCode::ReserveFeeConditionFailed);
+}
+
+#[test]
+fn test_apply_tail_block_level_fields() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions {
+        height_absolute: 50,
+        seconds_absolute: 100,
+        ..Default::default()
+    };
+    let cached = CachedConditionsTail {
+        height_absolute: 200,
+        seconds_absolute: 300,
+        before_height_absolute: Some(999),
+        before_seconds_absolute: Some(888),
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(ret.height_absolute, 200);
+    assert_eq!(ret.seconds_absolute, 300);
+    assert_eq!(ret.before_height_absolute, Some(999));
+    assert_eq!(ret.before_seconds_absolute, Some(888));
+}
+
+#[test]
+fn test_apply_tail_block_level_fields_merge() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions {
+        height_absolute: 500,
+        before_height_absolute: Some(800),
+        before_seconds_absolute: Some(200),
+        ..Default::default()
+    };
+    let cached = CachedConditionsTail {
+        height_absolute: 200,
+        before_height_absolute: Some(900),
+        before_seconds_absolute: Some(100),
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(ret.height_absolute, 500);
+    assert_eq!(ret.before_height_absolute, Some(800));
+    assert_eq!(ret.before_seconds_absolute, Some(100));
+}
+
+#[test]
+fn test_apply_tail_per_spend_fields_merge() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    spend.height_relative = Some(50);
+    spend.seconds_relative = Some(100);
+    spend.before_height_relative = Some(500);
+    spend.before_seconds_relative = Some(900);
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        height_relative: Some(200),
+        seconds_relative: Some(300),
+        before_height_relative: Some(400),
+        before_seconds_relative: Some(800),
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(spend.height_relative, Some(200));
+    assert_eq!(spend.seconds_relative, Some(300));
+    assert_eq!(spend.before_height_relative, Some(400));
+    assert_eq!(spend.before_seconds_relative, Some(800));
+}
+
+#[test]
+fn test_apply_tail_create_coin_replayed() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions::default();
+    let ph = a.new_atom(H1).unwrap();
+    let cached = CachedConditionsTail {
+        non_idempotent: Arc::new(vec![Condition::CreateCoin(ph, 42, NodePtr::NIL)]),
+        addition_amount: 42,
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(spend.create_coin.len(), 1);
+    let coin = spend.create_coin.iter().next().unwrap();
+    assert_eq!(coin.amount, 42);
+    assert_eq!(ret.addition_amount, 42);
+}
+
+#[test]
+fn test_apply_tail_duplicate_create_coin() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let ph = a.new_atom(H1).unwrap();
+    spend.create_coin.insert(NewCoin {
+        puzzle_hash: H1.into(),
+        amount: 42,
+        hint: NodePtr::NIL,
+    });
+    let mut ret = SpendBundleConditions::default();
+    let cached = CachedConditionsTail {
+        non_idempotent: Arc::new(vec![Condition::CreateCoin(ph, 42, NodePtr::NIL)]),
+        ..Default::default()
+    };
+    let err = apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap_err();
+    assert_eq!(err.error_code(), ErrorCode::DuplicateOutput);
+}
+
+#[test]
+fn test_apply_tail_non_idempotent_start_offset() {
+    let mut a = Allocator::new();
+    let mut spend = make_test_spend(&mut a);
+    let mut ret = SpendBundleConditions::default();
+    let ph1 = a.new_atom(H1).unwrap();
+    let ph2 = a.new_atom(H2).unwrap();
+    let cached = CachedConditionsTail {
+        non_idempotent: Arc::new(vec![
+            Condition::CreateCoin(ph1, 10, NodePtr::NIL),
+            Condition::CreateCoin(ph2, 20, NodePtr::NIL),
+        ]),
+        non_idempotent_start: 1,
+        addition_amount: 20,
+        ..Default::default()
+    };
+    apply_tail(&a, &cached, &mut spend, &mut ret, u64::MAX).unwrap();
+    assert_eq!(spend.create_coin.len(), 1);
+    let coin = spend.create_coin.iter().next().unwrap();
+    assert_eq!(coin.amount, 20);
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+    use rstest::rstest;
+
+    // Exhaustive condition cache test
+    //
+    // For every condition type, verify that running with and without the
+    // conditions cache produces identical results. Two scenarios are tested:
+    //   A) Full cache hit: all spends share the same conditions NodePtr.
+    //   B) Partial cache hit: spend 1 populates the cache for `shared`, spend 2
+    //      parses `[prefix | shared]` (cache hit mid-list, builds prefix entries),
+    //      spend 3 reuses the combined list (hits the prefix cache entry).
+
+    fn run_differential_scenario(
+        a: &mut Allocator,
+        conds_per_spend: &[NodePtr],
+        flags: ConsensusFlags,
+    ) -> (Vec<Option<ErrorCode>>, Vec<Option<ErrorCode>>) {
+        let parents: Vec<_> = (0u8..conds_per_spend.len() as u8)
+            .map(|i| {
+                let mut buf = [0u8; 32];
+                buf[0] = i + 1;
+                a.new_atom(&buf).unwrap()
+            })
+            .collect();
+        let puzzle_hash = a.new_atom(H2).unwrap();
+        let amount = a.new_number(123u64.into()).unwrap();
+
+        // Run A: without cache
+        let mut ret_a = SpendBundleConditions::default();
+        let mut state_a = ParseState::default();
+        let mut errors_a: Vec<Option<ErrorCode>> = Vec::new();
+        for (i, &conds) in conds_per_spend.iter().enumerate() {
+            let mut cost = 11_000_000_000u64;
+            let r = process_single_spend::<EmptyVisitor>(
+                a,
+                &mut ret_a,
+                &mut state_a,
+                parents[i],
+                puzzle_hash,
+                amount,
+                conds,
+                flags,
+                &mut cost,
+                0,
+                &TEST_CONSTANTS,
+                None,
+            );
+            errors_a.push(r.err().map(|e| e.error_code()));
+        }
+
+        // Run B: with cache
+        let mut ret_b = SpendBundleConditions::default();
+        let mut state_b = ParseState::default();
+        let mut cache = ConditionsCache::default();
+        let mut errors_b: Vec<Option<ErrorCode>> = Vec::new();
+        for (i, &conds) in conds_per_spend.iter().enumerate() {
+            let mut cost = 11_000_000_000u64;
+            let r = process_single_spend::<EmptyVisitor>(
+                a,
+                &mut ret_b,
+                &mut state_b,
+                parents[i],
+                puzzle_hash,
+                amount,
+                conds,
+                flags,
+                &mut cost,
+                0,
+                &TEST_CONSTANTS,
+                Some(&mut cache),
+            );
+            errors_b.push(r.err().map(|e| e.error_code()));
+        }
+
+        assert_eq!(errors_a, errors_b, "per-spend errors differ");
+
+        if errors_a.iter().all(Option::is_none) {
+            let validate_a = validate_conditions(a, &ret_a, &state_a, flags)
+                .err()
+                .map(|e| e.error_code());
+            let validate_b = validate_conditions(a, &ret_b, &state_b, flags)
+                .err()
+                .map(|e| e.error_code());
+            assert_eq!(
+                validate_a, validate_b,
+                "validate_conditions differs between cached and uncached"
+            );
+
+            let mut owned_a = OwnedSpendBundleConditions::from(a, ret_a);
+            let mut owned_b = OwnedSpendBundleConditions::from(a, ret_b);
+            for spend in &mut owned_a.spends {
+                spend.create_coin.sort();
+            }
+            for spend in &mut owned_b.spends {
+                spend.create_coin.sort();
+            }
+            assert_eq!(
+                owned_a, owned_b,
+                "OwnedSpendBundleConditions differ between cached and uncached"
+            );
+        }
+
+        (errors_a, errors_b)
+    }
+
+    #[rstest]
+    // --- Idempotent (time-lock) conditions ---
+    #[case("assert_height_relative", |a: &mut Allocator| {
+    let v = a.new_number(100u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_HEIGHT_RELATIVE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_height_absolute", |a: &mut Allocator| {
+    let v = a.new_number(200u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_HEIGHT_ABSOLUTE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_seconds_relative", |a: &mut Allocator| {
+    let v = a.new_number(300u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_SECONDS_RELATIVE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_seconds_absolute", |a: &mut Allocator| {
+    let v = a.new_number(400u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_SECONDS_ABSOLUTE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_before_height_relative", |a: &mut Allocator| {
+    let v = a.new_number(500u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_BEFORE_HEIGHT_RELATIVE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_before_height_absolute", |a: &mut Allocator| {
+    let v = a.new_number(600u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_BEFORE_HEIGHT_ABSOLUTE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_before_seconds_relative", |a: &mut Allocator| {
+    let v = a.new_number(700u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_BEFORE_SECONDS_RELATIVE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_before_seconds_absolute", |a: &mut Allocator| {
+    let v = a.new_number(800u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_BEFORE_SECONDS_ABSOLUTE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    // --- Birth assertions ---
+    #[case("assert_my_birth_height", |a: &mut Allocator| {
+    let v = a.new_number(100u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_MY_BIRTH_HEIGHT, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_my_birth_seconds", |a: &mut Allocator| {
+    let v = a.new_number(200u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_MY_BIRTH_SECONDS, &[v]);
+    build_cond_list(a, &[c])
+})]
+    // --- Ephemeral ---
+    #[case("assert_ephemeral", |a: &mut Allocator| {
+    let c = build_cond(a, ASSERT_EPHEMERAL, &[]);
+    build_cond_list(a, &[c])
+})]
+    // --- Accumulated scalars ---
+    #[case("reserve_fee", |a: &mut Allocator| {
+    let v = a.new_number(10u64.into()).unwrap();
+    let c = build_cond(a, RESERVE_FEE, &[v]);
+    build_cond_list(a, &[c])
+})]
+    #[case("create_coin", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let v = a.new_number(1u64.into()).unwrap();
+    let c = build_cond(a, CREATE_COIN, &[h, v]);
+    build_cond_list(a, &[c])
+})]
+    // --- AggSig variants ---
+    #[case("agg_sig_unsafe", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_UNSAFE, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_me", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_ME, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_parent", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_PARENT, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_puzzle", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_PUZZLE, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_amount", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_AMOUNT, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_puzzle_amount", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_PUZZLE_AMOUNT, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_parent_amount", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_PARENT_AMOUNT, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("agg_sig_parent_puzzle", |a: &mut Allocator| {
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, AGG_SIG_PARENT_PUZZLE, &[pk, msg]);
+    build_cond_list(a, &[c])
+})]
+    // --- Announcements ---
+    #[case("create_coin_announcement", |a: &mut Allocator| {
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, CREATE_COIN_ANNOUNCEMENT, &[msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("create_puzzle_announcement", |a: &mut Allocator| {
+    let msg = a.new_atom(MSG1).unwrap();
+    let c = build_cond(a, CREATE_PUZZLE_ANNOUNCEMENT, &[msg]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_coin_announcement", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_COIN_ANNOUNCEMENT, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_puzzle_announcement", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_PUZZLE_ANNOUNCEMENT, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_concurrent_spend", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_CONCURRENT_SPEND, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_concurrent_puzzle", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_CONCURRENT_PUZZLE, &[h]);
+    build_cond_list(a, &[c])
+})]
+    // --- Self-introspection ---
+    #[case("assert_my_coin_id", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_MY_COIN_ID, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_my_parent_id", |a: &mut Allocator| {
+    let h = a.new_atom(H1).unwrap();
+    let c = build_cond(a, ASSERT_MY_PARENT_ID, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_my_puzzlehash", |a: &mut Allocator| {
+    let h = a.new_atom(H2).unwrap();
+    let c = build_cond(a, ASSERT_MY_PUZZLEHASH, &[h]);
+    build_cond_list(a, &[c])
+})]
+    #[case("assert_my_amount", |a: &mut Allocator| {
+    let v = a.new_number(123u64.into()).unwrap();
+    let c = build_cond(a, ASSERT_MY_AMOUNT, &[v]);
+    build_cond_list(a, &[c])
+})]
+    // --- Messages (paired send + receive with mode=0) ---
+    #[case("send_receive_message", |a: &mut Allocator| {
+    let mode = a.new_number(0u64.into()).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let send = build_cond(a, SEND_MESSAGE, &[mode, msg]);
+    let recv = build_cond(a, RECEIVE_MESSAGE, &[mode, msg]);
+    build_cond_list(a, &[send, recv])
+})]
+    // --- Softfork ---
+    #[case("softfork", |a: &mut Allocator| {
+    let v = a.new_number(1u64.into()).unwrap();
+    let c = build_cond(a, SOFTFORK, &[v]);
+    build_cond_list(a, &[c])
+})]
+    // --- Remark (no-op / unknown condition) ---
+    #[case("remark", |a: &mut Allocator| {
+    let c = build_cond(a, REMARK, &[]);
+    build_cond_list(a, &[c])
+})]
+    // --- Kitchen sink: many conditions combined ---
+    #[case("kitchen_sink", |a: &mut Allocator| {
+    let v100 = a.new_number(100u64.into()).unwrap();
+    let v200 = a.new_number(200u64.into()).unwrap();
+    let v10 = a.new_number(10u64.into()).unwrap();
+    let v1 = a.new_number(1u64.into()).unwrap();
+    let v9999 = a.new_number(9999u64.into()).unwrap();
+    let v123 = a.new_number(123u64.into()).unwrap();
+    let h1 = a.new_atom(H1).unwrap();
+    let h2 = a.new_atom(H2).unwrap();
+    let pk = a.new_atom(PUBKEY).unwrap();
+    let msg = a.new_atom(MSG1).unwrap();
+    let mode = a.new_number(0u64.into()).unwrap();
+    let c_hr = build_cond(a, ASSERT_HEIGHT_RELATIVE, &[v100]);
+    let c_sa = build_cond(a, ASSERT_SECONDS_ABSOLUTE, &[v200]);
+    let c_bha = build_cond(a, ASSERT_BEFORE_HEIGHT_ABSOLUTE, &[v9999]);
+    let c_cc1 = build_cond(a, CREATE_COIN, &[h1, v1]);
+    let c_cc2 = build_cond(a, CREATE_COIN, &[h2, v10]);
+    let c_rf = build_cond(a, RESERVE_FEE, &[v10]);
+    let c_as = build_cond(a, AGG_SIG_ME, &[pk, msg]);
+    let c_cca = build_cond(a, CREATE_COIN_ANNOUNCEMENT, &[msg]);
+    let c_cpa = build_cond(a, CREATE_PUZZLE_ANNOUNCEMENT, &[msg]);
+    let c_ph = build_cond(a, ASSERT_MY_PUZZLEHASH, &[h2]);
+    let c_am = build_cond(a, ASSERT_MY_AMOUNT, &[v123]);
+    let c_sm = build_cond(a, SEND_MESSAGE, &[mode, msg]);
+    let c_rm = build_cond(a, RECEIVE_MESSAGE, &[mode, msg]);
+    let c_sf = build_cond(a, SOFTFORK, &[v1]);
+    let c_bh = build_cond(a, ASSERT_MY_BIRTH_HEIGHT, &[v100]);
+    let c_rk = build_cond(a, REMARK, &[]);
+    build_cond_list(a, &[
+        c_hr, c_sa, c_bha, c_cc1, c_cc2, c_rf, c_as, c_cca, c_cpa,
+        c_ph, c_am, c_sm, c_rm, c_sf, c_bh, c_rk,
+    ])
+})]
+    #[allow(clippy::used_underscore_binding)]
+    fn test_cache_differential_exhaustive(
+        #[case] _name: &str,
+        #[case] build_shared: fn(&mut Allocator) -> NodePtr,
+    ) {
+        let mut a = Allocator::new();
+        let shared = build_shared(&mut a);
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE;
+
+        // Scenario A: full cache hit — 3 spends all use the same conditions
+        run_differential_scenario(&mut a, &[shared, shared, shared], flags);
+
+        // Scenario B: partial cache hit
+        // spend 1: shared (populates cache)
+        // spend 2: [ASSERT_HEIGHT_ABSOLUTE(1) | shared] (hits cache mid-list)
+        // spend 3: same combined list (hits prefix cache entry)
+        let v1 = a.new_number(1u64.into()).unwrap();
+        let prefix = build_cond(&mut a, ASSERT_HEIGHT_ABSOLUTE, &[v1]);
+        let combined = a.new_pair(prefix, shared).unwrap();
+        run_differential_scenario(&mut a, &[shared, combined, combined], flags);
+    }
 }
 
 #[cfg(test)]
