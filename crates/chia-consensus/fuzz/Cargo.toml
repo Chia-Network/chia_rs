@@ -149,3 +149,10 @@ path = "fuzz_targets/puzzle-fingerprint.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "serde-2026-size-bound"
+path = "fuzz_targets/serde-2026-size-bound.rs"
+test = false
+doc = false
+bench = false

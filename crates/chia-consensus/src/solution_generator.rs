@@ -1,4 +1,5 @@
 use crate::error::Result;
+use crate::serde_2026::SERDE_2026_COMPRESSION_LEVEL;
 use chia_protocol::Coin;
 use chia_protocol::CoinSpend;
 use clvmr::allocator::{Allocator, NodePtr};
@@ -115,7 +116,7 @@ where
 {
     let mut a = Allocator::new();
     let generator = build_generator(&mut a, spends)?;
-    Ok(serialize_2026(&a, generator, 0)?)
+    Ok(serialize_2026(&a, generator, SERDE_2026_COMPRESSION_LEVEL)?)
 }
 
 #[cfg(test)]
@@ -454,6 +455,37 @@ mod tests {
         );
         let generator_output = run_generator(&result);
         assert_eq!(generator_output, EXPECTED_GENERATOR_OUTPUT);
+    }
+
+    #[test]
+    fn test_solution_generator_2026() {
+        use crate::serde_2026::node_from_bytes_auto;
+        use clvmr::serde::SERDE_2026_MAGIC_PREFIX;
+
+        let coin1: Coin = Coin::new(
+            hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000036840").into(),
+            hex!("fcc78a9e396df6ceebc217d2446bc016e0b3d5922fb32e5783ec5a85d490cfb6").into(),
+            1_750_000_000_000,
+        );
+        let coin2: Coin = Coin::new(
+            hex!("ccd5bb71183532bff220ba46c268991a00000000000000000000000000000000").into(),
+            hex!("d23da14695a188ae5708dd152263c4db883eb27edeb936178d4d988b8f3ce5fc").into(),
+            18_375_000_000_000_000_000,
+        );
+        let spends = [
+            (coin1, PUZZLE1.as_ref(), SOLUTION1.as_ref()),
+            (coin2, PUZZLE2.as_ref(), SOLUTION2.as_ref()),
+        ];
+
+        let result = solution_generator_2026(spends).expect("solution_generator_2026");
+        assert!(result.starts_with(&SERDE_2026_MAGIC_PREFIX));
+
+        // Round-trip through the consensus auto-deserializer and confirm the
+        // tree is identical to the one behind the classic encoding.
+        let mut a = Allocator::new();
+        let node = node_from_bytes_auto(&mut a, &result).expect("node_from_bytes_auto");
+        let classic = solution_generator(spends).expect("solution_generator");
+        assert_eq!(node_to_bytes(&a, node).expect("node_to_bytes"), classic);
     }
 
     #[rstest]
