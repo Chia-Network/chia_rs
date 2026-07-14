@@ -82,26 +82,24 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
     ((max_cost / cost_per_byte) as usize).saturating_add(5 + SERDE_2026_MAGIC_PREFIX.len())
 }
 
-/// Maximum total blob size accepted by consensus deserialization.
-///
-/// The principled floor for this value is [`max_canonical_blob_size`] at the
-/// network's cost constants (~917 KB on mainnet) — see its doc for the
-/// proof. The current value is ~11x that floor: it was inherited from
-/// clvm_rs's `DeserializeLimits` default, and the extra headroom admits
-/// non-minimal encodings (accepted because `strict = false` below). Whether
-/// to tighten it toward the floor, and whether a size cap belongs here or at
-/// the peer-protocol layer, are deliberately left open for review.
-pub const CONSENSUS_MAX_BLOB_SIZE: usize = 10 * 1024 * 1024;
-
 /// Deserialize CLVM bytes, auto-detecting classic / backrefs / serde_2026.
 ///
 /// Sniffs `SERDE_2026_MAGIC_PREFIX` at the head of `bytes`; if present,
-/// dispatches to [`deserialize_2026`] with consensus caps
-/// ([`CONSENSUS_MAX_ATOM_LEN`], [`CONSENSUS_MAX_BLOB_SIZE`]). Otherwise
-/// falls back to [`node_from_bytes_backrefs`] (which also accepts plain
-/// classic).
-pub fn node_from_bytes_auto(allocator: &mut Allocator, bytes: &[u8]) -> Result<NodePtr> {
-    if bytes.len() > CONSENSUS_MAX_BLOB_SIZE {
+/// dispatches to [`deserialize_2026`] with the per-atom consensus cap
+/// ([`CONSENSUS_MAX_ATOM_LEN`]). Otherwise falls back to
+/// [`node_from_bytes_backrefs`] (which also accepts plain classic).
+///
+/// `max_blob_size` bounds the total wire size accepted; blobs above it are
+/// rejected before any parsing. Callers should derive it from the network's
+/// cost constants via [`max_canonical_blob_size`] (any headroom multiplier
+/// on top — e.g. to tolerate non-minimal encodings, which `strict = false`
+/// otherwise admits — is caller policy).
+pub fn node_from_bytes_auto(
+    allocator: &mut Allocator,
+    bytes: &[u8],
+    max_blob_size: usize,
+) -> Result<NodePtr> {
+    if bytes.len() > max_blob_size {
         return Err(EvalErr::SerializationError);
     }
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
@@ -260,52 +258,55 @@ mod tests {
 
         for blob in [classic, backrefs, serde2026] {
             let mut b = Allocator::new();
-            let parsed = node_from_bytes_auto(&mut b, &blob).expect("node_from_bytes_auto");
+            let parsed =
+                node_from_bytes_auto(&mut b, &blob, mainnet_cap()).expect("node_from_bytes_auto");
             assert_eq!(node_to_bytes(&b, parsed).unwrap(), expected);
         }
     }
 
-    #[test]
-    fn test_max_canonical_blob_size_at_real_constants() {
+    /// The derived cap at the real consensus constants.
+    fn mainnet_cap() -> usize {
         use crate::consensus_constants::TEST_CONSTANTS;
-        // Ties the doc-comment numbers to the real consensus constants so
-        // drift gets caught here instead of silently invalidating the bound.
-        let bound = max_canonical_blob_size(
+        max_canonical_blob_size(
             TEST_CONSTANTS.max_block_cost_clvm,
             TEST_CONSTANTS.cost_per_byte,
-        );
-        assert_eq!(bound, 916_677);
-        assert!(CONSENSUS_MAX_BLOB_SIZE >= bound);
+        )
+    }
+
+    #[test]
+    fn test_max_canonical_blob_size_at_real_constants() {
+        // Ties the doc-comment number to the real consensus constants so
+        // drift gets caught here instead of silently invalidating the bound.
+        assert_eq!(mainnet_cap(), 916_677);
     }
 
     #[test]
     fn test_blob_size_cap() {
-        // One byte over the cap must be rejected before any parsing,
-        // regardless of format.
-        let mut blob = vec![0u8; CONSENSUS_MAX_BLOB_SIZE + 1];
-        blob[..SERDE_2026_MAGIC_PREFIX.len()].copy_from_slice(&SERDE_2026_MAGIC_PREFIX);
         let mut a = Allocator::new();
+        let node = sample_tree(&mut a);
+        let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+
+        // One byte over the cap: rejected before any parsing.
+        let mut b = Allocator::new();
         assert!(matches!(
-            node_from_bytes_auto(&mut a, &blob),
+            node_from_bytes_auto(&mut b, &blob, blob.len() - 1),
             Err(EvalErr::SerializationError)
         ));
 
-        // At exactly the cap, the size gate lets the blob through to the
-        // parser (an all-zeros blob happens to parse on the backrefs path:
-        // leading 0x00 is a valid atom).
-        let blob = vec![0u8; CONSENSUS_MAX_BLOB_SIZE];
-        let mut a = Allocator::new();
-        assert!(node_from_bytes_auto(&mut a, &blob).is_ok());
-
-        // A valid small blob parses.
-        let mut a = Allocator::new();
-        let node = sample_tree(&mut a);
-        let blob = serialize_2026(&a, node, 0).unwrap();
+        // At exactly the cap: parses.
         let mut b = Allocator::new();
-        let parsed = node_from_bytes_auto(&mut b, &blob).unwrap();
+        let parsed = node_from_bytes_auto(&mut b, &blob, blob.len()).unwrap();
         assert_eq!(
             node_to_bytes(&b, parsed).unwrap(),
             node_to_bytes(&a, node).unwrap()
         );
+
+        // The size gate applies to non-serde_2026 formats too.
+        let classic = node_to_bytes(&a, node).unwrap();
+        let mut b = Allocator::new();
+        assert!(matches!(
+            node_from_bytes_auto(&mut b, &classic, classic.len() - 1),
+            Err(EvalErr::SerializationError)
+        ));
     }
 }
