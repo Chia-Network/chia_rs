@@ -44,6 +44,8 @@ text-diff = { workspace = true }
 criterion = { workspace = true }
 rand = { workspace = true, features = [ "small_rng" ] }
 blocking-threadpool = { workspace = true }
+clvm-fuzzing = { workspace = true }
+arbitrary = { workspace = true }
 
 [lib]
 bench = false

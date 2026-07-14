@@ -20,6 +20,10 @@ use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, intern_tree, serialize_2026};
 //    max_canonical_blob_size(max_cost, cost_per_byte).
 //
 // Also verifies the blob round-trips to the same tree.
+//
+// The bound is only tight for specific tree shapes; seed the corpus with
+// near-bound inputs first (see the gen_serde_2026_fuzz_seeds example in
+// chia-consensus) so mutation starts at the boundary.
 fuzz_target!(|data: &[u8]| {
     let mut unstructured = arbitrary::Unstructured::new(data);
     let max_cost: u64 = unstructured.arbitrary().unwrap_or(11_000_000_000);
