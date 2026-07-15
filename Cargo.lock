@@ -674,6 +674,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chia-vdf-verify-c"
+version = "0.46.0"
+dependencies = [
+ "chia-vdf-verify",
+ "hex",
+ "malachite-nz",
+]
+
+[[package]]
 name = "chia_py_streamable_macro"
 version = "0.46.0"
 dependencies = [
