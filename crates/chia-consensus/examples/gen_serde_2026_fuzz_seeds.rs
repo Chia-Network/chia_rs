@@ -8,7 +8,9 @@
 //! encoding comes closest to the bound, and writes the best as seeds, so
 //! fuzz runs mutate around the boundary instead of wandering toward it.
 //!
-//! Deterministic: fixed RNG seed, so regenerated seeds are reproducible.
+//! Deterministic per rand version: fixed RNG seed, so regenerated seeds are
+//! reproducible (seed corpora are regenerable scratch, so drift across rand
+//! releases is fine).
 //!
 //! ```sh
 //! cargo run --release --example gen_serde_2026_fuzz_seeds -- \
@@ -21,20 +23,9 @@ use chia_consensus::serde_2026::SERDE_2026_COMPRESSION_LEVEL;
 use clvm_fuzzing::make_tree;
 use clvmr::Allocator;
 use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, intern_tree, serialize_2026};
+use rand::rngs::SmallRng;
+use rand::{Rng, RngCore, SeedableRng};
 use std::fs;
-
-struct XorShift(u64);
-
-impl XorShift {
-    fn next(&mut self) -> u64 {
-        let mut x = self.0;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        self.0 = x;
-        x
-    }
-}
 
 /// Interpret `data` exactly as the fuzz target does and return
 /// (blob_size / bound, blob_size).
@@ -56,20 +47,18 @@ fn main() {
         .unwrap_or_else(|| "fuzz/corpus/serde-2026-size-bound".to_string());
     fs::create_dir_all(&out).unwrap();
 
-    let mut rng = XorShift(0x9e37_79b9_7f4a_7c15);
+    let mut rng = SmallRng::seed_from_u64(0x9e37_79b9_7f4a_7c15);
     let mut best: Vec<(f64, usize, Vec<u8>)> = Vec::new();
 
     for round in 0..400_000u64 {
-        let len = 16 + (rng.next() % 3000) as usize;
+        let len = 16 + (rng.next_u64() % 3000) as usize;
         let mut data = vec![0u8; len];
-        for b in &mut data {
-            *b = (rng.next() >> 32) as u8;
-        }
+        rng.fill_bytes(&mut data);
         // Bias some inputs toward long constant runs, which favors large
         // atoms and deep spines over noise.
         if round % 3 == 0 {
-            let run_byte = (rng.next() >> 24) as u8;
-            let start = 16 + (rng.next() as usize % (len - 16).max(1)).min(len - 16);
+            let run_byte = rng.random::<u8>();
+            let start = 16 + (rng.next_u64() as usize % (len - 16).max(1)).min(len - 16);
             for b in &mut data[start..] {
                 *b = run_byte;
             }
