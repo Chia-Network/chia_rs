@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "chia-vdf-verify"
+version = "0.46.0"
+description = "Pure-Rust VDF verifier for Chia (drop-in replacement for chiavdf verification)"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+features = ["py-bindings"]
+module-name = "chia_vdf_verify"
+# Also need cdylib for standalone maturin builds; enable via:
+#   cargo build --features py-bindings
+# For wheel packaging, prefer the workspace `wheel` crate.
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]

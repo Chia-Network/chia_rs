@@ -8,6 +8,7 @@ pub use chia_secp as secp;
 pub use chia_serde as serde;
 pub use chia_sha2 as sha2;
 pub use chia_ssl as ssl;
+pub use chia_vdf_verify as vdf_verify;
 pub use chia_traits as traits;
 pub use clvm_traits;
 pub use clvm_utils;

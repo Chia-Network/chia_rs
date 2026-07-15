@@ -68,6 +68,7 @@ chia-serde = { workspace = true, optional = true }
 chia-traits = { workspace = true, optional = true }
 chia-puzzle-types = { workspace = true, optional = true }
 chia-sha2 = { workspace = true, optional = true }
+chia-vdf-verify = { workspace = true, optional = true }
 clvm-traits = { workspace = true, optional = true }
 clvm-utils = { workspace = true, optional = true }
 clvmr = { workspace = true }
@@ -90,6 +91,7 @@ default = [
     "traits",
     "puzzle-types",
     "sha2",
+    "vdf-verify",
     "clvm-traits",
     "clvm-utils"
 ]
@@ -105,6 +107,7 @@ serde = ["dep:chia-serde", "chia-protocol/serde", "chia-bls/serde"]
 traits = ["dep:chia-traits"]
 puzzle-types = ["dep:chia-puzzle-types"]
 sha2 = ["dep:chia-sha2"]
+vdf-verify = ["dep:chia-vdf-verify"]
 clvm-traits = ["dep:clvm-traits"]
 clvm-utils = ["dep:clvm-utils"]
 
@@ -131,6 +134,7 @@ chia-traits = { path = "./crates/chia-traits", version = "0.46.0" }
 chia-puzzle-types = { path = "./crates/chia-puzzle-types", version = "0.46.0" }
 chia-sha2 = { path = "./crates/chia-sha2", version = "0.46.0" }
 chia-serde = { path = "./crates/chia-serde", version = "0.46.0" }
+chia-vdf-verify = { path = "./crates/chia-vdf-verify", version = "0.46.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.46.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.46.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.46.0" }
@@ -199,3 +203,5 @@ tempfile = "3.19.1"
 bitvec = "1.0.1"
 indexmap = "2.10.0"
 serde_arrays = "0.2.0"
+malachite-nz = "0.9"
+malachite-base = "0.9"

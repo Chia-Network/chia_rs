@@ -1,0 +1,46 @@
+[package]
+name = "chia-vdf-verify"
+version.workspace = true
+edition = "2024"
+license = "Apache-2.0"
+description = "Pure-Rust Chia VDF proof verifier — no GMP, no C dependencies"
+authors = ["Richard Kiss <him@richardkiss.com>"]
+homepage = "https://github.com/Chia-Network/chia_rs"
+repository = "https://github.com/Chia-Network/chia_rs"
+readme = "README.md"
+keywords = ["chia", "vdf", "verifiable-delay-function", "wesolowski"]
+categories = ["cryptography"]
+
+[lints]
+workspace = true
+
+[lib]
+name = "chia_vdf_verify"
+crate-type = ["rlib"]
+bench = false
+
+[features]
+py-bindings = ["dep:pyo3"]
+
+[dependencies]
+malachite-nz = { workspace = true }
+malachite-base = { workspace = true }
+sha2 = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+
+[dev-dependencies]
+hex = { workspace = true }
+criterion = { workspace = true, features = ["html_reports"] }
+num-bigint = { workspace = true, features = ["rand"] }
+
+[[bench]]
+name = "verify"
+harness = false
+
+[[bench]]
+name = "bigint_compare"
+harness = false
+
+[[bench]]
+name = "micro"
+harness = false
