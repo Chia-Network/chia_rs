@@ -10,13 +10,6 @@ use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::{EvalErr, Result};
 use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs};
 
-/// Per-atom byte cap used by chia consensus when deserializing CLVM blobs.
-///
-/// Matches the historical `clvm_rs` default. CLVM atoms above this size are
-/// uneconomical to construct under cost limits anyway; this is a defensive
-/// pre-allocation cap, not a hard consensus rule.
-pub const CONSENSUS_MAX_ATOM_LEN: usize = 1 << 20;
-
 /// Compression level passed to [`clvmr::serde::serialize_2026`] when chia
 /// produces serde_2026 blobs.
 ///
@@ -56,8 +49,9 @@ pub const SERDE_2026_COMPRESSION_LEVEL: u32 = 0;
 /// header; the headers and per-item slack together never exceed the `+5`
 /// because `U_a <= U_p + 1` forces cheap 1-byte pushes to exist whenever the
 /// headers grow. The bound is tight (slack reaches 0 at atom length 2^20)
-/// and requires atom lengths < 2^27, guaranteed by
-/// [`CONSENSUS_MAX_ATOM_LEN`]. The wire blob adds the
+/// and requires atom lengths < 2^27 — enforced by the per-atom cap in
+/// [`node_from_bytes_auto`] whenever the derived blob cap is below 2^27
+/// (at mainnet constants it is ~0.9 MB). The wire blob adds the
 /// [`SERDE_2026_MAGIC_PREFIX`] on top of the body.
 ///
 /// **Step 2 — cost bound:** consensus charges `vbytes * cost_per_byte`, and
@@ -85,8 +79,7 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// Deserialize CLVM bytes, auto-detecting classic / backrefs / serde_2026.
 ///
 /// Sniffs `SERDE_2026_MAGIC_PREFIX` at the head of `bytes`; if present,
-/// dispatches to [`deserialize_2026`] with the per-atom consensus cap
-/// ([`CONSENSUS_MAX_ATOM_LEN`]). Otherwise falls back to
+/// dispatches to [`deserialize_2026`]. Otherwise falls back to
 /// [`node_from_bytes_backrefs`] (which also accepts plain classic).
 ///
 /// `max_blob_size` bounds the total wire size accepted; blobs above it are
@@ -94,6 +87,12 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// cost constants via [`max_canonical_blob_size`] (any headroom multiplier
 /// on top — e.g. to tolerate non-minimal encodings, which `strict = false`
 /// otherwise admits — is caller policy).
+///
+/// The same value doubles as the per-atom cap: atoms appear as literals in
+/// the canonical serialization, so an atom of length `L` forces a canonical
+/// blob of at least `L` bytes — no atom of a cost-valid generator can ever
+/// exceed the blob bound. There is deliberately no separate atom-length
+/// constant.
 pub fn node_from_bytes_auto(
     allocator: &mut Allocator,
     bytes: &[u8],
@@ -110,7 +109,7 @@ pub fn node_from_bytes_auto(
         // rejecting valid transactions over a self-inflicted encoding choice;
         // a node is free to re-encode strictly before relaying, and to
         // disconnect a peer that habitually sends non-minimal encodings.
-        deserialize_2026(allocator, bytes, CONSENSUS_MAX_ATOM_LEN, false)
+        deserialize_2026(allocator, bytes, max_blob_size, false)
     } else {
         node_from_bytes_backrefs(allocator, bytes)
     }
@@ -143,9 +142,10 @@ mod tests {
     fn tight_trees() -> Vec<(Allocator, NodePtr)> {
         let mut trees = Vec::new();
 
-        // Single atom at the max length: the bound is exactly tight here.
+        // Single atom at 2^20 bytes, where the encoding bound's slack
+        // reaches exactly zero (see the proof's tightness note).
         let mut a = Allocator::new();
-        let node = a.new_atom(&vec![0xa5; CONSENSUS_MAX_ATOM_LEN]).unwrap();
+        let node = a.new_atom(&vec![0xa5; 1 << 20]).unwrap();
         trees.push((a, node));
 
         // >63 distinct atom lengths: forces a 2-byte atom-group-count header.
@@ -199,12 +199,15 @@ mod tests {
 
     #[test]
     fn test_encoding_bound_tight_at_max_atom_len() {
-        // A single atom of exactly CONSENSUS_MAX_ATOM_LEN (2^20) bytes is the
-        // known worst case: the encoding uses every byte the bound allows.
-        // If this stops being exact, the "+5" analysis has changed — revisit
+        // A single atom of exactly 2^20 bytes is the known worst case: the
+        // encoding uses every byte the bound allows. 2^20 is a property of
+        // the encoding's varint/header boundaries, NOT of any consensus cap
+        // (mainnet's derived cap is ~917 KB, below this), which is why it is
+        // hardcoded rather than computed via max_canonical_blob_size.
+        // If equality stops holding, the "+5" analysis has changed — revisit
         // the proof on max_canonical_blob_size.
         let mut a = Allocator::new();
-        let node = a.new_atom(&vec![0xa5; CONSENSUS_MAX_ATOM_LEN]).unwrap();
+        let node = a.new_atom(&vec![0xa5; 1 << 20]).unwrap();
         let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
         assert_eq!(blob.len(), encoding_bound(&a, node));
     }
