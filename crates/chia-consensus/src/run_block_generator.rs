@@ -25,7 +25,10 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
+use clvmr::serde::{
+    InternedTree, SERDE_2026_MAGIC_PREFIX, intern_tree_limited, node_from_bytes,
+    node_from_bytes_backrefs,
+};
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -172,8 +175,12 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        // serde_2026 blocks have a different serialization header
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR)
+        && program.starts_with(&SERDE_2026_MAGIC_PREFIX)
+    {
+        // the serde_2026 header can't match the [0xff, 0x01] quote shape;
+        // quote enforcement happens post-deserialization in
+        // check_generator_node() instead
         return Ok(());
     }
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
@@ -191,9 +198,7 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR)
-        || flags.contains(ConsensusFlags::INTERNED_GENERATOR)
-    {
+    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
@@ -572,7 +577,7 @@ mod tests {
     use chia_protocol::Bytes32;
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
-    use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
+    use clvmr::serde::node_to_bytes;
     use rstest::rstest;
 
     const IDENTITY_PUZZLE: &[u8] = &[1];
@@ -717,11 +722,27 @@ mod tests {
     }
 
     #[test]
-    fn test_check_generator_quote_interned_bypasses_check() {
+    fn test_check_generator_quote_interned_only_bypasses_serde_2026() {
         let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
-        // With INTERNED_GENERATOR, even non-quote bytes are accepted
-        assert!(check_generator_quote(&[0x80], flags).is_ok());
-        assert!(check_generator_quote(&[0x00, 0x42], flags).is_ok());
+        // serde_2026-prefixed blobs skip the byte-level quote check (their
+        // header can't match [0xff, 0x01]); enforcement happens at the node
+        // level instead
+        assert!(check_generator_quote(&SERDE_2026_MAGIC_PREFIX, flags).is_ok());
+        // classic encodings keep the post-SIMPLE_GENERATOR quote enforcement
+        // even after INTERNED_GENERATOR activates
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+        assert_eq!(
+            check_generator_quote(&[0x80], flags)
+                .unwrap_err()
+                .error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        assert_eq!(
+            check_generator_quote(&[0x00, 0x42], flags)
+                .unwrap_err()
+                .error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
     }
 
     #[test]
@@ -804,11 +825,75 @@ mod tests {
     }
 
     #[test]
-    fn test_check_generator_node_interned_bypasses_check() {
+    fn test_check_generator_node_enforced_with_interned_flag() {
+        // The node-level check is the quote enforcement point for serde_2026
+        // blobs (whose byte encoding can't be checked for the quote shape),
+        // so it must NOT be bypassed when INTERNED_GENERATOR is set.
         let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
-        // INTERNED_GENERATOR bypasses the node check even for non-quote trees
-        assert!(check_generator_node(&a, atom, flags).is_ok());
+        assert_eq!(
+            check_generator_node(&a, atom, flags)
+                .unwrap_err()
+                .error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        let one = a.new_atom(&[1]).unwrap();
+        let nil = a.nil();
+        let pair = a.new_pair(one, nil).unwrap();
+        assert!(check_generator_node(&a, pair, flags).is_ok());
+    }
+
+    #[test]
+    fn test_serde_2026_quote_enforcement_end_to_end() {
+        use crate::solution_generator::solution_generator_2026;
+        use clvmr::serde::serialize_2026;
+
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
+            | ConsensusFlags::SIMPLE_GENERATOR
+            | ConsensusFlags::INTERNED_GENERATOR;
+        let blocks: &[&[u8]] = &[];
+
+        // a quoted spend list in serde_2026 encoding is accepted
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80];
+        let spends = [(
+            Coin::new([0u8; 32].into(), puzzle_hash.into(), 0),
+            IDENTITY_PUZZLE,
+            empty_solution,
+        )];
+        let program = solution_generator_2026(spends).expect("solution_generator_2026");
+        assert!(program.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        let (_, conds) = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_block_generator2");
+        assert_eq!(conds.spends.len(), 1);
+
+        // a non-quoted serde_2026 generator is rejected by the node-level
+        // quote check
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        let blob = serialize_2026(&a, atom, 0).expect("serialize_2026");
+        assert!(blob.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
     }
 }
