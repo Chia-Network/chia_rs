@@ -25,10 +25,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{
-    InternedTree, SERDE_2026_MAGIC_PREFIX, intern_tree_limited, node_from_bytes,
-    node_from_bytes_backrefs,
-};
+use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -175,17 +172,6 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
-    // CRITICAL: Reject serde_2026 format before INTERNED_GENERATOR activates.
-    // Without this explicit guard, a serde_2026-prefixed generator would be
-    // accepted on the pre-HF2 chain during the window between code shipping
-    // and SIMPLE_GENERATOR (soft_fork9) activation.
-    if !flags.contains(ConsensusFlags::INTERNED_GENERATOR)
-        && program.starts_with(&SERDE_2026_MAGIC_PREFIX)
-    {
-        return Err(ValidationErr::Err(
-            ErrorCode::InvalidTransactionsGeneratorEncoding,
-        ));
-    }
     if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         // serde_2026 blocks have a different serialization header
         return Ok(());
@@ -363,9 +349,13 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let max_blob_size =
-        max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
-    let program = node_from_bytes_auto(&mut a, generator, max_blob_size)?;
+    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let max_blob_size =
+            max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
+        node_from_bytes_auto(&mut a, generator, max_blob_size)?
+    } else {
+        node_from_bytes_backrefs(&mut a, generator)?
+    };
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -464,9 +454,13 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
-    let max_blob_size =
-        max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
-    let program = node_from_bytes_auto(&mut a, generator, max_blob_size)?;
+    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let max_blob_size =
+            max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
+        node_from_bytes_auto(&mut a, generator, max_blob_size)?
+    } else {
+        node_from_bytes_backrefs(&mut a, generator)?
+    };
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -578,7 +572,7 @@ mod tests {
     use chia_protocol::Bytes32;
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
-    use clvmr::serde::node_to_bytes;
+    use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
     use rstest::rstest;
 
     const IDENTITY_PUZZLE: &[u8] = &[1];
@@ -733,31 +727,51 @@ mod tests {
     #[test]
     fn test_check_generator_quote_pre_simple_always_passes() {
         let flags = ConsensusFlags::empty();
-        // Before SIMPLE_GENERATOR, non-serde_2026 bytes are accepted
+        // Before SIMPLE_GENERATOR, the quote check accepts any bytes
         assert!(check_generator_quote(&[0x80], flags).is_ok());
         assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
     }
 
     #[test]
-    fn test_check_generator_quote_rejects_serde_2026_without_interned_flag() {
-        // CRITICAL guard: serde_2026 prefix must be rejected whenever
-        // INTERNED_GENERATOR is NOT set, regardless of SIMPLE_GENERATOR.
-        let prefix = SERDE_2026_MAGIC_PREFIX;
+    fn test_serde_2026_blob_rejected_without_interned_flag() {
+        // Without INTERNED_GENERATOR, a serde_2026-prefixed blob must fail the
+        // same way as on deployed nodes: the magic prefix starts with 0xfd,
+        // which is an invalid header byte in classic CLVM serialization, so
+        // node_from_bytes_backrefs() fails and maps to GeneratorRuntimeError.
+        let mut blob = SERDE_2026_MAGIC_PREFIX.to_vec();
+        blob.push(0x80);
+        let blocks: &[&[u8]] = &[];
+
         // Pre-fork (no flags at all)
-        let flags = ConsensusFlags::empty();
-        assert_eq!(
-            check_generator_quote(&prefix, flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::InvalidTransactionsGeneratorEncoding,
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
         );
-        // SIMPLE_GENERATOR active but INTERNED_GENERATOR not yet
-        let flags = ConsensusFlags::SIMPLE_GENERATOR;
         assert_eq!(
-            check_generator_quote(&prefix, flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::InvalidTransactionsGeneratorEncoding,
+            result.unwrap_err().error_code(),
+            ErrorCode::GeneratorRuntimeError,
+        );
+
+        // SIMPLE_GENERATOR active but INTERNED_GENERATOR not yet: the blob
+        // fails the quote check first (it doesn't start with [0xff, 0x01]),
+        // exactly as on deployed nodes.
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::ComplexGeneratorReceived,
         );
     }
 

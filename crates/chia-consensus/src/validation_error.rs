@@ -165,7 +165,6 @@ pub enum ErrorCode {
     MessageNotSentOrReceived,
     ComplexGeneratorReceived,
     TooManySpends,
-    InvalidTransactionsGeneratorEncoding,
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -381,7 +380,6 @@ impl From<ErrorCode> for u32 {
             ErrorCode::MessageNotSentOrReceived => 147,
             ErrorCode::ComplexGeneratorReceived => 148,
             ErrorCode::TooManySpends => 149,
-            ErrorCode::InvalidTransactionsGeneratorEncoding => 150,
         }
     }
 }
