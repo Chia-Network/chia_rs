@@ -93,12 +93,13 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     );
 
     // Round-trip: generator bytes must decode back to the same spends (cf. generator.rs).
+    // finalize() emits serde_2026, so INTERNED_GENERATOR is needed to parse it.
     let gen_prog = Program::new(generator.into());
     let Ok(mut result) = get_coinspends_for_trusted_block(
         &TEST_CONSTANTS,
         &gen_prog,
         vec![&[]],
-        ConsensusFlags::empty(),
+        ConsensusFlags::INTERNED_GENERATOR,
     ) else {
         return Corpus::Reject;
     };

@@ -11,7 +11,7 @@ use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
 };
-use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_auto};
+use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_2026};
 use crate::validation_error::{ErrorCode, ValidationErr, first};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -25,10 +25,7 @@ use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::{
-    InternedTree, SERDE_2026_MAGIC_PREFIX, intern_tree_limited, node_from_bytes,
-    node_from_bytes_backrefs,
-};
+use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -175,12 +172,11 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR)
-        && program.starts_with(&SERDE_2026_MAGIC_PREFIX)
-    {
-        // the serde_2026 header can't match the [0xff, 0x01] quote shape;
-        // quote enforcement happens post-deserialization in
-        // check_generator_node() instead
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        // nothing to check at the byte level: serde_2026 (the only legal
+        // encoding, enforced by node_from_bytes_2026 at parse time) can't be
+        // examined for the quote shape; quote enforcement happens
+        // post-deserialization in check_generator_node() instead
         return Ok(());
     }
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
@@ -236,7 +232,7 @@ where
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
         let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
-        let program_node = node_from_bytes_auto(&mut decode_allocator, program, max_blob_size)
+        let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
@@ -357,7 +353,7 @@ where
     let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
-        node_from_bytes_auto(&mut a, generator, max_blob_size)?
+        node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
         node_from_bytes_backrefs(&mut a, generator)?
     };
@@ -462,7 +458,7 @@ where
     let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
-        node_from_bytes_auto(&mut a, generator, max_blob_size)?
+        node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
         node_from_bytes_backrefs(&mut a, generator)?
     };
@@ -577,7 +573,7 @@ mod tests {
     use chia_protocol::Bytes32;
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
-    use clvmr::serde::node_to_bytes;
+    use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
     use rstest::rstest;
 
     const IDENTITY_PUZZLE: &[u8] = &[1];
@@ -708,49 +704,14 @@ mod tests {
     }
 
     #[test]
-    fn test_check_generator_quote_simple_only_rejects_non_quote() {
-        let flags = ConsensusFlags::SIMPLE_GENERATOR;
-        // Non-quote generator: starts with 0x80 (nil atom), not [0xff, 0x01]
-        assert_eq!(
-            check_generator_quote(&[0x80], flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::ComplexGeneratorReceived,
-        );
-        // Valid quote generator: starts with [0xff, 0x01]
-        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
-    }
-
-    #[test]
-    fn test_check_generator_quote_interned_only_bypasses_serde_2026() {
+    fn test_check_generator_quote_interned_defers_to_parse_and_node_checks() {
+        // with INTERNED_GENERATOR set, there is nothing to check at the byte
+        // level: encoding is enforced by node_from_bytes_2026 at parse time
+        // and the quote shape by check_generator_node() after decode
         let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
-        // serde_2026-prefixed blobs skip the byte-level quote check (their
-        // header can't match [0xff, 0x01]); enforcement happens at the node
-        // level instead
         assert!(check_generator_quote(&SERDE_2026_MAGIC_PREFIX, flags).is_ok());
-        // classic encodings keep the post-SIMPLE_GENERATOR quote enforcement
-        // even after INTERNED_GENERATOR activates
         assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
-        assert_eq!(
-            check_generator_quote(&[0x80], flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::ComplexGeneratorReceived,
-        );
-        assert_eq!(
-            check_generator_quote(&[0x00, 0x42], flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::ComplexGeneratorReceived,
-        );
-    }
-
-    #[test]
-    fn test_check_generator_quote_pre_simple_always_passes() {
-        let flags = ConsensusFlags::empty();
-        // Before SIMPLE_GENERATOR, the quote check accepts any bytes
         assert!(check_generator_quote(&[0x80], flags).is_ok());
-        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
     }
 
     #[test]
@@ -794,34 +755,6 @@ mod tests {
             result.unwrap_err().error_code(),
             ErrorCode::ComplexGeneratorReceived,
         );
-    }
-
-    #[test]
-    fn test_check_generator_quote_accepts_serde_2026_with_interned_flag() {
-        let prefix = SERDE_2026_MAGIC_PREFIX;
-        let flags = ConsensusFlags::INTERNED_GENERATOR;
-        assert!(check_generator_quote(&prefix, flags).is_ok());
-        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
-        assert!(check_generator_quote(&prefix, flags).is_ok());
-    }
-
-    #[test]
-    fn test_check_generator_node_simple_only_rejects_non_quote() {
-        let flags = ConsensusFlags::SIMPLE_GENERATOR;
-        let mut a = Allocator::new();
-        // Build a non-quote tree: just an atom (not (1 . rest))
-        let atom = a.new_atom(&[42]).unwrap();
-        assert_eq!(
-            check_generator_node(&a, atom, flags)
-                .unwrap_err()
-                .error_code(),
-            ErrorCode::ComplexGeneratorReceived,
-        );
-        // Build a valid (1 . nil) tree
-        let one = a.new_atom(&[1]).unwrap();
-        let nil = a.nil();
-        let pair = a.new_pair(one, nil).unwrap();
-        assert!(check_generator_node(&a, pair, flags).is_ok());
     }
 
     #[test]
@@ -894,6 +827,42 @@ mod tests {
         assert_eq!(
             result.unwrap_err().error_code(),
             ErrorCode::ComplexGeneratorReceived,
+        );
+    }
+
+    #[test]
+    fn test_old_serialization_rejected_with_interned_flag() {
+        // with INTERNED_GENERATOR active, an otherwise-valid generator in the
+        // old (classic/backrefs) serialization is a consensus failure
+        let program = make_generator(1);
+        assert!(program.starts_with(&[0xff, 0x01]));
+        let blocks: &[&[u8]] = &[];
+
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
+        let result = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert!(result.is_ok(), "sanity: valid without INTERNED_GENERATOR");
+
+        let flags = flags | ConsensusFlags::INTERNED_GENERATOR;
+        let result = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::GeneratorRuntimeError,
         );
     }
 }

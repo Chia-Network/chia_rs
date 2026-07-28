@@ -1,10 +1,11 @@
 use crate::consensus_constants::ConsensusConstants;
 use crate::error::Result;
 use crate::generator_cost::interned_vbytes;
+use crate::serde_2026::SERDE_2026_COMPRESSION_LEVEL;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{intern_tree, node_from_bytes_backrefs, node_to_bytes_backrefs};
+use clvmr::serde::{intern_tree, node_from_bytes_backrefs, serialize_2026};
 use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
@@ -219,7 +220,7 @@ impl InternedBlockBuilder {
             .allocator
             .new_pair(self.spend_list, self.allocator.nil())?;
         let root = self.allocator.new_pair(self.allocator.one(), inner)?;
-        let serialized = node_to_bytes_backrefs(&self.allocator, root)?;
+        let serialized = serialize_2026(&self.allocator, root, SERDE_2026_COMPRESSION_LEVEL)?;
 
         let interned = intern_tree(&self.allocator, root)?;
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
