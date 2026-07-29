@@ -831,6 +831,8 @@ mod tests {
 
     #[test]
     fn test_old_serialization_rejected_with_interned_flag() {
+        use clvmr::serde::node_to_bytes_backrefs;
+
         // with INTERNED_GENERATOR active, an otherwise-valid generator in the
         // old (classic/backrefs) serialization is a consensus failure
         let program = make_generator(1);
@@ -849,19 +851,83 @@ mod tests {
         );
         assert!(result.is_ok(), "sanity: valid without INTERNED_GENERATOR");
 
+        // the same generator in the backrefs encoding (also starts with the
+        // 0xff pair marker)
+        let mut a = Allocator::new();
+        let node = node_from_bytes(&mut a, &program).expect("node_from_bytes");
+        let backrefs = node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs");
+        assert!(backrefs.starts_with(&[0xff, 0x01]));
+
+        // and the classic blob wrapped in the serde_2026 magic prefix (so it
+        // is passed through, not prepended to — both framings of the
+        // prefix check must reject old encodings)
+        let mut wrapped = SERDE_2026_MAGIC_PREFIX.to_vec();
+        wrapped.extend_from_slice(&program);
+
         let flags = flags | ConsensusFlags::INTERNED_GENERATOR;
-        let result = run_block_generator2(
-            &program,
-            blocks,
-            u64::MAX,
-            flags,
-            &Signature::default(),
-            None,
-            &TEST_CONSTANTS,
-        );
-        assert_eq!(
-            result.unwrap_err(),
-            ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
-        );
+        for blob in [program.as_slice(), &backrefs, &wrapped] {
+            // after normalization the blob is a garbage serde_2026 body: its
+            // leading 0xff is an invalid varint first byte
+            let result = run_block_generator2(
+                blob,
+                blocks,
+                u64::MAX,
+                flags,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            );
+            assert_eq!(
+                result.unwrap_err(),
+                ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
+            );
+        }
+    }
+
+    #[test]
+    fn test_bare_serde_2026_body_accepted_with_interned_flag() {
+        use crate::solution_generator::solution_generator_2026;
+
+        // generous parsing: a serde_2026 generator stripped of its magic
+        // prefix (e.g. loaded from a future database format that saves the
+        // 6 bytes) validates identically to the prefixed wire form
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
+            | ConsensusFlags::SIMPLE_GENERATOR
+            | ConsensusFlags::INTERNED_GENERATOR;
+        let blocks: &[&[u8]] = &[];
+
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80];
+        let spends = [(
+            Coin::new([0u8; 32].into(), puzzle_hash.into(), 0),
+            IDENTITY_PUZZLE,
+            empty_solution,
+        )];
+        let program = solution_generator_2026(spends).expect("solution_generator_2026");
+        assert!(program.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        let body = &program[SERDE_2026_MAGIC_PREFIX.len()..];
+
+        let run = |blob: &[u8]| {
+            let (_, conds) = run_block_generator2(
+                blob,
+                blocks,
+                u64::MAX,
+                flags,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            )
+            .expect("run_block_generator2");
+            conds
+        };
+        let prefixed = run(&program);
+        let bare = run(body);
+        assert_eq!(prefixed.spends.len(), 1);
+        assert_eq!(bare.spends.len(), 1);
+        assert_eq!(prefixed.spends[0].coin_id, bare.spends[0].coin_id);
+        // cost is charged on the interned tree, not wire bytes, so both
+        // framings cost the same
+        assert_eq!(prefixed.cost, bare.cost);
+        assert_eq!(prefixed.execution_cost, bare.execution_cost);
     }
 }

@@ -6,24 +6,67 @@
 //! "sniff the magic prefix and dispatch" convenience that callers used to get
 //! from `clvm_rs::serde::node_from_bytes_auto`.
 
+use std::borrow::Cow;
+
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::{EvalErr, Result};
 use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs};
 
+/// Normalize a serde_2026 blob to its canonical, magic-prefixed form.
+///
+/// If `blob` already starts with [`SERDE_2026_MAGIC_PREFIX`], it is passed
+/// through unchanged (no copy); otherwise a copy with the prefix prepended
+/// is returned.
+///
+/// The direction matters: readers normalize by *prepending*, never by
+/// stripping. The prefixed form is the only in-memory / interchange form, so
+/// a blob that leaks out of the node (an RPC response, a cache dump, a .bin
+/// file) always carries the prefix and fails fast in old deserializers —
+/// the leading `0xfd` declares an atom length far beyond their hard cap. A
+/// *bare* body, by contrast, "successfully" misparses as a small garbage
+/// atom in old software, so bare bodies may exist only at rest (e.g. a
+/// database format that saves the 6 bytes); this helper re-arms them at the
+/// load boundary.
+///
+/// The prepend-or-passthrough decision is structurally unambiguous: no
+/// valid serde_2026 body can begin with `0xfd`. A varint whose first byte is
+/// `0xfd` has six leading ones and its single first-byte payload bit set —
+/// that bit is the sign bit of the two's-complement value, so the varint
+/// always decodes negative, and the body's leading varint (the atom-group
+/// count) must be non-negative. This holds for overlong (non-strict)
+/// encodings too, so a bare body can never be mistaken for a prefixed blob.
+pub fn ensure_serde_2026_prefix(blob: &[u8]) -> Cow<'_, [u8]> {
+    if blob.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+        Cow::Borrowed(blob)
+    } else {
+        let mut prefixed = Vec::with_capacity(SERDE_2026_MAGIC_PREFIX.len() + blob.len());
+        prefixed.extend_from_slice(&SERDE_2026_MAGIC_PREFIX);
+        prefixed.extend_from_slice(blob);
+        Cow::Owned(prefixed)
+    }
+}
+
 /// Deserialize a generator on the consensus path: the blob must be a
-/// magic-prefixed serde_2026 encoding, with no fallback to classic/backrefs
-/// parsing — with `INTERNED_GENERATOR` active, serde_2026 is the only legal
-/// generator encoding. `max_blob_size` and `strict = false` have the same
-/// meaning (and rationale) as in [`node_from_bytes_auto`].
+/// serde_2026 encoding, with no fallback to classic/backrefs parsing — with
+/// `INTERNED_GENERATOR` active, serde_2026 is the only legal generator
+/// encoding. Both framings are accepted: the magic-prefixed wire form and
+/// the bare body (normalized via [`ensure_serde_2026_prefix`], which
+/// prepends the prefix — the underlying deserializer still requires it).
+/// Classic/backrefs blobs fail either way: their leading byte makes for an
+/// invalid serde_2026 body. `max_blob_size` and `strict = false` have the
+/// same meaning (and rationale) as in [`node_from_bytes_auto`].
 pub fn node_from_bytes_2026(
     allocator: &mut Allocator,
     bytes: &[u8],
     max_blob_size: usize,
 ) -> Result<NodePtr> {
+    let bytes = ensure_serde_2026_prefix(bytes);
+    // the size cap applies to the canonical (prefixed) form, so both
+    // framings of the same generator are accepted or rejected together
     if bytes.len() > max_blob_size {
         return Err(EvalErr::SerializationError);
     }
-    deserialize_2026(allocator, bytes, max_blob_size, false)
+    deserialize_2026(allocator, &bytes, max_blob_size, false)
 }
 
 /// Compression level passed to [`clvmr::serde::serialize_2026`] when chia
@@ -109,6 +152,12 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// blob of at least `L` bytes — no atom of a cost-valid generator can ever
 /// exceed the blob bound. There is deliberately no separate atom-length
 /// constant.
+///
+/// Do not pass *bare* (prefix-stripped) serde_2026 bodies here: without the
+/// prefix they are indistinguishable from classic encodings and would
+/// silently misparse via the backrefs fallback. A blob known to be
+/// serde_2026 belongs in [`node_from_bytes_2026`], which accepts both
+/// framings.
 pub fn node_from_bytes_auto(
     allocator: &mut Allocator,
     bytes: &[u8],
@@ -262,6 +311,102 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_ensure_serde_2026_prefix() {
+        let mut a = Allocator::new();
+        let node = sample_tree(&mut a);
+        let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+
+        // prefixed blob: passed through without copying
+        assert!(matches!(ensure_serde_2026_prefix(&blob), Cow::Borrowed(_)));
+
+        // bare body: normalizing prepends the prefix, recovering the wire form
+        let body = &blob[SERDE_2026_MAGIC_PREFIX.len()..];
+        let normalized = ensure_serde_2026_prefix(body);
+        assert!(matches!(normalized, Cow::Owned(_)));
+        assert_eq!(normalized.as_ref(), blob.as_slice());
+    }
+
+    #[test]
+    fn test_node_from_bytes_2026_accepts_both_framings() {
+        use clvm_utils::tree_hash;
+
+        let mut a = Allocator::new();
+        let node = sample_tree(&mut a);
+        let expected_bytes = node_to_bytes(&a, node).unwrap();
+        let expected_hash = tree_hash(&a, node);
+        let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+        let body = &blob[SERDE_2026_MAGIC_PREFIX.len()..];
+
+        for framing in [blob.as_slice(), body] {
+            let mut b = Allocator::new();
+            let parsed =
+                node_from_bytes_2026(&mut b, framing, mainnet_cap()).expect("node_from_bytes_2026");
+            assert_eq!(node_to_bytes(&b, parsed).unwrap(), expected_bytes);
+            assert_eq!(tree_hash(&b, parsed), expected_hash);
+        }
+    }
+
+    #[test]
+    fn test_node_from_bytes_2026_body_with_multibyte_group_count() {
+        // >63 distinct atom lengths force a multi-byte group-count header,
+        // so the bare body starts with a high varint byte (0x80..=0xbf) —
+        // still distinct from the 0xfd magic, so it must be prepended to
+        // and parse like the prefixed form.
+        let mut a = Allocator::new();
+        let mut node = a.nil();
+        for len in 1..=64usize {
+            let atom = a.new_atom(&vec![0x5a; len]).unwrap();
+            node = a.new_pair(atom, node).unwrap();
+        }
+        let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+        let body = &blob[SERDE_2026_MAGIC_PREFIX.len()..];
+        assert!((0x80..=0xbf).contains(&body[0]));
+
+        let mut b = Allocator::new();
+        let parsed =
+            node_from_bytes_2026(&mut b, body, mainnet_cap()).expect("node_from_bytes_2026");
+        assert_eq!(
+            node_to_bytes(&b, parsed).unwrap(),
+            node_to_bytes(&a, node).unwrap()
+        );
+    }
+
+    #[rstest]
+    #[case::empty(&[])]
+    #[case::first_prefix_byte_only(&[0xfd])]
+    #[case::shorter_than_prefix(&SERDE_2026_MAGIC_PREFIX[..5])]
+    #[case::exactly_the_prefix(&SERDE_2026_MAGIC_PREFIX)]
+    // classic/backrefs generators serialize a pair, so they start with 0xff
+    // — an invalid varint first byte in either framing of the check
+    #[case::classic_bare(&[0xff, 0x01, 0x80])]
+    #[case::classic_wrapped_in_prefix(&[0xfd, 0xff, b'2', b'0', b'2', b'6', 0xff, 0x01, 0x80])]
+    fn test_node_from_bytes_2026_rejects(#[case] blob: &[u8]) {
+        let mut a = Allocator::new();
+        assert!(matches!(
+            node_from_bytes_2026(&mut a, blob, mainnet_cap()),
+            Err(EvalErr::SerializationError)
+        ));
+    }
+
+    #[test]
+    fn test_node_from_bytes_2026_cap_applies_to_canonical_form() {
+        let mut a = Allocator::new();
+        let node = sample_tree(&mut a);
+        let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+        let body = &blob[SERDE_2026_MAGIC_PREFIX.len()..];
+
+        // the bare body is rejected or accepted exactly like its prefixed
+        // equivalent: the cap counts the prepended prefix
+        let mut b = Allocator::new();
+        assert!(matches!(
+            node_from_bytes_2026(&mut b, body, blob.len() - 1),
+            Err(EvalErr::SerializationError)
+        ));
+        let mut b = Allocator::new();
+        node_from_bytes_2026(&mut b, body, blob.len()).expect("node_from_bytes_2026");
     }
 
     #[test]
