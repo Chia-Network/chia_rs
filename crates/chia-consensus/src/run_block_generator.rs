@@ -232,8 +232,7 @@ where
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
         let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
-        let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)
-            .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
+        let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let cost = interned_vbytes(&interned) * constants.cost_per_byte;
@@ -861,8 +860,8 @@ mod tests {
             &TEST_CONSTANTS,
         );
         assert_eq!(
-            result.unwrap_err().error_code(),
-            ErrorCode::GeneratorRuntimeError,
+            result.unwrap_err(),
+            ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
         );
     }
 }
