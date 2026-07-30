@@ -135,6 +135,16 @@ pub fn fast_forward_singleton(
         return Err(Error::PuzzleHashMismatch);
     }
 
+    // fast-forwarding must not change the serialized size (and therefore the
+    // run-time cost) of the spend. We rewrite two variable-size fields: the
+    // lineage proof's parent amount and the solution's amount. Requiring the
+    // amounts to stay the same guarantees the encoding (and cost) is unchanged.
+    // Note that the original solution amount equals coin.amount, which was
+    // verified above.
+    if lineage_proof.parent_amount != new_parent.amount || new_solution.amount != new_coin.amount {
+        return Err(Error::CoinAmountMismatch);
+    }
+
     // update the solution to use the new parent coin's information
     lineage_proof.parent_parent_coin_info = new_parent.parent_coin_info;
     lineage_proof.parent_amount = new_parent.amount;
@@ -245,8 +255,6 @@ mod tests {
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         )]
         new_parents_parent: &str,
-        #[values(0, 1, 3, 5)] new_amount: u64,
-        #[values(0, 1, 3, 5)] prev_amount: u64,
     ) {
         let spend_bytes =
             fs::read(format!("../../ff-tests/{spend_file}.spend")).expect("read file");
@@ -258,24 +266,18 @@ mod tests {
         let solution = spend.solution.to_clvm(&mut a).expect("to_clvm");
         let puzzle_hash = Bytes32::from(tree_hash(&a, puzzle));
 
+        // fast-forwarding must not change the coin amounts, so the new parent
+        // and new coin keep the same (odd) amount as the original spend.
         let new_parent_coin = Coin {
             parent_coin_info: new_parents_parent.try_into().unwrap(),
             puzzle_hash,
-            amount: if prev_amount == 0 {
-                spend.coin.amount
-            } else {
-                prev_amount
-            },
+            amount: spend.coin.amount,
         };
 
         let new_coin = Coin {
             parent_coin_info: new_parent_coin.coin_id(),
             puzzle_hash,
-            amount: if new_amount == 0 {
-                spend.coin.amount
-            } else {
-                new_amount
-            },
+            amount: spend.coin.amount,
         };
 
         // perform fast-forward
@@ -397,9 +399,33 @@ mod tests {
 
     #[test]
     fn test_amount_mismatch() {
+        // changing the spent coin's amount makes it disagree with the solution
         run_ff_test(
             |_a, coin, _new_coin, _new_parent, _puzzle, _solution| {
                 coin.amount = 3;
+            },
+            Error::CoinAmountMismatch,
+        );
+
+        // fast-forwarding must not change the new coin's amount (still odd)
+        run_ff_test(
+            |_a, _coin, new_coin, _new_parent, _puzzle, _solution| {
+                new_coin.amount += 2;
+            },
+            Error::CoinAmountMismatch,
+        );
+
+        // fast-forwarding must not change the new parent's amount (still odd)
+        run_ff_test(
+            |a, _coin, new_coin, new_parent, _puzzle, solution| {
+                let new_solution = parse_solution(a, solution);
+
+                let Proof::Lineage(lineage_proof) = &new_solution.lineage_proof else {
+                    unreachable!();
+                };
+
+                new_parent.amount = lineage_proof.parent_amount + 2;
+                new_coin.parent_coin_info = new_parent.coin_id();
             },
             Error::CoinAmountMismatch,
         );
