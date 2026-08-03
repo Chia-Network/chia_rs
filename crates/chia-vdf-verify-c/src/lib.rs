@@ -24,7 +24,10 @@ pub struct ByteArray {
 /// Create a discriminant from `seed` and write `|D|` as big-endian into `result`.
 ///
 /// `result` must point to a buffer of exactly `size_bits / 8` bytes.
-/// Returns `false` on null pointers, invalid `size_bits`, or panic.
+/// Returns `false` on null pointers, empty `seed` (`seed_size == 0`), invalid
+/// `size_bits`, or panic. Empty seeds are rejected up front: `hash_prime`
+/// cannot advance an empty sprout, so an infinite loop would not be caught by
+/// `catch_unwind`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn create_discriminant_wrapper(
     seed: *const u8,
@@ -32,7 +35,14 @@ pub unsafe extern "C" fn create_discriminant_wrapper(
     size_bits: usize,
     result: *mut u8,
 ) -> bool {
-    if seed.is_null() || result.is_null() {
+    if result.is_null() {
+        return false;
+    }
+    // Reject empty seeds before calling into hash_prime (hang, not panic).
+    if seed_size == 0 {
+        return false;
+    }
+    if seed.is_null() {
         return false;
     }
     if size_bits == 0 || !size_bits.is_multiple_of(8) {

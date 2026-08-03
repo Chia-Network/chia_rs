@@ -146,7 +146,13 @@ pub fn is_prime_bpsw(n: &Integer) -> bool {
 ///
 /// Uses iterative SHA256 to expand seed, then applies bitmask and tests primality.
 /// Matches chiavdf's HashPrime(seed, length, bitmask).
+///
+/// # Panics
+///
+/// Panics if `seed` is empty. An empty sprout makes the increment a no-op, so the
+/// same blob would be retested forever whenever it is composite.
 pub fn hash_prime(seed: &[u8], length: usize, bitmask: &[usize]) -> Integer {
+    assert!(!seed.is_empty(), "seed cannot be empty");
     assert!(length.is_multiple_of(8), "length must be multiple of 8");
     let byte_len = length / 8;
 
@@ -229,5 +235,11 @@ mod tests {
             256,
             "hash_prime result should have correct bit length"
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "seed cannot be empty")]
+    fn test_hash_prime_empty_seed_rejected() {
+        let _ = hash_prime(b"", 256, &[255]);
     }
 }

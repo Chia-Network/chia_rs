@@ -133,6 +133,14 @@ fn test_verify_rejects_null_and_bad_input() {
             7,
             [0u8; 1].as_mut_ptr()
         ));
+        // Non-null pointer with seed_size == 0 must return false (not hang).
+        // catch_unwind cannot stop the infinite loop that empty sprout causes.
+        assert!(!create_discriminant_wrapper(
+            b"".as_ptr(),
+            0,
+            512,
+            [0u8; 64].as_mut_ptr()
+        ));
     }
 }
 

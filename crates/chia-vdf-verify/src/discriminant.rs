@@ -8,7 +8,15 @@ use malachite_nz::integer::Integer;
 /// Create a discriminant D from a seed and bit length.
 /// D = -HashPrime(seed, length, {0, 1, 2, length-1})
 /// D ≡ 7 (mod 8), so D ≡ 1 (mod 8) after negation.
+///
+/// Matches chiavdf `CreateDiscriminant`: rejects an empty seed (an empty sprout
+/// cannot be incremented, so `hash_prime` would loop forever on a composite).
+///
+/// # Panics
+///
+/// Panics if `seed` is empty, or if `length` is not a positive multiple of 8.
 pub fn create_discriminant(seed: &[u8], length: usize) -> Integer {
+    assert!(!seed.is_empty(), "seed cannot be empty");
     assert!(
         length > 0 && length.is_multiple_of(8),
         "length must be positive multiple of 8"
@@ -47,5 +55,11 @@ mod tests {
             is_prime_bpsw(&(-d)),
             "discriminant magnitude should be prime"
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "seed cannot be empty")]
+    fn test_empty_seed_rejected() {
+        let _ = create_discriminant(b"", 256);
     }
 }
