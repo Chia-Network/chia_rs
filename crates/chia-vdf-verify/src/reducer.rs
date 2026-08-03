@@ -218,11 +218,7 @@ mod tests {
 
     /// Discriminant for (5, ±5, 7): b^2 - 4ac = 25 - 140 = -115.
     fn make_boundary_form(b: i32) -> Form {
-        Form::new(
-            Integer::from(5i32),
-            Integer::from(b),
-            Integer::from(7i32),
-        )
+        Form::new(Integer::from(5i32), Integer::from(b), Integer::from(7i32))
     }
 
     // PulmarkReducer used to treat (a, -a, c) with a < c as already reduced,
