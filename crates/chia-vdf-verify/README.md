@@ -11,15 +11,15 @@ Chiavdf-compatible verification API, available as:
 - Standalone: `chia_vdf_verify` (`maturin develop -m crates/chia-vdf-verify`)
 - Via the `chia_rs` wheel: `from chia_rs.vdf_verify import ...`
 
-| Function | Notes |
-| -------- | ----- |
-| `create_discriminant` | Returns `-0x…` hex (same as chiavdf) |
-| `verify_wesolowski` | Depth-0 Wesolowski check |
-| `verify_n_wesolowski` | N-Wesolowski proof blob |
-| `create_discriminant_and_verify_n_wesolowski` | Combined create + verify |
-| `verify_n_wesolowski_with_b` | Compact path with explicit B |
-| `get_b_from_n_wesolowski` | Extract B as `0x…` hex |
-| `bqfc_deserialize` | Low-level form decode |
+| Function                                      | Notes                                |
+| --------------------------------------------- | ------------------------------------ |
+| `create_discriminant`                         | Returns `-0x…` hex (same as chiavdf) |
+| `verify_wesolowski`                           | Depth-0 Wesolowski check             |
+| `verify_n_wesolowski`                         | N-Wesolowski proof blob              |
+| `create_discriminant_and_verify_n_wesolowski` | Combined create + verify             |
+| `verify_n_wesolowski_with_b`                  | Compact path with explicit B         |
+| `get_b_from_n_wesolowski`                     | Extract B as `0x…` hex               |
+| `bqfc_deserialize`                            | Low-level form decode                |
 
 Extras (not in chiavdf): `create_discriminant_bytes`, `verify_n_wesolowski_bytes`. `prove` is not implemented.
 
