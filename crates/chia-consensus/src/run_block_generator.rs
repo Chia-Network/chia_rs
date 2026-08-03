@@ -11,6 +11,7 @@ use crate::opcodes::{
     AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
     AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
 };
+use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_2026};
 use crate::validation_error::{ErrorCode, ValidationErr, first};
 use chia_bls::{BlsCache, Signature};
 use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
@@ -171,6 +172,13 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
+    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        // nothing to check at the byte level: serde_2026 (the only legal
+        // encoding, enforced by node_from_bytes_2026 at parse time) can't be
+        // examined for the quote shape; quote enforcement happens
+        // post-deserialization in check_generator_node() instead
+        return Ok(());
+    }
     if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) || program.starts_with(&[0xff, 0x01]) {
         Ok(())
     } else {
@@ -223,7 +231,8 @@ where
 
     let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut decode_allocator = Allocator::new();
-        let program_node = node_from_bytes_backrefs(&mut decode_allocator, program)?;
+        let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
+        let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let cost = interned_vbytes(&interned) * constants.cost_per_byte;
@@ -340,7 +349,13 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let max_blob_size =
+            max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
+        node_from_bytes_2026(&mut a, generator, max_blob_size)?
+    } else {
+        node_from_bytes_backrefs(&mut a, generator)?
+    };
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -439,7 +454,13 @@ where
     check_generator_quote(generator.as_ref(), flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
-    let program = node_from_bytes_backrefs(&mut a, generator)?;
+    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        let max_blob_size =
+            max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
+        node_from_bytes_2026(&mut a, generator, max_blob_size)?
+    } else {
+        node_from_bytes_backrefs(&mut a, generator)?
+    };
     check_generator_node(&a, program, flags)?;
     let args = setup_generator_args(&mut a, refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -551,7 +572,7 @@ mod tests {
     use chia_protocol::Bytes32;
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
-    use clvmr::serde::node_to_bytes;
+    use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
     use rstest::rstest;
 
     const IDENTITY_PUZZLE: &[u8] = &[1];
@@ -679,5 +700,168 @@ mod tests {
         );
 
         assert_eq!(without.execution_cost, with.execution_cost);
+    }
+
+    #[test]
+    fn test_check_generator_quote_interned_defers_to_parse_and_node_checks() {
+        // with INTERNED_GENERATOR set, there is nothing to check at the byte
+        // level: encoding is enforced by node_from_bytes_2026 at parse time
+        // and the quote shape by check_generator_node() after decode
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        assert!(check_generator_quote(&SERDE_2026_MAGIC_PREFIX, flags).is_ok());
+        assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
+        assert!(check_generator_quote(&[0x80], flags).is_ok());
+    }
+
+    #[test]
+    fn test_serde_2026_blob_rejected_without_interned_flag() {
+        // Without INTERNED_GENERATOR, a serde_2026-prefixed blob must fail the
+        // same way as on deployed nodes: the magic prefix starts with 0xfd,
+        // which is an invalid header byte in classic CLVM serialization, so
+        // node_from_bytes_backrefs() fails and maps to GeneratorRuntimeError.
+        let mut blob = SERDE_2026_MAGIC_PREFIX.to_vec();
+        blob.push(0x80);
+        let blocks: &[&[u8]] = &[];
+
+        // Pre-fork (no flags at all)
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::GeneratorRuntimeError,
+        );
+
+        // SIMPLE_GENERATOR active but INTERNED_GENERATOR not yet: the blob
+        // fails the quote check first (it doesn't start with [0xff, 0x01]),
+        // exactly as on deployed nodes.
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+    }
+
+    #[test]
+    fn test_check_generator_node_enforced_with_interned_flag() {
+        // The node-level check is the quote enforcement point for serde_2026
+        // blobs (whose byte encoding can't be checked for the quote shape),
+        // so it must NOT be bypassed when INTERNED_GENERATOR is set.
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        assert_eq!(
+            check_generator_node(&a, atom, flags)
+                .unwrap_err()
+                .error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        let one = a.new_atom(&[1]).unwrap();
+        let nil = a.nil();
+        let pair = a.new_pair(one, nil).unwrap();
+        assert!(check_generator_node(&a, pair, flags).is_ok());
+    }
+
+    #[test]
+    fn test_serde_2026_quote_enforcement_end_to_end() {
+        use crate::solution_generator::solution_generator_2026;
+        use clvmr::serde::serialize_2026;
+
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
+            | ConsensusFlags::SIMPLE_GENERATOR
+            | ConsensusFlags::INTERNED_GENERATOR;
+        let blocks: &[&[u8]] = &[];
+
+        // a quoted spend list in serde_2026 encoding is accepted
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80];
+        let spends = [(
+            Coin::new([0u8; 32].into(), puzzle_hash.into(), 0),
+            IDENTITY_PUZZLE,
+            empty_solution,
+        )];
+        let program = solution_generator_2026(spends).expect("solution_generator_2026");
+        assert!(program.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        let (_, conds) = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        )
+        .expect("run_block_generator2");
+        assert_eq!(conds.spends.len(), 1);
+
+        // a non-quoted serde_2026 generator is rejected by the node-level
+        // quote check
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        let blob = serialize_2026(&a, atom, 0).expect("serialize_2026");
+        assert!(blob.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        let result = run_block_generator2(
+            &blob,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err().error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+    }
+
+    #[test]
+    fn test_old_serialization_rejected_with_interned_flag() {
+        // with INTERNED_GENERATOR active, an otherwise-valid generator in the
+        // old (classic/backrefs) serialization is a consensus failure
+        let program = make_generator(1);
+        assert!(program.starts_with(&[0xff, 0x01]));
+        let blocks: &[&[u8]] = &[];
+
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
+        let result = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert!(result.is_ok(), "sanity: valid without INTERNED_GENERATOR");
+
+        let flags = flags | ConsensusFlags::INTERNED_GENERATOR;
+        let result = run_block_generator2(
+            &program,
+            blocks,
+            u64::MAX,
+            flags,
+            &Signature::default(),
+            None,
+            &TEST_CONSTANTS,
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
+        );
     }
 }

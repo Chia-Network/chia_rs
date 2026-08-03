@@ -10,6 +10,22 @@ use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::error::{EvalErr, Result};
 use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs};
 
+/// Deserialize a generator on the consensus path: the blob must be a
+/// magic-prefixed serde_2026 encoding, with no fallback to classic/backrefs
+/// parsing — with `INTERNED_GENERATOR` active, serde_2026 is the only legal
+/// generator encoding. `max_blob_size` and `strict = false` have the same
+/// meaning (and rationale) as in [`node_from_bytes_auto`].
+pub fn node_from_bytes_2026(
+    allocator: &mut Allocator,
+    bytes: &[u8],
+    max_blob_size: usize,
+) -> Result<NodePtr> {
+    if bytes.len() > max_blob_size {
+        return Err(EvalErr::SerializationError);
+    }
+    deserialize_2026(allocator, bytes, max_blob_size, false)
+}
+
 /// Compression level passed to [`clvmr::serde::serialize_2026`] when chia
 /// produces serde_2026 blobs.
 ///
