@@ -98,11 +98,19 @@ fn is_reduced(f: &mut Form) -> bool {
         return false;
     }
 
-    let a_cmp_c = abs_a.cmp(abs_c);
+    let mut a_eq_b = abs_a == abs_b;
+    let mut a_cmp_c = abs_a.cmp(abs_c);
     if a_cmp_c == std::cmp::Ordering::Greater {
         std::mem::swap(&mut f.a, &mut f.c);
         f.b.neg_assign();
-    } else if a_cmp_c == std::cmp::Ordering::Equal && f.b < 0i32 {
+        // After the swap, |b| may equal the new a with the wrong sign.
+        a_eq_b = f.a.unsigned_abs_ref() == f.b.unsigned_abs_ref();
+        a_cmp_c = std::cmp::Ordering::Less; // strictly a < c after the swap
+    }
+    // Reduced forms require b >= 0 when a == c or |b| == a.
+    // Without the |b| == a case, (a, -a, c) is left non-canonical and
+    // Form::is_reduced rejects it (it is the inverse of (a, a, c)).
+    if (a_cmp_c == std::cmp::Ordering::Equal || a_eq_b) && f.b < 0i32 {
         f.b.neg_assign();
     }
     true
@@ -206,5 +214,49 @@ mod tests {
         let f2 = f.clone();
         reduce(&mut f);
         assert_eq!(f, f2, "reduction should be idempotent");
+    }
+
+    /// Discriminant for (5, ±5, 7): b^2 - 4ac = 25 - 140 = -115.
+    fn make_boundary_form(b: i32) -> Form {
+        Form::new(
+            Integer::from(5i32),
+            Integer::from(b),
+            Integer::from(7i32),
+        )
+    }
+
+    // PulmarkReducer used to treat (a, -a, c) with a < c as already reduced,
+    // because is_reduced only forced b >= 0 when a == c. That left the
+    // non-canonical inverse of (a, a, c), which Form::is_reduced rejects.
+    #[test]
+    fn test_canonicalizes_when_abs_b_equals_a() {
+        let mut noncanonical = make_boundary_form(-5);
+        let expected = make_boundary_form(5);
+
+        assert!(!noncanonical.is_reduced());
+        assert!(expected.is_reduced());
+
+        reduce(&mut noncanonical);
+
+        assert!(noncanonical.is_reduced());
+        assert_eq!(noncanonical, expected);
+    }
+
+    // When a > c and |b| == c with b > 0, the a/c swap yields (c, -c, a).
+    // That must also be normalized to (c, c, a).
+    #[test]
+    fn test_canonicalizes_after_swap_when_abs_b_equals_new_a() {
+        let mut f = Form::new(
+            Integer::from(7i32),
+            Integer::from(5i32),
+            Integer::from(5i32),
+        );
+
+        reduce(&mut f);
+
+        assert!(f.is_reduced());
+        assert_eq!(f.a, Integer::from(5i32));
+        assert_eq!(f.b, Integer::from(5i32));
+        assert_eq!(f.c, Integer::from(7i32));
     }
 }
