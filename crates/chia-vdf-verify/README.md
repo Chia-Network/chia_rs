@@ -13,7 +13,7 @@ The existing `chiavdf` library depends on GMP (GNU Multiple Precision Arithmetic
 Rust is consistently ~12% slower than C++/GMP across all proof depths, measured on real mainnet proofs:
 
 | Depth | chiavdf C++ | chia-vdf-verify (Rust) | Ratio |
-|-------|-------------|------------------------|-------|
+| ----- | ----------- | ---------------------- | ----- |
 | 0     | ~4.3 ms     | ~4.8 ms                | 1.11x |
 | 1     | ~9.5 ms     | ~10.7 ms               | 1.13x |
 | 2     | ~15.2 ms    | ~17.1 ms               | 1.12x |
@@ -83,18 +83,18 @@ cargo bench --bench verify
 
 Ported from chiavdf's C++ verification path (~2,700 LOC):
 
-| Module | Source | Purpose |
-|--------|--------|---------|
-| `verifier` | `verifier.h` | `VerifyWesolowskiProof`, `CheckProofOfTimeNWesolowski` |
-| `proof_common` | `proof_common.h` | `FastPow`, `FastPowFormNucomp`, `GetB`, serialization |
-| `nucomp` | `nucomp.h` | Class group form composition (`nucomp`, `nudupl`) |
-| `reducer` | `Reducer.h` | Pulmark form reduction |
-| `xgcd_partial` | `xgcd_partial.c` | Partial extended GCD (Lehmer-accelerated) |
-| `bqfc` | `bqfc.c` | Compressed form serialization (BQFC format) |
-| `primetest` | `primetest.h` | BPSW primality test, `HashPrime` |
-| `discriminant` | `create_discriminant.h` | Discriminant generation from seed |
-| `form` | `ClassGroup.h` | Quadratic form (a, b, c) with discriminant |
-| `integer` | `integer_common.h` | BigInt wrapper, Lehmer extended GCD |
+| Module         | Source                  | Purpose                                                |
+| -------------- | ----------------------- | ------------------------------------------------------ |
+| `verifier`     | `verifier.h`            | `VerifyWesolowskiProof`, `CheckProofOfTimeNWesolowski` |
+| `proof_common` | `proof_common.h`        | `FastPow`, `FastPowFormNucomp`, `GetB`, serialization  |
+| `nucomp`       | `nucomp.h`              | Class group form composition (`nucomp`, `nudupl`)      |
+| `reducer`      | `Reducer.h`             | Pulmark form reduction                                 |
+| `xgcd_partial` | `xgcd_partial.c`        | Partial extended GCD (Lehmer-accelerated)              |
+| `bqfc`         | `bqfc.c`                | Compressed form serialization (BQFC format)            |
+| `primetest`    | `primetest.h`           | BPSW primality test, `HashPrime`                       |
+| `discriminant` | `create_discriminant.h` | Discriminant generation from seed                      |
+| `form`         | `ClassGroup.h`          | Quadratic form (a, b, c) with discriminant             |
+| `integer`      | `integer_common.h`      | BigInt wrapper, Lehmer extended GCD                    |
 
 ## License
 

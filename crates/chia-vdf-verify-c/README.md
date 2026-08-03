@@ -7,12 +7,12 @@ C FFI for [`chia-vdf-verify`](../chia-vdf-verify), mirroring
 
 Header: [`include/c_wrapper.h`](include/c_wrapper.h)
 
-| Function | Status |
-|----------|--------|
-| `create_discriminant_wrapper` | Implemented |
-| `verify_n_wesolowski_wrapper` | Implemented |
-| `prove_wrapper` | Stub (always returns null — proving not included) |
-| `delete_byte_array` | Implemented |
+| Function                      | Status                                            |
+| ----------------------------- | ------------------------------------------------- |
+| `create_discriminant_wrapper` | Implemented                                       |
+| `verify_n_wesolowski_wrapper` | Implemented                                       |
+| `prove_wrapper`               | Stub (always returns null — proving not included) |
+| `delete_byte_array`           | Implemented                                       |
 
 Discriminant buffers use the same unsigned big-endian `|D|` encoding as chiavdf
 (`mpz_export` / `mpz_import`).
