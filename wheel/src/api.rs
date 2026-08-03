@@ -75,6 +75,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::serde_2026::node_from_bytes_auto;
 use chia_consensus::validation_error::ValidationErr;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -196,7 +197,10 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
+    // the generator comes from an already-validated block, so accept any
+    // encoding (sniffing the serde_2026 magic prefix). No size cap: the
+    // classic path never had one and the input is trusted.
+    let program = node_from_bytes_auto(&mut allocator, program, usize::MAX).map_err(map_pyerr)?;
     let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -250,8 +254,9 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
+    // see get_puzzle_and_solution_for_coin() for why any encoding is accepted
     let generator =
-        node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
+        node_from_bytes_auto(&mut allocator, generator.as_ref(), usize::MAX).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 

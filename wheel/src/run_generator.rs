@@ -8,9 +8,10 @@ use chia_consensus::run_block_generator::run_block_generator as native_run_block
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
 use chia_protocol::{Bytes, Bytes32, Coin};
 
+use chia_consensus::serde_2026::node_from_bytes_auto;
 use clvmr::allocator::Allocator;
 use clvmr::cost::Cost;
-use clvmr::serde::{intern_tree_limited, node_from_bytes_backrefs};
+use clvmr::serde::intern_tree_limited;
 
 use pyo3::PyResult;
 use pyo3::buffer::PyBuffer;
@@ -153,7 +154,8 @@ pub fn additions_and_removals<'a>(
 
 /// Return the byte-weight-equivalent of a serialized generator program.
 ///
-/// Deserializes (with back-refs), interns the tree, and returns
+/// Deserializes (accepting classic, back-refs and serde_2026 encodings),
+/// interns the tree, and returns
 /// `atom_bytes + 2*atom_count + 3*pair_count`.  Multiply by
 /// `cost_per_byte` from consensus constants to get the full generator size cost.
 #[pyfunction]
@@ -161,7 +163,8 @@ pub fn generator_interned_vbytes(py: Python<'_>, program: PyBuffer<u8>) -> PyRes
     let program = py_to_slice(program);
     py.detach(|| {
         let mut a = Allocator::new();
-        let node = node_from_bytes_backrefs(&mut a, program)
+        // trusted input; no size cap, like the back-refs path had none
+        let node = node_from_bytes_auto(&mut a, program, usize::MAX)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("bad generator: {e}")))?;
         let tree = intern_tree_limited(&a, node, u32::MAX as usize)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("intern failed: {e}")))?;
