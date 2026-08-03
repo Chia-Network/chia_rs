@@ -4,6 +4,25 @@ Pure-Rust Chia VDF (Verifiable Delay Function) proof verifier. No GMP, no C depe
 
 Imported from [richardkiss/chia-vdf-verify](https://github.com/richardkiss/chia-vdf-verify). This is a port of the verification path from [chiavdf](https://github.com/Chia-Network/chiavdf) (C++/GMP). Only proof **verification** is implemented — proof creation (proving) is not included.
 
+## Python bindings
+
+Chiavdf-compatible verification API, available as:
+
+- Standalone: `chia_vdf_verify` (`maturin develop -m crates/chia-vdf-verify`)
+- Via the `chia_rs` wheel: `from chia_rs.vdf_verify import ...`
+
+| Function | Notes |
+| -------- | ----- |
+| `create_discriminant` | Returns `-0x…` hex (same as chiavdf) |
+| `verify_wesolowski` | Depth-0 Wesolowski check |
+| `verify_n_wesolowski` | N-Wesolowski proof blob |
+| `create_discriminant_and_verify_n_wesolowski` | Combined create + verify |
+| `verify_n_wesolowski_with_b` | Compact path with explicit B |
+| `get_b_from_n_wesolowski` | Extract B as `0x…` hex |
+| `bqfc_deserialize` | Low-level form decode |
+
+Extras (not in chiavdf): `create_discriminant_bytes`, `verify_n_wesolowski_bytes`. `prove` is not implemented.
+
 ## Why?
 
 The existing `chiavdf` library depends on GMP (GNU Multiple Precision Arithmetic Library) via C/C++ linking, which is painful to build cross-platform — especially on Windows. This crate replaces GMP with [num-bigint](https://crates.io/crates/num-bigint) for a fully portable pure-Rust implementation.

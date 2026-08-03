@@ -16,7 +16,7 @@ workspace = true
 
 [lib]
 name = "chia_vdf_verify"
-crate-type = ["rlib"]
+crate-type = ["cdylib", "rlib"]
 bench = false
 
 [features]

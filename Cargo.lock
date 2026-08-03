@@ -706,6 +706,7 @@ dependencies = [
  "chia-sha2 0.46.0",
  "chia-ssl",
  "chia-traits 0.46.0",
+ "chia-vdf-verify",
  "clvm-utils",
  "clvmr",
  "pyo3",

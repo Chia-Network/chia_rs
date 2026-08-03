@@ -96,6 +96,46 @@ pub fn to_signed_bytes_be(n: &Integer) -> Vec<u8> {
     out
 }
 
+/// Parse an integer string the way chiavdf/`mpz_set_str(..., 0)` does for the
+/// common cases: decimal, or hex with a `0x`/`0X` prefix (optional leading `-`).
+pub fn parse_integer_auto(s: &str) -> Option<Integer> {
+    use malachite_base::num::conversion::traits::FromStringBase;
+
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+
+    let (negative, rest) = if let Some(r) = s.strip_prefix('-') {
+        (true, r)
+    } else if let Some(r) = s.strip_prefix('+') {
+        (false, r)
+    } else {
+        (false, s)
+    };
+    if rest.is_empty() {
+        return None;
+    }
+
+    let value = if let Some(hex) = rest.strip_prefix("0x").or_else(|| rest.strip_prefix("0X")) {
+        Integer::from_string_base(16, hex)?
+    } else {
+        Integer::from_string_base(10, rest)?
+    };
+
+    Some(if negative { -value } else { value })
+}
+
+/// Format like chiavdf `integer::to_string()`: `0x…` / `-0x…`.
+pub fn format_hex_chia(n: &Integer) -> String {
+    let mag = format!("{:x}", n.unsigned_abs_ref());
+    if *n < 0i32 {
+        format!("-0x{mag}")
+    } else {
+        format!("0x{mag}")
+    }
+}
+
 /// Import big-endian bytes as a non-negative integer.
 pub fn from_bytes_be(bytes: &[u8]) -> Integer {
     if bytes.is_empty() {
@@ -379,5 +419,34 @@ mod tests {
             let restored = from_signed_bytes_be(&bytes).expect("roundtrip failed");
             assert_eq!(n, restored, "roundtrip failed for {n}");
         }
+    }
+
+    #[test]
+    fn test_parse_integer_auto() {
+        assert_eq!(
+            parse_integer_auto("12345").unwrap(),
+            Integer::from(12345i32)
+        );
+        assert_eq!(
+            parse_integer_auto("-12345").unwrap(),
+            Integer::from(-12345i32)
+        );
+        assert_eq!(
+            parse_integer_auto("0xdead").unwrap(),
+            Integer::from(0xdead_i32)
+        );
+        assert_eq!(
+            parse_integer_auto("-0xabc").unwrap(),
+            Integer::from(-0xabc_i32)
+        );
+        assert!(parse_integer_auto("").is_none());
+        assert!(parse_integer_auto("0x").is_none());
+        assert!(parse_integer_auto("xyz").is_none());
+    }
+
+    #[test]
+    fn test_format_hex_chia() {
+        assert_eq!(format_hex_chia(&Integer::from(255i32)), "0xff");
+        assert_eq!(format_hex_chia(&Integer::from(-255i32)), "-0xff");
     }
 }
