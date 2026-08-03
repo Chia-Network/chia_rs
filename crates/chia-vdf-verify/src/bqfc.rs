@@ -20,8 +20,11 @@ use malachite_base::num::logic::traits::SignificantBits;
 use malachite_nz::integer::Integer;
 use malachite_nz::natural::Natural;
 
+/// Maximum supported discriminant bit length (chiavdf `BQFC_MAX_D_BITS`).
+pub const BQFC_MAX_D_BITS: usize = 1024;
+
 /// Size of the serialized form (100 bytes for 1024-bit max discriminant).
-pub const BQFC_FORM_SIZE: usize = 1024_usize.div_ceil(32) * 3 + 4;
+pub const BQFC_FORM_SIZE: usize = BQFC_MAX_D_BITS.div_ceil(32) * 3 + 4;
 
 /// Flag bits
 const BQFC_B_SIGN: u8 = 1 << 0;
@@ -195,7 +198,24 @@ pub fn serialize(a: &Integer, b: &Integer, d_bits: usize) -> Vec<u8> {
 /// Deserialize a form from 100-byte input with discriminant D.
 /// When `strict` is true, reject inflated b0 encodings (|b| > a check).
 /// When false, preserve historical (pre-2026) behaviour for consensus compatibility.
+///
+/// Returns `Err` if `num_bits(d)` is 0 or greater than [`BQFC_MAX_D_BITS`]: field
+/// sizes are derived from that bit length against a fixed [`BQFC_FORM_SIZE`]
+/// buffer, so oversized discriminants must not index past the end.
 pub fn deserialize(d: &Integer, data: &[u8], strict: bool) -> Result<(Integer, Integer), String> {
+    let d_bits = num_bits(d);
+    if d_bits == 0 || d_bits > BQFC_MAX_D_BITS {
+        return Err(format!(
+            "discriminant bit length {d_bits} out of range (1..={BQFC_MAX_D_BITS})"
+        ));
+    }
+    let d_bits_rounded = (d_bits + 31) & !31usize;
+    if d_bits_rounded > BQFC_MAX_D_BITS {
+        return Err(format!(
+            "rounded discriminant bit length {d_bits_rounded} exceeds {BQFC_MAX_D_BITS}"
+        ));
+    }
+
     if data.len() != BQFC_FORM_SIZE {
         return Err(format!(
             "expected {} bytes, got {}",
@@ -213,9 +233,6 @@ pub fn deserialize(d: &Integer, data: &[u8], strict: bool) -> Result<(Integer, I
         return Ok((a, Integer::ONE));
     }
 
-    let d_bits = num_bits(d);
-    let d_bits_rounded = (d_bits + 31) & !31usize;
-
     let g_size = data[1] as usize;
     if g_size >= d_bits_rounded / 32 {
         return Err("g_size out of range".to_string());
@@ -224,17 +241,13 @@ pub fn deserialize(d: &Integer, data: &[u8], strict: bool) -> Result<(Integer, I
     let mut offset = 2usize;
 
     let a_bytes = d_bits_rounded / 16 - g_size;
-    let a = from_bytes_le(&data[offset..offset + a_bytes]);
-    offset += a_bytes;
+    let a = read_le_field(data, &mut offset, a_bytes)?;
 
     let t_bytes = d_bits_rounded / 32 - g_size;
-    let t_raw = from_bytes_le(&data[offset..offset + t_bytes]);
-    offset += t_bytes;
+    let t_raw = read_le_field(data, &mut offset, t_bytes)?;
 
-    let g = from_bytes_le(&data[offset..=(offset + g_size)]);
-    offset += g_size + 1;
-
-    let b0 = from_bytes_le(&data[offset..=(offset + g_size)]);
+    let g = read_le_field(data, &mut offset, g_size + 1)?;
+    let b0 = read_le_field(data, &mut offset, g_size + 1)?;
 
     let b_sign = data[0] & BQFC_B_SIGN != 0;
     let t_sign = data[0] & BQFC_T_SIGN != 0;
@@ -256,6 +269,23 @@ pub fn deserialize(d: &Integer, data: &[u8], strict: bool) -> Result<(Integer, I
     }
 
     Ok((out_a, out_b))
+}
+
+/// Read `len` little-endian bytes from `data` at `offset`, advancing `offset`.
+fn read_le_field(data: &[u8], offset: &mut usize, len: usize) -> Result<Integer, String> {
+    let start = *offset;
+    let end = start
+        .checked_add(len)
+        .filter(|&end| end <= data.len())
+        .ok_or_else(|| {
+            format!(
+                "BQFC field of {len} bytes at offset {start} exceeds {}-byte buffer",
+                data.len()
+            )
+        })?;
+    let value = from_bytes_le(&data[start..end]);
+    *offset = end;
+    Ok(value)
 }
 
 /// Compute the serialization size for a given discriminant bit length.
@@ -302,5 +332,18 @@ mod tests {
         let (ra, rb) = deserialize(&d, &data, true).unwrap();
         assert_eq!(ra, a);
         assert_eq!(rb, b);
+    }
+
+    #[test]
+    fn test_deserialize_rejects_oversized_discriminant() {
+        // |D| with > BQFC_MAX_D_BITS bits: field sizes would exceed BQFC_FORM_SIZE.
+        let d = -(Integer::ONE << 2047u64); // 2048-bit magnitude
+        assert!(num_bits(&d) > BQFC_MAX_D_BITS);
+        let data = [0u8; BQFC_FORM_SIZE];
+        let err = deserialize(&d, &data, false).unwrap_err();
+        assert!(
+            err.contains("out of range"),
+            "expected range error, got: {err}"
+        );
     }
 }
