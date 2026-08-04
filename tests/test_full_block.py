@@ -113,7 +113,7 @@ def make_full_block_v1(
         None,
         None,
         [],
-        [uint8(b) for b in generator_buffer] if generator_buffer is not None else None,
+        generator_buffer,
         uint8(1),
     )
 
