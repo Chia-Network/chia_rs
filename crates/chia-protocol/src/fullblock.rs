@@ -35,7 +35,7 @@ pub struct FullBlock {
 
     // Raw generator bytes, only used when version == 1. Mutually exclusive
     // with transactions_generator and transactions_generator_ref_list.
-    transactions_generator_buffer: Option<Vec<u8>>,
+    transactions_generator_buffer: Option<Bytes>,
 
     // 0 = legacy format (Program serialization + ref_list)
     // 1 = raw bytes format (length-prefixed bytes, ref_list omitted)
@@ -65,8 +65,7 @@ impl Streamable for FullBlock {
                 }
                 Some(buf) => {
                     0b11_u8.update_digest(digest);
-                    (buf.len() as u32).update_digest(digest);
-                    digest.update(buf);
+                    buf.update_digest(digest);
                 }
             }
         } else {
@@ -96,8 +95,7 @@ impl Streamable for FullBlock {
                 }
                 Some(buf) => {
                     0b11_u8.stream(out)?;
-                    (buf.len() as u32).stream(out)?;
-                    out.extend_from_slice(buf);
+                    buf.stream(out)?;
                 }
             }
         } else {
@@ -151,8 +149,7 @@ impl Streamable for FullBlock {
             })
         } else if version == 1 {
             let transactions_generator_buffer = if has_generator {
-                let bytes = <Bytes as Streamable>::parse::<TRUSTED>(input)?;
-                Some(bytes.into_inner())
+                Some(<Bytes as Streamable>::parse::<TRUSTED>(input)?)
             } else {
                 None
             };
@@ -394,7 +391,7 @@ mod tests {
             None,
             None,
             vec![],
-            buffer,
+            buffer.map(Bytes::from),
             1,
         )
     }
@@ -452,7 +449,14 @@ mod tests {
         assert_eq!(block2.version, 1);
         assert!(block2.transactions_generator.is_none());
         assert!(block2.transactions_generator_ref_list.is_empty());
-        assert_eq!(block2.transactions_generator_buffer.as_ref().unwrap(), &raw);
+        assert_eq!(
+            block2
+                .transactions_generator_buffer
+                .as_ref()
+                .unwrap()
+                .to_vec(),
+            raw
+        );
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
 
@@ -545,7 +549,10 @@ mod tests {
         let block = make_v1_block(Some(garbage.clone()));
         let buf = block.to_bytes().unwrap();
         let block2 = FullBlock::parse::<false>(&mut Cursor::new(&buf)).unwrap();
-        assert_eq!(block2.transactions_generator_buffer.unwrap(), garbage);
+        assert_eq!(
+            block2.transactions_generator_buffer.unwrap().to_vec(),
+            garbage
+        );
     }
 
     // The version flag is packed into the transactions_generator Option prefix
