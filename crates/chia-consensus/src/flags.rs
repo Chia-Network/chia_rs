@@ -23,6 +23,7 @@ bitflags! {
         const RELAXED_BLS = 0x0008;
         const LIMIT_SOFTFORK = 0x0010;
         const ENABLE_GC = 0x0020;
+        const LIMITS = 0x0040;
         const ENABLE_KECCAK_OPS_OUTSIDE_GUARD = 0x0100;
         const DISABLE_OP = 0x0200;
         const ENABLE_SHA256_TREE = 0x0400;
@@ -102,6 +103,9 @@ impl ConsensusFlags {
         if clvm.contains(ClvmFlags::NEW_COST_MODEL) {
             out = out.union(ConsensusFlags::NEW_COST_MODEL);
         }
+        if clvm.contains(ClvmFlags::LIMITS) {
+            out = out.union(ConsensusFlags::LIMITS);
+        }
         out
     }
 
@@ -145,6 +149,9 @@ impl ConsensusFlags {
         }
         if self.contains(ConsensusFlags::NEW_COST_MODEL) {
             out.insert(ClvmFlags::NEW_COST_MODEL);
+        }
+        if self.contains(ConsensusFlags::LIMITS) {
+            out.insert(ClvmFlags::LIMITS);
         }
         out
     }
