@@ -87,11 +87,13 @@ pub fn get_flags_for_height_and_constants(
         flags |= ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
+            | ConsensusFlags::NEW_COST_MODEL
             | ConsensusFlags::RELAXED_BLS;
-    }
-
-    if prev_tx_height >= constants.soft_fork8_height {
+    } else if prev_tx_height >= constants.soft_fork8_height {
+        // once the hard fork activates, we no longer apply the limits, nor
+        // disable the operators
         flags |= ConsensusFlags::DISABLE_OP;
+        flags |= ConsensusFlags::LIMITS;
     }
 
     if prev_tx_height >= constants.soft_fork9_height {
