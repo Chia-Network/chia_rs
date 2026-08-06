@@ -1048,6 +1048,21 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BlsCache>()?;
 
     add_datalayer_submodule(py, m)?;
+    add_vdf_verify_submodule(py, m)?;
+
+    Ok(())
+}
+
+pub fn add_vdf_verify_submodule(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    let vdf = PyModule::new(py, "vdf_verify")?;
+    parent.add_submodule(&vdf)?;
+    chia_vdf_verify::python::add_to_module(&vdf)?;
+
+    // https://github.com/PyO3/pyo3/issues/1517#issuecomment-808664021
+    // https://github.com/PyO3/pyo3/issues/759
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("chia_rs.vdf_verify", &vdf)?;
 
     Ok(())
 }

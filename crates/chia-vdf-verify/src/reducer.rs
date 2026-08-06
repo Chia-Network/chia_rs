@@ -1,0 +1,258 @@
+//! Pulmark form reducer.
+//!
+//! Port of chiavdf/src/Reducer.h.
+//! Reduces a quadratic form (a, b, c) to its canonical reduced representative.
+
+use crate::form::Form;
+use crate::integer::get_si_2exp;
+use malachite_base::num::arithmetic::traits::{AddMulAssign, CeilingDivMod, NegAssign};
+use malachite_nz::integer::Integer;
+
+const THRESH: i64 = 1i64 << 31;
+const EXP_THRESH: i64 = 31;
+
+/// Reduce form f in place.
+pub fn reduce(f: &mut Form) {
+    while !is_reduced(f) {
+        let (a_val, a_exp) = get_si_2exp(&f.a);
+        let (b_val, b_exp) = get_si_2exp(&f.b);
+        let (c_val, c_exp) = get_si_2exp(&f.c);
+
+        let max_exp = *[a_exp, b_exp, c_exp].iter().max().unwrap() + 1;
+        let min_exp = *[a_exp, b_exp, c_exp].iter().min().unwrap();
+
+        if max_exp - min_exp > EXP_THRESH {
+            reducer_simple(f);
+            continue;
+        }
+
+        let a_sh = max_exp - a_exp;
+        let b_sh = max_exp - b_exp;
+        let c_sh = max_exp - c_exp;
+
+        let a = a_val >> a_sh;
+        let b = b_val >> b_sh;
+        let c = c_val >> c_sh;
+
+        let (u, v, w, x) = calc_uvwx(a, b, c);
+
+        let uu = Integer::from(u * u);
+        let uw = Integer::from(u * w);
+        let ww = Integer::from(w * w);
+        let uv2 = Integer::from(2 * u * v);
+        let ux_vw = Integer::from(u * x + v * w);
+        let wx2 = Integer::from(2 * w * x);
+        let vv = Integer::from(v * v);
+        let vx = Integer::from(v * x);
+        let xx = Integer::from(x * x);
+
+        let mut new_a = &f.a * &uu;
+        new_a.add_mul_assign(&f.b, &uw);
+        new_a.add_mul_assign(&f.c, &ww);
+
+        let mut new_b = &f.a * &uv2;
+        new_b.add_mul_assign(&f.b, &ux_vw);
+        new_b.add_mul_assign(&f.c, &wx2);
+
+        let mut new_c = &f.a * &vv;
+        new_c.add_mul_assign(&f.b, &vx);
+        new_c.add_mul_assign(&f.c, &xx);
+
+        f.a = new_a;
+        f.b = new_b;
+        f.c = new_c;
+    }
+}
+
+/// Simple reducer step (used when exponent spread is large).
+fn reducer_simple(f: &mut Form) {
+    let r = ceildiv(&f.b, &f.c);
+    let s = (r + Integer::from(1i32)) >> 1u64;
+
+    let cs = &f.c * &s;
+    let m = &cs - &f.b;
+    let new_b = (&cs << 1u64) - &f.b;
+
+    std::mem::swap(&mut f.a, &mut f.c);
+    f.c.add_mul_assign(&s, &m);
+    f.b = new_b;
+}
+
+/// Ceiling division: ceil(a/b).
+fn ceildiv(a: &Integer, b: &Integer) -> Integer {
+    if *b > 0i32 {
+        a.ceiling_div_mod(b).0
+    } else {
+        a / b
+    }
+}
+
+/// Check if the form is reduced and normalize if needed.
+/// Returns true if already reduced (but may have swapped a/c or negated b).
+fn is_reduced(f: &mut Form) -> bool {
+    let abs_a = f.a.unsigned_abs_ref();
+    let abs_b = f.b.unsigned_abs_ref();
+    let abs_c = f.c.unsigned_abs_ref();
+
+    if abs_a < abs_b || abs_c < abs_b {
+        return false;
+    }
+
+    let mut a_eq_b = abs_a == abs_b;
+    let mut a_cmp_c = abs_a.cmp(abs_c);
+    if a_cmp_c == std::cmp::Ordering::Greater {
+        std::mem::swap(&mut f.a, &mut f.c);
+        f.b.neg_assign();
+        // After the swap, |b| may equal the new a with the wrong sign.
+        a_eq_b = f.a.unsigned_abs_ref() == f.b.unsigned_abs_ref();
+        a_cmp_c = std::cmp::Ordering::Less; // strictly a < c after the swap
+    }
+    // Reduced forms require b >= 0 when a == c or |b| == a.
+    // Without the |b| == a case, (a, -a, c) is left non-canonical and
+    // Form::is_reduced rejects it (it is the inverse of (a, a, c)).
+    if (a_cmp_c == std::cmp::Ordering::Equal || a_eq_b) && f.b < 0i32 {
+        f.b.neg_assign();
+    }
+    true
+}
+
+/// Lehmer acceleration step: compute (u, v, w, x) 2x2 matrix.
+fn calc_uvwx(mut a: i64, mut b: i64, mut c: i64) -> (i64, i64, i64, i64) {
+    let mut u_ = 1i64;
+    let mut v_ = 0i64;
+    let mut w_ = 0i64;
+    let mut x_ = 1i64;
+
+    let mut u;
+    let mut v;
+    let mut w;
+    let mut x;
+
+    loop {
+        u = u_;
+        v = v_;
+        w = w_;
+        x = x_;
+
+        if c == 0 {
+            break;
+        }
+
+        let s = if b >= 0 {
+            (b + c) / (c << 1)
+        } else {
+            -(-b + c) / (c << 1)
+        };
+
+        let a_ = a;
+        let b_ = b;
+
+        a = c;
+        b = -b + (c.wrapping_mul(s) << 1);
+        c = a_ - s * (b_ - c.wrapping_mul(s));
+
+        u_ = v;
+        v_ = -u + s.wrapping_mul(v);
+        w_ = x;
+        x_ = -w + s.wrapping_mul(x);
+
+        let below_threshold = (v_.abs() | x_.abs()) <= THRESH;
+        if !(below_threshold && a > c && c > 0) {
+            if below_threshold {
+                u = u_;
+                v = v_;
+                w = w_;
+                x = x_;
+            }
+            break;
+        }
+    }
+
+    (u, v, w, x)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::form::Form;
+
+    fn disc_check(f: &Form, d: &Integer) -> bool {
+        let disc = &f.b * &f.b - Integer::from(4i32) * &f.a * &f.c;
+        &disc == d
+    }
+
+    #[test]
+    fn test_reduce_preserves_discriminant() {
+        let d = Integer::from(-47i64);
+        let mut f = Form::new(
+            Integer::from(3i32),
+            Integer::from(1i32),
+            Integer::from(4i32),
+        );
+        assert!(disc_check(&f, &d));
+        reduce(&mut f);
+        assert!(disc_check(&f, &d), "discriminant changed after reduction");
+        assert!(
+            f.is_reduced(),
+            "form not reduced: a={}, b={}, c={}",
+            f.a,
+            f.b,
+            f.c
+        );
+    }
+
+    #[test]
+    fn test_reduce_idempotent() {
+        let d = Integer::from(-47i64);
+        let mut f = Form::new(
+            Integer::from(2i32),
+            Integer::from(1i32),
+            Integer::from(6i32),
+        );
+        assert!(disc_check(&f, &d));
+        reduce(&mut f);
+        let f2 = f.clone();
+        reduce(&mut f);
+        assert_eq!(f, f2, "reduction should be idempotent");
+    }
+
+    /// Discriminant for (5, ±5, 7): b^2 - 4ac = 25 - 140 = -115.
+    fn make_boundary_form(b: i32) -> Form {
+        Form::new(Integer::from(5i32), Integer::from(b), Integer::from(7i32))
+    }
+
+    // PulmarkReducer used to treat (a, -a, c) with a < c as already reduced,
+    // because is_reduced only forced b >= 0 when a == c. That left the
+    // non-canonical inverse of (a, a, c), which Form::is_reduced rejects.
+    #[test]
+    fn test_canonicalizes_when_abs_b_equals_a() {
+        let mut noncanonical = make_boundary_form(-5);
+        let expected = make_boundary_form(5);
+
+        assert!(!noncanonical.is_reduced());
+        assert!(expected.is_reduced());
+
+        reduce(&mut noncanonical);
+
+        assert!(noncanonical.is_reduced());
+        assert_eq!(noncanonical, expected);
+    }
+
+    // When a > c and |b| == c with b > 0, the a/c swap yields (c, -c, a).
+    // That must also be normalized to (c, c, a).
+    #[test]
+    fn test_canonicalizes_after_swap_when_abs_b_equals_new_a() {
+        let mut f = Form::new(
+            Integer::from(7i32),
+            Integer::from(5i32),
+            Integer::from(5i32),
+        );
+
+        reduce(&mut f);
+
+        assert!(f.is_reduced());
+        assert_eq!(f.a, Integer::from(5i32));
+        assert_eq!(f.b, Integer::from(5i32));
+        assert_eq!(f.c, Integer::from(7i32));
+    }
+}
