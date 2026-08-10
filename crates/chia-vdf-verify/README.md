@@ -73,10 +73,11 @@ This takes ~15 seconds in release mode.
 
 ### Benchmarks
 
-Compare verification performance using Criterion:
+Criterion benches:
 
 ```bash
-cargo bench --bench verify
+cargo bench --bench verify           # fixture vectors (512-bit + vdf.txt depths)
+cargo bench --bench mainnet_proofs   # 100 real mainnet reward-chain IP proofs
 ```
 
 ## Architecture

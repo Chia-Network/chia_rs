@@ -27,16 +27,13 @@ sha2 = { workspace = true }
 [dev-dependencies]
 hex = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
-num-bigint = { workspace = true, features = ["rand"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 
 [[bench]]
 name = "verify"
 harness = false
 
 [[bench]]
-name = "bigint_compare"
-harness = false
-
-[[bench]]
-name = "micro"
+name = "mainnet_proofs"
 harness = false
