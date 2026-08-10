@@ -669,17 +669,7 @@ dependencies = [
  "malachite-base",
  "malachite-nz",
  "num-bigint",
- "pyo3",
  "sha2 0.10.9",
-]
-
-[[package]]
-name = "chia-vdf-verify-c"
-version = "0.46.0"
-dependencies = [
- "chia-vdf-verify",
- "hex",
- "malachite-nz",
 ]
 
 [[package]]
@@ -706,7 +696,6 @@ dependencies = [
  "chia-sha2 0.46.0",
  "chia-ssl",
  "chia-traits 0.46.0",
- "chia-vdf-verify",
  "clvm-utils",
  "clvmr",
  "pyo3",

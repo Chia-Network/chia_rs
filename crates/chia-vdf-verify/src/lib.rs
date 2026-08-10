@@ -10,6 +10,3 @@ pub mod proof_common;
 pub mod reducer;
 pub mod verifier;
 pub mod xgcd_partial;
-
-#[cfg(feature = "py-bindings")]
-pub mod python;

@@ -2,26 +2,7 @@
 
 Pure-Rust Chia VDF (Verifiable Delay Function) proof verifier. No GMP, no C dependencies, no unsafe code.
 
-Imported from [richardkiss/chia-vdf-verify](https://github.com/richardkiss/chia-vdf-verify). This is a port of the verification path from [chiavdf](https://github.com/Chia-Network/chiavdf) (C++/GMP). Only proof **verification** is implemented — proof creation (proving) is not included.
-
-## Python bindings
-
-Chiavdf-compatible verification API, available as:
-
-- Standalone: `chia_vdf_verify` (`maturin develop -m crates/chia-vdf-verify`)
-- Via the `chia_rs` wheel: `from chia_rs.vdf_verify import ...`
-
-| Function                                      | Notes                                |
-| --------------------------------------------- | ------------------------------------ |
-| `create_discriminant`                         | Returns `-0x…` hex (same as chiavdf) |
-| `verify_wesolowski`                           | Depth-0 Wesolowski check             |
-| `verify_n_wesolowski`                         | N-Wesolowski proof blob              |
-| `create_discriminant_and_verify_n_wesolowski` | Combined create + verify             |
-| `verify_n_wesolowski_with_b`                  | Compact path with explicit B         |
-| `get_b_from_n_wesolowski`                     | Extract B as `0x…` hex               |
-| `bqfc_deserialize`                            | Low-level form decode                |
-
-Extras (not in chiavdf): `create_discriminant_bytes`, `verify_n_wesolowski_bytes`. `prove` is not implemented.
+Imported from [richardkiss/chia-vdf-verify](https://github.com/richardkiss/chia-vdf-verify). This is a port of the verification path from [chiavdf](https://github.com/Chia-Network/chiavdf) (C++/GMP). Only proof **verification** is implemented — proof creation (proving) is not included. This crate is Rust-only (no C FFI or Python bindings).
 
 ## Why?
 
@@ -40,7 +21,7 @@ Rust is consistently ~12% slower than C++/GMP across all proof depths, measured 
 | 4     | ~25.8 ms    | ~28.9 ms               | 1.12x |
 | 5     | ~31.2 ms    | ~34.4 ms               | 1.10x |
 
-Benchmarked using `benches/vdf_cpp_vs_rust.py` against 100 real mainnet proofs. Chia mainnet uses 1024-bit discriminants, depth 0–2 typical. The ~12% overhead is acceptable for consensus validation (one proof per block).
+Benchmarked against 100 real mainnet proofs. Chia mainnet uses 1024-bit discriminants, depth 0–2 typical. The ~12% overhead is acceptable for consensus validation (one proof per block).
 
 ## How VDF verification works
 

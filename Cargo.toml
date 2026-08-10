@@ -135,7 +135,6 @@ chia-puzzle-types = { path = "./crates/chia-puzzle-types", version = "0.46.0" }
 chia-sha2 = { path = "./crates/chia-sha2", version = "0.46.0" }
 chia-serde = { path = "./crates/chia-serde", version = "0.46.0" }
 chia-vdf-verify = { path = "./crates/chia-vdf-verify", version = "0.46.0" }
-chia-vdf-verify-c = { path = "./crates/chia-vdf-verify-c", version = "0.46.0" }
 clvm-traits = { path = "./crates/clvm-traits", version = "0.46.0" }
 clvm-utils = { path = "./crates/clvm-utils", version = "0.46.0" }
 clvm-derive = { path = "./crates/clvm-derive", version = "0.46.0" }
