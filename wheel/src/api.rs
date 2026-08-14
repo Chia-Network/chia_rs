@@ -137,10 +137,15 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
 pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
     let slice = py_to_slice::<'a>(blob);
     let mut a = clvmr::Allocator::new();
-    // Non-consensus path: the blob is already in memory, so cap the frame
-    // (and per-atom preallocation) at its physical size.
     let node = node_from_bytes_auto(&mut a, slice).map_err(map_pyerr)?;
-    let hash = clvm_utils::tree_hash(&a, node);
+    // This is called on unvalidated blobs (e.g. the generator_root check on
+    // blocks straight off the wire), so the hash must be DAG-aware: backrefs
+    // and serde_2026 can encode trees whose expansion is exponential in the
+    // blob size. tree_hash_cached memoizes shared pairs, keeping the work
+    // linear in the number of unique nodes (which parsing already bounds by
+    // the blob length). The uncached tree_hash would walk the full expansion.
+    let mut cache = clvm_utils::TreeCache::default();
+    let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
 

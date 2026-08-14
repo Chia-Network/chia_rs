@@ -101,18 +101,25 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// dispatches to [`deserialize_2026`]. Otherwise falls back to
 /// [`node_from_bytes_backrefs`] (which also accepts plain classic).
 ///
-/// This is the *trusted-reader* entry point (already-validated blocks, RPC
-/// tooling), so it imposes no size policy in either branch — trusted
-/// readers of historical blocks must accept every blob the chain ever
-/// accepted, whatever the rules were when it was created. The classic
-/// branch is byte-for-byte [`node_from_bytes_backrefs`], same as before
-/// this dispatcher existed. Consensus validation uses
-/// [`node_from_bytes_2026`] instead, which enforces the cost-derived size
-/// cap from [`max_canonical_blob_size`].
+/// This is a *policy-free reader*: it enforces no consensus rules and must
+/// never be a consensus entry point — consensus validation uses
+/// [`node_from_bytes_2026`], which enforces the cost-derived size cap from
+/// [`max_canonical_blob_size`]. Being policy-free is what lets readers of
+/// historical blocks accept every blob the chain ever accepted, whatever
+/// the rules were when it was created. The classic branch is byte-for-byte
+/// [`node_from_bytes_backrefs`], same as before this dispatcher existed.
 ///
-/// clvmr's deserializer still wants a per-atom bound; `bytes.len()` is the
-/// natural policy-free choice, since an atom of length `L` appears as a
-/// literal in the blob and therefore forces `bytes.len() >= L`.
+/// Parsing itself is safe on *untrusted* input: time and memory are linear
+/// in the blob length for all three formats (every node costs at least one
+/// input byte; shared subtrees are shared, not copied). clvmr's
+/// deserializer still wants a per-atom bound; `bytes.len()` is the natural
+/// policy-free choice, since an atom of length `L` appears as a literal in
+/// the blob and therefore forces `bytes.len() >= L`.
+///
+/// The caveat is downstream: backrefs and serde_2026 can encode trees whose
+/// *expansion* is exponential in the blob size, so anything traversing the
+/// result of an untrusted parse must be DAG-aware (e.g.
+/// [`clvm_utils::tree_hash_cached`] rather than the naive `tree_hash`).
 pub fn node_from_bytes_auto(allocator: &mut Allocator, bytes: &[u8]) -> Result<NodePtr> {
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
         // strict = false is deliberate. Post-HF2 the generator's identity and

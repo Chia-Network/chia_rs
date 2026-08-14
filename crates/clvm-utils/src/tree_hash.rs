@@ -405,6 +405,53 @@ fn test_tree_hash_from_bytes() {
 }
 
 #[test]
+fn test_tree_hash_cached_deep_dag() {
+    // A doubling chain: node_{i+1} = (node_i . node_i), 64 deep. Both
+    // backrefs and serde_2026 encode this in O(depth) bytes, but its
+    // expansion has 2^64 leaves — the uncached tree_hash would never
+    // terminate. tree_hash_cached must complete in O(unique nodes) and
+    // agree with the iteratively computed hash. This is the property the
+    // wheel's tree_hash_auto relies on when hashing unvalidated blobs
+    // (e.g. the post-HF2 generator_root check on blocks off the wire).
+    use clvmr::serde::{deserialize_2026, node_from_bytes_backrefs, node_to_bytes_backrefs};
+
+    const DEPTH: usize = 64;
+
+    let mut a = Allocator::new();
+    let mut node = a.new_atom(&[1, 2, 3]).unwrap();
+    let mut expected = tree_hash_atom(&[1, 2, 3]);
+    for _ in 0..DEPTH {
+        node = a.new_pair(node, node).unwrap();
+        expected = tree_hash_pair(expected, expected);
+    }
+
+    let mut cache = TreeCache::default();
+    assert_eq!(tree_hash_cached(&a, node, &mut cache), expected);
+
+    // Round-trip through both compact serializations and re-hash.
+    let backrefs = node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs");
+    let serde_2026 = clvmr::serde::serialize_2026(&a, node, 0).expect("serialize_2026");
+    for (label, blob, is_2026) in [
+        ("backrefs", &backrefs, false),
+        ("serde_2026", &serde_2026, true),
+    ] {
+        assert!(blob.len() < 1024, "{label}: expected a compact encoding");
+        let mut b = Allocator::new();
+        let parsed = if is_2026 {
+            deserialize_2026(&mut b, blob, blob.len(), false).expect("deserialize_2026")
+        } else {
+            node_from_bytes_backrefs(&mut b, blob).expect("node_from_bytes_backrefs")
+        };
+        let mut cache = TreeCache::default();
+        assert_eq!(
+            tree_hash_cached(&b, parsed, &mut cache),
+            expected,
+            "{label}: hash mismatch"
+        );
+    }
+}
+
+#[test]
 fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
     use clvmr::serde::{
         SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
