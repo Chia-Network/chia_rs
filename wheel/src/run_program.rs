@@ -46,9 +46,8 @@ pub fn run_chia_program(
         // Non-consensus path: the blob is already in memory, so cap the frame
         // (and per-atom preallocation) at its physical size. Consensus caps
         // are enforced at run_block_generator time.
-        let program =
-            node_from_bytes_auto(&mut allocator, program, program.len()).map_err(map_pyerr)?;
-        let args = node_from_bytes_auto(&mut allocator, args, args.len()).map_err(map_pyerr)?;
+        let program = node_from_bytes_auto(&mut allocator, program).map_err(map_pyerr)?;
+        let args = node_from_bytes_auto(&mut allocator, args).map_err(map_pyerr)?;
         let dialect = ChiaDialect::new(flags);
 
         Ok(py.detach(|| run_program(&mut allocator, &dialect, program, args, max_cost)))

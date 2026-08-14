@@ -139,7 +139,7 @@ pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<
     let mut a = clvmr::Allocator::new();
     // Non-consensus path: the blob is already in memory, so cap the frame
     // (and per-atom preallocation) at its physical size.
-    let node = node_from_bytes_auto(&mut a, slice, slice.len()).map_err(map_pyerr)?;
+    let node = node_from_bytes_auto(&mut a, slice).map_err(map_pyerr)?;
     let hash = clvm_utils::tree_hash(&a, node);
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
@@ -206,9 +206,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program =
-        node_from_bytes_auto(&mut allocator, program, program.len()).map_err(map_pyerr)?;
-    let args = node_from_bytes_auto(&mut allocator, args, args.len()).map_err(map_pyerr)?;
+    let program = node_from_bytes_auto(&mut allocator, program).map_err(map_pyerr)?;
+    let args = node_from_bytes_auto(&mut allocator, args).map_err(map_pyerr)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
@@ -261,8 +260,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let generator = node_from_bytes_auto(&mut allocator, generator.as_ref(), generator.len())
-        .map_err(map_pyerr)?;
+    let generator = node_from_bytes_auto(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 

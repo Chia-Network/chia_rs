@@ -459,8 +459,7 @@ fn test_serde_2026_tree_hash_auto_agrees() {
 
     // same dispatch as the wheel's tree_hash_auto()
     let mut a = Allocator::new();
-    let node = node_from_bytes_auto(&mut a, &generator_2026, generator_2026.len())
-        .expect("node_from_bytes_auto");
+    let node = node_from_bytes_auto(&mut a, &generator_2026).expect("node_from_bytes_auto");
     let hash_2026 = tree_hash(&a, node);
 
     let hash_classic = tree_hash_from_bytes(&generator_classic).expect("tree_hash_from_bytes");
