@@ -5,7 +5,7 @@ use crate::serde_2026::SERDE_2026_COMPRESSION_LEVEL;
 use chia_bls::Signature;
 use chia_protocol::SpendBundle;
 use clvmr::allocator::{Allocator, NodePtr};
-use clvmr::serde::{intern_tree, node_from_bytes_backrefs, node_to_bytes_backrefs, serialize_2026};
+use clvmr::serde::{intern_tree, node_from_bytes_backrefs, serialize_2026};
 use std::borrow::Borrow;
 
 #[cfg(feature = "py-bindings")]
@@ -48,6 +48,13 @@ pub enum BuildBlockResult {
 /// By the triangle inequality (vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), the
 /// running sum is an upper bound on the true interned cost of all spends
 /// combined. finalize() computes the exact cost.
+///
+/// finalize() always emits the generator in serde_2026 format (interned
+/// serialization, magic-prefixed). There is no classic-emission mode: this
+/// builder's cost accounting charges by interned vbytes, which is only
+/// correct once INTERNED_GENERATOR is active, and serde_2026 acceptance
+/// activates at that same height (single activation) — so there is no valid
+/// height at which this builder's output could be classic-serialized.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct InternedBlockBuilder {
     allocator: Allocator,
@@ -68,12 +75,6 @@ pub struct InternedBlockBuilder {
     // from consensus constants, set at construction
     cost_per_byte: u64,
     max_block_cost: u64,
-
-    // when set, finalize() emits the generator in serde_2026 format (interned
-    // serialization, magic-prefixed) instead of the classic back-ref format.
-    // The builder does not see consensus flags; the caller decides based on
-    // INTERNED_GENERATOR activation.
-    serde_2026: bool,
 }
 
 fn result(num_skipped: u32) -> BuildBlockResult {
@@ -97,7 +98,6 @@ impl InternedBlockBuilder {
             num_skipped: 0,
             cost_per_byte,
             max_block_cost,
-            serde_2026: false,
         }
     }
 
@@ -107,16 +107,6 @@ impl InternedBlockBuilder {
         // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
 
         Self::new_with(constants.cost_per_byte, constants.max_block_cost_clvm)
-    }
-
-    /// Like `new()`, but `finalize()` emits the generator in serde_2026
-    /// format (interned serialization, magic-prefixed) instead of the
-    /// classic back-ref format.
-    pub fn new_serde_2026(constants: &ConsensusConstants) -> Self {
-        Self {
-            serde_2026: true,
-            ..Self::new(constants)
-        }
     }
 
     /// Compute the interned vbyte cost of a single spend in isolation.
@@ -237,11 +227,7 @@ impl InternedBlockBuilder {
             .allocator
             .new_pair(self.spend_list, self.allocator.nil())?;
         let root = self.allocator.new_pair(self.allocator.one(), inner)?;
-        let serialized = if self.serde_2026 {
-            serialize_2026(&self.allocator, root, SERDE_2026_COMPRESSION_LEVEL)?
-        } else {
-            node_to_bytes_backrefs(&self.allocator, root)?
-        };
+        let serialized = serialize_2026(&self.allocator, root, SERDE_2026_COMPRESSION_LEVEL)?;
 
         let interned = intern_tree(&self.allocator, root)?;
         let total_cost = interned_vbytes(&interned) * self.cost_per_byte + self.block_cost;
@@ -255,13 +241,8 @@ impl InternedBlockBuilder {
 #[pymethods]
 impl InternedBlockBuilder {
     #[new]
-    #[pyo3(signature = (constants, serde_2026 = false))]
-    pub fn py_new(constants: &ConsensusConstants, serde_2026: bool) -> PyResult<Self> {
-        Ok(if serde_2026 {
-            Self::new_serde_2026(constants)
-        } else {
-            Self::new(constants)
-        })
+    pub fn py_new(constants: &ConsensusConstants) -> PyResult<Self> {
+        Ok(Self::new(constants))
     }
 
     /// the first bool indicates whether the bundles was added.
@@ -300,13 +281,9 @@ impl InternedBlockBuilder {
     pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
         let cost_per_byte = self.cost_per_byte;
         let max_block_cost = self.max_block_cost;
-        let serde_2026 = self.serde_2026;
         match self.finalize() {
             Ok(x) => {
-                *self = InternedBlockBuilder {
-                    serde_2026,
-                    ..InternedBlockBuilder::new_with(cost_per_byte, max_block_cost)
-                };
+                *self = InternedBlockBuilder::new_with(cost_per_byte, max_block_cost);
                 Ok(x)
             }
             Err(err) => Err(err.into()),
@@ -452,7 +429,7 @@ mod tests {
                 bundles.shuffle(&mut rng);
 
                 let start = Instant::now();
-                let mut builder = InternedBlockBuilder::new_serde_2026(&TEST_CONSTANTS);
+                let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
                 let mut skipped = 0;
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
