@@ -98,26 +98,35 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// dispatches to [`deserialize_2026`]. Otherwise falls back to
 /// [`node_from_bytes_backrefs`] (which also accepts plain classic).
 ///
-/// `max_blob_size` bounds the total wire size accepted; blobs above it are
-/// rejected before any parsing. Callers should derive it from the network's
-/// cost constants via [`max_canonical_blob_size`] (any headroom multiplier
-/// on top — e.g. to tolerate non-minimal encodings, which `strict = false`
-/// otherwise admits — is caller policy).
+/// `max_blob_size` bounds the total wire size accepted **for serde_2026
+/// blobs only**; oversized serde_2026 blobs are rejected before any parsing.
+/// Callers should derive it from the network's cost constants via
+/// [`max_canonical_blob_size`] (any headroom multiplier on top — e.g. to
+/// tolerate non-minimal encodings, which `strict = false` otherwise admits —
+/// is caller policy).
 ///
-/// The same value doubles as the per-atom cap: atoms appear as literals in
-/// the canonical serialization, so an atom of length `L` forces a canonical
-/// blob of at least `L` bytes — no atom of a cost-valid generator can ever
-/// exceed the blob bound. There is deliberately no separate atom-length
-/// constant.
+/// Classic/backrefs blobs are deliberately NOT size-capped: the cap's
+/// derivation is serde_2026 vbyte math, and trusted readers of historical
+/// blocks must accept every blob the chain ever accepted — a bound derived
+/// from *current* constants must not be applied retroactively to blobs
+/// validated under whatever rules held when they were created. The classic
+/// branch here is byte-for-byte [`node_from_bytes_backrefs`], same as
+/// before this dispatcher existed.
+///
+/// For serde_2026, the same value doubles as the per-atom cap: atoms appear
+/// as literals in the canonical serialization, so an atom of length `L`
+/// forces a canonical blob of at least `L` bytes — no atom of a cost-valid
+/// generator can ever exceed the blob bound. There is deliberately no
+/// separate atom-length constant.
 pub fn node_from_bytes_auto(
     allocator: &mut Allocator,
     bytes: &[u8],
     max_blob_size: usize,
 ) -> Result<NodePtr> {
-    if bytes.len() > max_blob_size {
-        return Err(EvalErr::SerializationError);
-    }
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+        if bytes.len() > max_blob_size {
+            return Err(EvalErr::SerializationError);
+        }
         // strict = false is deliberate. Post-HF2 the generator's identity and
         // cost come from the interned tree, not its byte encoding, so overlong
         // (non-minimal) varints don't affect consensus — they only bloat the
@@ -320,12 +329,14 @@ mod tests {
             node_to_bytes(&a, node).unwrap()
         );
 
-        // The size gate applies to non-serde_2026 formats too.
+        // Classic blobs are NOT size-gated: historical blocks must load
+        // regardless of the cap derived from current constants.
         let classic = node_to_bytes(&a, node).unwrap();
         let mut b = Allocator::new();
-        assert!(matches!(
-            node_from_bytes_auto(&mut b, &classic, classic.len() - 1),
-            Err(EvalErr::SerializationError)
-        ));
+        let parsed = node_from_bytes_auto(&mut b, &classic, classic.len() - 1).unwrap();
+        assert_eq!(
+            node_to_bytes(&b, parsed).unwrap(),
+            node_to_bytes(&a, node).unwrap()
+        );
     }
 }
