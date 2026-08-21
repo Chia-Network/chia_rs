@@ -72,6 +72,23 @@ impl Program {
         self.0.into_inner()
     }
 
+    /// Reports the encoding of the serialized bytes this `Program` carries.
+    ///
+    /// A `Program` is CLVM; it doesn't "have" an encoding scheme itself, but
+    /// the bytes it wraps were produced by one of two serializers (classic or
+    /// serde_2026), and callers sometimes need to know which. This is
+    /// computed from those bytes on every call, never cached: `Program` holds
+    /// its original serialization verbatim and never re-encodes, so there's
+    /// nothing that could go stale.
+    ///
+    /// This is a transitional probe for the HF2 migration window (e.g.
+    /// chia-blockchain's generator-encoding validation can ask the object
+    /// instead of sniffing raw bytes) and is expected to be removable once
+    /// the migration era ends.
+    pub fn is_serde_2026_encoded(&self) -> bool {
+        self.0.starts_with(&SERDE_2026_MAGIC_PREFIX)
+    }
+
     pub fn run<A: ToClvm<Allocator>>(
         &self,
         a: &mut Allocator,
@@ -333,6 +350,12 @@ impl Program {
             .into()
     }
 
+    #[getter]
+    #[pyo3(name = "is_serde_2026_encoded")]
+    fn py_is_serde_2026_encoded(&self) -> bool {
+        self.is_serde_2026_encoded()
+    }
+
     #[staticmethod]
     fn fromhex(h: String) -> Result<Self> {
         let s = if let Some(st) = h.strip_prefix("0x") {
@@ -546,6 +569,24 @@ mod tests {
             .expect("run");
         assert_eq!(cost, 869);
         assert_eq!(a.number(result), 1337.into());
+    }
+
+    #[test]
+    fn program_is_serde_2026_encoded() {
+        // classic-encoded program
+        let classic = Program::from_bytes(&hex::decode("ff10ff02ff0580").expect("hex::decode"))
+            .expect("from_bytes");
+        assert!(!classic.is_serde_2026_encoded());
+
+        // serde_2026 blob: magic prefix followed by a trivial atom
+        let mut blob = SERDE_2026_MAGIC_PREFIX.to_vec();
+        blob.push(0x80);
+        let serde_2026 = Program::from(blob);
+        assert!(serde_2026.is_serde_2026_encoded());
+
+        // empty/trivial program
+        let trivial = Program::default();
+        assert!(!trivial.is_serde_2026_encoded());
     }
 }
 

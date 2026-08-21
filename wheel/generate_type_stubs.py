@@ -265,6 +265,7 @@ extra_members = {
         "@staticmethod\n    def to(o: object) -> Program: ...",
         "def run_rust(self, max_cost: int, flags: int, args: object) -> tuple[int, LazyNode]: ...",
         "def uncurry_rust(self) -> tuple[LazyNode, LazyNode]: ...",
+        "@property\n    def is_serde_2026_encoded(self) -> bool: ...",
     ],
     "SpendBundle": [
         "@classmethod\n    def aggregate(cls, spend_bundles: list[SpendBundle]) -> Self: ...",
