@@ -183,6 +183,12 @@ jobs:
         env:
           CC: "clang"
           CFLAGS: "-D__BLST_PORTABLE__"
+          # On releases, emit line-table debug info so the MSVC linker produces a
+          # separate .pdb (doesn't bloat the .pyd) for crash-stack symbolication.
+          # line-tables-only maps addresses to function/file/line for post-mortem
+          # triage while keeping link cost and PDB size down. Off otherwise, since
+          # the extra link time isn't worth paying on every PR/push.
+          CARGO_PROFILE_RELEASE_DEBUG: ${{ github.event_name == 'release' && 'line-tables-only' || '0' }}
         run: |
           maturin build -i python --release -m wheel/Cargo.toml
 
@@ -209,6 +215,78 @@ jobs:
         with:
           name: packages-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
+
+      # Archive the .pdb under a per-matrix zip name (releases only, matching the
+      # debug-info build above). Compress-Archive stores the entry by its leaf
+      # name, chia_rs.pdb, which must be preserved: the .pyd embeds that name + a
+      # GUID/age signature that debuggers use to locate symbols. Only the zip name
+      # carries the matrix identity, keeping release-asset names unique.
+      - name: Archive debug symbols (Windows)
+        if: matrix.os.matrix == 'windows' && github.event_name == 'release'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path debug-symbols | Out-Null
+          $name = "chia_rs-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}.pdb.zip"
+          Compress-Archive -Path target/release/chia_rs.pdb -DestinationPath "debug-symbols/$name"
+
+      # Artifact name must not start with "packages-", or the PyPI upload job
+      # (pattern: packages-*) would ingest it.
+      - name: Upload debug symbols artifact (Windows)
+        if: matrix.os.matrix == 'windows' && github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
+          path: ./debug-symbols/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Attach the .pdb archives to the release (release assets persist as long as the
+  # release, unlike the retention-bounded build artifacts). This is the only job
+  # with contents: write; it runs only on releases and compiles nothing, keeping
+  # the write token's blast radius minimal.
+  upload-debug-symbols:
+    name: Attach debug symbols to release
+    if: github.event_name == 'release'
+    needs:
+      - build-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Resolve RELEASE_TAG from the event payload (repo convention for release
+      # metadata). The job-level `if` already restricts this to published
+      # releases, so no per-step release gate is needed here; attaching runs for
+      # every release the build/archive steps produced symbols for, including
+      # pre-releases.
+      - name: Set Env
+        uses: Chia-Network/actions/setjobenv@main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The per-matrix .zip archives already have unique names, so flatten them
+      # all into one directory with merge-multiple.
+      - name: Download debug symbols
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          pattern: debug-symbols-*
+          path: ./debug-symbols
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          zips=(debug-symbols/*.pdb.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "no debug-symbol archives found" >&2
+            exit 1
+          fi
+          for zip_file in "${zips[@]}"; do
+            gh release upload "${{ env.RELEASE_TAG }}" "${zip_file}" \
+              --clobber --repo "${{ github.repository }}"
+          done
 
   check-typestubs:
     name: Check chia_rs.pyi
