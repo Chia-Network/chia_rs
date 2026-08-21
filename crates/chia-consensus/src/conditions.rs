@@ -160,6 +160,11 @@ impl SpendVisitor for MempoolVisitor {
             Condition::CreateCoinAnnouncement(_msg) => {
                 spend.flags &= !ELIGIBLE_FOR_FF;
             }
+            Condition::SkipRelativeCondition => {
+                // a dropped relative timelock is still a relative timelock as
+                // far as FF eligibility is concerned
+                spend.flags &= !ELIGIBLE_FOR_FF;
+            }
             _ => {}
         }
         self.condition_counter += 1;
@@ -4820,24 +4825,70 @@ fn test_assert_ephemeral_wrong_parent() {
 #[rstest]
 // the default expected errors are post soft-fork, when both new rules are
 // activated
-#[case(ASSERT_HEIGHT_ABSOLUTE, None)]
-#[case(ASSERT_HEIGHT_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_SECONDS_ABSOLUTE, None)]
-#[case(ASSERT_SECONDS_RELATIVE, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_HEIGHT, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_MY_BIRTH_SECONDS, Some(ErrorCode::EphemeralRelativeCondition))]
-#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, None)]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "1000", None)]
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    "1000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(ASSERT_SECONDS_ABSOLUTE, "1000", None)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    "1000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_MY_BIRTH_HEIGHT,
+    "1000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_MY_BIRTH_SECONDS,
+    "1000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "1000", None)]
 #[case(
     ASSERT_BEFORE_HEIGHT_RELATIVE,
+    "1000",
     Some(ErrorCode::EphemeralRelativeCondition)
 )]
-#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, None)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "1000", None)]
 #[case(
     ASSERT_BEFORE_SECONDS_RELATIVE,
+    "1000",
     Some(ErrorCode::EphemeralRelativeCondition)
 )]
+// a trivially-true relative timelock is dropped but still counts as a relative
+// condition, so it's still disallowed on ephemeral spends. The corresponding
+// absolute conditions are simply skipped and impose no such restriction.
+#[case(
+    ASSERT_HEIGHT_RELATIVE,
+    "-1",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_SECONDS_RELATIVE,
+    "-1",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_BEFORE_HEIGHT_RELATIVE,
+    "0x0100000000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(
+    ASSERT_BEFORE_SECONDS_RELATIVE,
+    "0x010000000000000000",
+    Some(ErrorCode::EphemeralRelativeCondition)
+)]
+#[case(ASSERT_HEIGHT_ABSOLUTE, "-1", None)]
+#[case(ASSERT_SECONDS_ABSOLUTE, "-1", None)]
+#[case(ASSERT_BEFORE_HEIGHT_ABSOLUTE, "0x0100000000", None)]
+#[case(ASSERT_BEFORE_SECONDS_ABSOLUTE, "0x010000000000000000", None)]
 fn test_relative_condition_on_ephemeral(
     #[case] condition: ConditionOpcode,
+    #[case] arg: &str,
     #[case] expect_error: Option<ErrorCode>,
 ) {
     // this test ensures that we disallow relative conditions (including
@@ -4857,7 +4908,7 @@ fn test_relative_condition_on_ephemeral(
            ((51 ({{h2}} (123 ) \
            ))\
        (({{coin11}} ({{h2}} (123 (\
-           (({cond} (1000 ) \
+           (({cond} ({arg} ) \
            ))\
        ))"
     );
@@ -5216,6 +5267,14 @@ fn test_eligible_for_ff_invalid_assert_parent(
 #[case(ASSERT_MY_BIRTH_SECONDS, "0", false)]
 #[case(ASSERT_MY_AMOUNT, "123", true)]
 #[case(CREATE_COIN_ANNOUNCEMENT, "123", false)]
+// trivially-true relative timelocks are dropped (SkipRelativeCondition) but
+// still mark the spend as not-ephemeral, so they must clear FF eligibility too.
+// a negative "after" relative timelock is always true
+#[case(ASSERT_HEIGHT_RELATIVE, "-1", false)]
+#[case(ASSERT_SECONDS_RELATIVE, "-1", false)]
+// a "before" relative timelock whose value overflows is always true
+#[case(ASSERT_BEFORE_HEIGHT_RELATIVE, "0x0100000000", false)]
+#[case(ASSERT_BEFORE_SECONDS_RELATIVE, "0x010000000000000000", false)]
 fn test_eligible_for_ff_timelocks(
     #[case] condition: ConditionOpcode,
     #[case] arg: &str,
