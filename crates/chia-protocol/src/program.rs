@@ -10,6 +10,8 @@ use clvmr::SExp;
 use clvmr::cost::Cost;
 use clvmr::error::EvalErr;
 use clvmr::run_program;
+#[cfg(feature = "py-bindings")]
+use clvmr::serde::deserialize_2026;
 use clvmr::serde::{
     SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes,
     serialized_length_from_bytes, serialized_length_from_bytes_trusted,
@@ -195,6 +197,23 @@ fn map_pyerr(err: EvalErr) -> PyErr {
     PyValueError::new_err(err.to_string())
 }
 
+#[cfg(feature = "py-bindings")]
+// Deserialize CLVM bytes, dispatching on encoding: serde_2026 (detected via
+// its magic prefix) or classic/backrefs. Mirrors
+// `chia_consensus::serde_2026::node_from_bytes_auto` byte-for-byte, but
+// chia-protocol can't depend on chia-consensus (the dependency runs the
+// other way), so the dispatch is duplicated here instead of shared.
+fn node_from_bytes_dispatch(
+    a: &mut Allocator,
+    bytes: &[u8],
+) -> std::result::Result<NodePtr, EvalErr> {
+    if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+        deserialize_2026(a, bytes, bytes.len(), false)
+    } else {
+        node_from_bytes_backrefs(a, bytes)
+    }
+}
+
 // TODO: this conversion function should probably be converted to a type holding
 // the PyAny object implementing the ToClvm trait. That way, the Program::to()
 // function could turn a python structure directly into bytes, without taking
@@ -344,10 +363,22 @@ impl Program {
             .map_err(|error| PyErr::new::<PyTypeError, _>(error.to_string()))
     }
 
-    fn get_tree_hash(&self) -> crate::Bytes32 {
-        clvm_utils::tree_hash_from_bytes(self.0.as_ref())
-            .unwrap()
-            .into()
+    fn get_tree_hash(&self) -> PyResult<crate::Bytes32> {
+        if self.is_serde_2026_encoded() {
+            // tree_hash_from_bytes below only understands classic/backrefs,
+            // so serde_2026 bytes need their own dispatch. And since
+            // backrefs/serde_2026 can encode trees whose expansion is
+            // exponential in the blob size, the hasher must be DAG-aware
+            // (tree_hash_cached) rather than the naive tree_hash walker.
+            let mut a = Allocator::new();
+            let node = node_from_bytes_dispatch(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
+            let mut cache = clvm_utils::TreeCache::default();
+            Ok(clvm_utils::tree_hash_cached(&a, node, &mut cache).into())
+        } else {
+            Ok(clvm_utils::tree_hash_from_bytes(self.0.as_ref())
+                .unwrap()
+                .into())
+        }
     }
 
     #[getter]
@@ -395,7 +426,7 @@ impl Program {
         let clvm_args = clvm_serialize(&mut a, args)?;
 
         let r: Response = (|| -> PyResult<Response> {
-            let program = node_from_bytes_backrefs(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
+            let program = node_from_bytes_dispatch(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
             let dialect = ChiaDialect::new(ClvmFlags::from_bits_truncate(flags));
 
             Ok(py.detach(|| run_program(&mut a, &dialect, program, clvm_args, max_cost)))
@@ -414,7 +445,7 @@ impl Program {
 
     fn uncurry_rust(&self) -> PyResult<(LazyNode, LazyNode)> {
         let mut a = Allocator::new_limited(500_000_000);
-        let prg = node_from_bytes_backrefs(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
+        let prg = node_from_bytes_dispatch(&mut a, self.0.as_ref()).map_err(map_pyerr)?;
         let Ok(uncurried) = CurriedProgram::<NodePtr, NodePtr>::from_clvm(&a, prg) else {
             let a = Rc::new(a);
             let prg = LazyNode::new(a.clone(), prg);
@@ -587,6 +618,93 @@ mod tests {
         // empty/trivial program
         let trivial = Program::default();
         assert!(!trivial.is_serde_2026_encoded());
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "py-bindings")]
+mod pytests {
+    use super::*;
+    use clvmr::serde::serialize_2026;
+    use pyo3::Python;
+    use pyo3::types::PyList;
+
+    // (+ 2 5), classic-encoded. Reused across the tests below, re-encoded as
+    // serde_2026 via `to_serde_2026`.
+    const CLASSIC_HEX: &str = "ff10ff02ff0580";
+
+    fn to_serde_2026(classic_bytes: &[u8]) -> Vec<u8> {
+        let mut a = Allocator::new();
+        let node = node_from_bytes(&mut a, classic_bytes).unwrap();
+        let blob = serialize_2026(&a, node, 0).expect("serialize_2026");
+        assert!(blob.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        blob
+    }
+
+    #[test]
+    fn get_tree_hash_serde_2026_matches_classic() {
+        let classic_bytes = hex::decode(CLASSIC_HEX).unwrap();
+        let classic = Program::from_bytes(&classic_bytes).expect("from_bytes");
+        let serde_2026 = Program::from(to_serde_2026(&classic_bytes));
+        assert!(serde_2026.is_serde_2026_encoded());
+
+        assert_eq!(
+            classic.get_tree_hash().expect("get_tree_hash"),
+            serde_2026.get_tree_hash().expect("get_tree_hash")
+        );
+    }
+
+    #[test]
+    fn get_tree_hash_serde_2026_agrees_with_wheel_dispatch() {
+        // wheel/src/api.rs's tree_hash_auto sniffs the magic prefix, dispatches
+        // to the matching deserializer, then hashes with tree_hash_cached.
+        // chia-protocol can't depend on the wheel crate (or chia-consensus,
+        // whose node_from_bytes_auto the wheel uses) to call that function
+        // directly, so this reproduces the same dispatch+hash steps and
+        // checks get_tree_hash() agrees byte-for-byte.
+        let classic_bytes = hex::decode(CLASSIC_HEX).unwrap();
+        let serde_2026_bytes = to_serde_2026(&classic_bytes);
+        let program = Program::from(serde_2026_bytes.clone());
+
+        let mut a = Allocator::new();
+        let node = node_from_bytes_dispatch(&mut a, &serde_2026_bytes).expect("dispatch");
+        let mut cache = clvm_utils::TreeCache::default();
+        let expected = clvm_utils::tree_hash_cached(&a, node, &mut cache);
+
+        assert_eq!(
+            program.get_tree_hash().expect("get_tree_hash"),
+            expected.into()
+        );
+    }
+
+    #[test]
+    fn run_rust_serde_2026() {
+        Python::initialize();
+        let classic_bytes = hex::decode(CLASSIC_HEX).unwrap();
+        let program = Program::from(to_serde_2026(&classic_bytes));
+
+        Python::attach(|py| {
+            let args = PyList::new(py, [1300i64, 37i64]).unwrap();
+            let (cost, result) = program
+                .run_rust(py, 1000, ClvmFlags::empty().bits(), args.as_any())
+                .expect("run_rust");
+            assert_eq!(cost, 869);
+            let atom = result.atom(py).expect("atom");
+            let bytes: Vec<u8> = atom.extract(py).unwrap();
+            assert_eq!(bytes, vec![0x05, 0x39]); // 1337
+        });
+    }
+
+    #[test]
+    fn uncurry_rust_serde_2026() {
+        let classic_bytes = hex::decode(CLASSIC_HEX).unwrap();
+        let program = Program::from(to_serde_2026(&classic_bytes));
+
+        // Not a curried puzzle, so this exercises the "doesn't match the
+        // curry pattern" fallback path -- the point of the test is that
+        // parsing the serde_2026 bytes succeeds rather than erroring out
+        // with "unexpected end of buffer".
+        program.uncurry_rust().expect("uncurry_rust");
     }
 }
 
