@@ -90,16 +90,19 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::NEW_COST_MODEL
             | ConsensusFlags::RELAXED_BLS;
     } else if prev_tx_height >= constants.soft_fork8_height {
-        // once the hard fork activates, we no longer apply the limits, nor
-        // disable the operators
+        // once the hard fork activates, we no longer disable the operators
         flags |= ConsensusFlags::DISABLE_OP;
-        flags |= ConsensusFlags::LIMITS;
     }
 
     if prev_tx_height >= constants.soft_fork9_height {
         flags |= ConsensusFlags::SIMPLE_GENERATOR
             | ConsensusFlags::CANONICAL_INTS
             | ConsensusFlags::LIMIT_SPENDS;
+        // LIMITS is enabled with soft fork 9, but is subsumed by the hard fork
+        // 2 behavior once it activates
+        if prev_tx_height < constants.hard_fork2_height {
+            flags |= ConsensusFlags::LIMITS;
+        }
     }
     flags
 }
@@ -223,6 +226,89 @@ mod tests {
             get_flags_for_height_and_constants(prev_tx_height, &TEST_CONSTANTS).bits(),
             expected_bits
         );
+    }
+
+    // Constants with well-separated, non-placeholder fork heights so we can
+    // pin down exactly which flags are active in each fork window.
+    const FORK_CONSTANTS: ConsensusConstants = ConsensusConstants {
+        soft_fork8_height: 100,
+        soft_fork9_height: 200,
+        hard_fork2_height: 300,
+        ..TEST_CONSTANTS
+    };
+
+    // Regression table: exactly which flags are enabled at each fork boundary.
+    // Note: soft fork 8 enables DISABLE_OP; soft fork 9 additionally enables
+    // LIMITS + the generator flags; hard fork 2 subsumes soft fork 8/LIMITS
+    // (they turn off) while keeping the soft fork 9 generator flags.
+    #[rstest]
+    // before any fork -> no flags
+    #[case(0, ConsensusFlags::empty())]
+    #[case(99, ConsensusFlags::empty())]
+    // soft fork 8 window: DISABLE_OP only
+    #[case(100, ConsensusFlags::DISABLE_OP)]
+    #[case(199, ConsensusFlags::DISABLE_OP)]
+    // soft fork 9 window: DISABLE_OP + generator flags + LIMITS
+    #[case(
+        200,
+        ConsensusFlags::DISABLE_OP
+            .union(ConsensusFlags::SIMPLE_GENERATOR)
+            .union(ConsensusFlags::CANONICAL_INTS)
+            .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::LIMITS)
+    )]
+    #[case(
+        299,
+        ConsensusFlags::DISABLE_OP
+            .union(ConsensusFlags::SIMPLE_GENERATOR)
+            .union(ConsensusFlags::CANONICAL_INTS)
+            .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::LIMITS)
+    )]
+    // hard fork 2 window: keccak/secp/cost flags + generator flags,
+    // but NOT DISABLE_OP and NOT LIMITS (mutually exclusive with hard fork 2)
+    #[case(
+        300,
+        ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
+            .union(ConsensusFlags::COST_CONDITIONS)
+            .union(ConsensusFlags::ENABLE_SECP_OPS)
+            .union(ConsensusFlags::NEW_COST_MODEL)
+            .union(ConsensusFlags::RELAXED_BLS)
+            .union(ConsensusFlags::SIMPLE_GENERATOR)
+            .union(ConsensusFlags::CANONICAL_INTS)
+            .union(ConsensusFlags::LIMIT_SPENDS)
+    )]
+    #[case(
+        u32::MAX,
+        ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
+            .union(ConsensusFlags::COST_CONDITIONS)
+            .union(ConsensusFlags::ENABLE_SECP_OPS)
+            .union(ConsensusFlags::NEW_COST_MODEL)
+            .union(ConsensusFlags::RELAXED_BLS)
+            .union(ConsensusFlags::SIMPLE_GENERATOR)
+            .union(ConsensusFlags::CANONICAL_INTS)
+            .union(ConsensusFlags::LIMIT_SPENDS)
+    )]
+    fn test_get_flags_at_forks(#[case] prev_tx_height: u32, #[case] expected: ConsensusFlags) {
+        assert_eq!(
+            get_flags_for_height_and_constants(prev_tx_height, &FORK_CONSTANTS),
+            expected
+        );
+
+        // LIMITS is enabled only from soft fork 9 up to (but not including)
+        // hard fork 2.
+        let has_limits = expected.contains(ConsensusFlags::LIMITS);
+        let expected_limits = (FORK_CONSTANTS.soft_fork9_height..FORK_CONSTANTS.hard_fork2_height)
+            .contains(&prev_tx_height);
+        assert_eq!(has_limits, expected_limits);
+
+        // DISABLE_OP is likewise enabled only from soft fork 8 up to (but not
+        // including) hard fork 2.
+        let has_disable_op = expected.contains(ConsensusFlags::DISABLE_OP);
+        let expected_disable_op = (FORK_CONSTANTS.soft_fork8_height
+            ..FORK_CONSTANTS.hard_fork2_height)
+            .contains(&prev_tx_height);
+        assert_eq!(has_disable_op, expected_disable_op);
     }
 
     #[test]
