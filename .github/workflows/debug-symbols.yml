@@ -1,29 +1,33 @@
 name: Debug symbols (Windows)
 
-# Manually-triggered (or push-triggered) helper to rebuild a given tag/ref on a
-# Windows runner WITH debug info, so we get a .pdb to symbolize a crash (e.g. a
-# WER "BEX64" fault offset) in the chia_rs native extension.
+# Produce trustworthy symbols for a shipped chia_rs Windows wheel and map a WER
+# "BEX64" fault offset (P7) to a Rust function:line.
 #
-# Enabling debug info (CARGO_PROFILE_RELEASE_DEBUG=2) does not change codegen /
-# optimizations, it only makes the linker also emit a .pdb. For the fault
-# offset to map to the correct function, the rebuild must match the original
-# build's code layout -- keep the same features/flags AND the same rustc.
+# The shipped binary that actually crashed is on PyPI (chia_rs==<pypi_version>,
+# cp3XX-win_amd64). We download it and use it as the ground truth. We then
+# rebuild the same tag WITH debug info (to get a .pdb) and VERIFY, byte-for-byte,
+# that our rebuilt .text matches the official .text. Only if it matches (at least
+# up to and including the fault offset) is the symbolization trustworthy -- this
+# is what the previous naive approach was missing.
 #
-# The repo pins the compiler via rust-toolchain.toml (channel = "1.92.0" at the
-# 0.45.1 tag). rustup honors that file when cargo/maturin run in the repo, so
-# the original wheel was built with 1.92.0 regardless of the "@stable" in
-# build-wheels.yml. `rust_toolchain` defaults to 1.92.0 to match.
+# The repo pins rustc via rust-toolchain.toml (1.92.0 at the 0.45.1 tag), so the
+# Rust codegen matches. The remaining variables are the debug flag and the C
+# toolchain (blst is compiled with clang); the `repro-check` job isolates which,
+# if any, is causing a mismatch.
 #
-# NOTE: workflow_dispatch's "Run workflow" button only appears once this file is
-# on the default branch. The `push` trigger below lets it run from a throwaway
-# branch without merging to main -- just push the branch and it runs with the
-# defaults. Use workflow_dispatch (once on default branch) to override inputs.
+# workflow_dispatch's "Run workflow" button only appears once this file is on the
+# default branch. The `push` trigger lets it run from a throwaway `debug/**`
+# branch with the defaults.
 
 on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: "Tag/branch/SHA to build"
+        description: "Tag/branch/SHA to build (source for symbols)"
+        required: true
+        default: "0.45.1"
+      pypi_version:
+        description: "Official chia_rs version on PyPI to compare against"
         required: true
         default: "0.45.1"
       python_version:
@@ -31,13 +35,17 @@ on:
         required: true
         default: "3.12"
       rust_toolchain:
-        description: "Rust toolchain (must match rust-toolchain.toml for exact offsets)"
+        description: "Rust toolchain (should match rust-toolchain.toml)"
         required: true
         default: "1.92.0"
       fault_offset:
-        description: "WER fault offset (P7) to symbolize, hex"
+        description: "WER fault offset (P7) to symbolize, hex RVA"
         required: true
         default: "0x703697"
+      debuginfo:
+        description: "CARGO_PROFILE_RELEASE_DEBUG for the symbol build (2 or 1)"
+        required: true
+        default: "2"
   push:
     branches:
       - "debug/**"
@@ -46,11 +54,207 @@ permissions:
   contents: read
 
 jobs:
-  build-debug-symbols:
-    name: Build with PDB
+  symbolize:
+    name: Symbolize against official ${{ github.event.inputs.pypi_version || '0.45.1' }}
     runs-on: windows-latest
     env:
       GIT_REF: ${{ github.event.inputs.git_ref || '0.45.1' }}
+      PYPI_VER: ${{ github.event.inputs.pypi_version || '0.45.1' }}
+      PY_VER: ${{ github.event.inputs.python_version || '3.12' }}
+      RUST_TC: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
+      FAULT_OFFSET: ${{ github.event.inputs.fault_offset || '0x703697' }}
+      DEBUGINFO: ${{ github.event.inputs.debuginfo || '2' }}
+
+    steps:
+      - name: Checkout ${{ github.event.inputs.git_ref || '0.45.1' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref || '0.45.1' }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python_version || '3.12' }}
+
+      - name: Set up Rust (${{ github.event.inputs.rust_toolchain || '1.92.0' }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
+
+      - name: Record toolchain + compiler versions
+        shell: bash
+        run: |
+          mkdir -p symbols
+          {
+            rustc -vV
+            cargo --version
+            echo "--- clang ---"; clang --version || true
+            echo "--- python ---"; python --version
+          } | tee symbols/toolchain.txt
+
+      - name: Install maturin
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install maturin
+
+      - name: Download official wheel from PyPI and extract .pyd
+        shell: bash
+        run: |
+          mkdir -p official
+          python -m pip download "chia_rs==${PYPI_VER}" --no-deps --only-binary=:all: --dest official
+          echo "==== official/ ===="; ls -l official
+          python - <<'PY'
+          import glob, zipfile, os
+          os.makedirs("official", exist_ok=True)
+          whls = glob.glob("official/*.whl")
+          assert whls, "no official wheel downloaded"
+          with zipfile.ZipFile(whls[0]) as z:
+              for n in z.namelist():
+                  if n.endswith(".pyd"):
+                      out = os.path.join("official", os.path.basename(n))
+                      open(out, "wb").write(z.read(n))
+                      print("official pyd:", out)
+          PY
+
+      # Mirror the official Windows build step from build-wheels.yml, but force
+      # release debug info on so the linker also emits chia_rs.pdb.
+      - name: Build wheel with debug info
+        env:
+          CC: "clang"
+          CFLAGS: "-D__BLST_PORTABLE__"
+          CARGO_PROFILE_RELEASE_DEBUG: ${{ github.event.inputs.debuginfo || '2' }}
+        run: |
+          maturin build -i python --release -m wheel/Cargo.toml
+
+      - name: Collect our build outputs
+        shell: bash
+        run: |
+          cp Cargo.lock symbols/ 2>/dev/null || true
+          cp target/release/chia_rs.pdb symbols/ 2>/dev/null || true
+          cp target/wheels/*.whl symbols/ 2>/dev/null || true
+          python - <<'PY'
+          import glob, zipfile, os
+          for w in glob.glob("target/wheels/*.whl"):
+              with zipfile.ZipFile(w) as z:
+                  for n in z.namelist():
+                      if n.endswith(".pyd"):
+                          out = os.path.join("symbols", os.path.basename(n))
+                          open(out, "wb").write(z.read(n))
+                          print("our pyd:", out)
+          PY
+          cp official/*.pyd symbols/official-$(ls official | grep -E '\.pyd$' | head -n1) 2>/dev/null || true
+          echo "==== symbols/ ===="; ls -l symbols
+
+      - name: Write analysis script
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/analyze.py" <<'PY'
+          import sys, struct, hashlib, subprocess
+
+          def read(p):
+              with open(p, "rb") as f:
+                  return f.read()
+
+          def parse_pe(d):
+              e = struct.unpack_from("<I", d, 0x3C)[0]
+              assert d[e:e+4] == b"PE\0\0", "not a PE"
+              nsec = struct.unpack_from("<H", d, e + 6)[0]
+              szopt = struct.unpack_from("<H", d, e + 20)[0]
+              magic = struct.unpack_from("<H", d, e + 24)[0]
+              base = struct.unpack_from("<Q", d, e + 48)[0] if magic == 0x20b else struct.unpack_from("<I", d, e + 52)[0]
+              secoff = e + 24 + szopt
+              secs = []
+              for i in range(nsec):
+                  b = secoff + i * 40
+                  name = d[b:b+8].rstrip(b"\0").decode("latin1")
+                  vsize = struct.unpack_from("<I", d, b + 8)[0]
+                  vaddr = struct.unpack_from("<I", d, b + 12)[0]
+                  rsize = struct.unpack_from("<I", d, b + 16)[0]
+                  rptr = struct.unpack_from("<I", d, b + 20)[0]
+                  secs.append((name, vaddr, vsize, rptr, rsize))
+              return base, secs
+
+          def section(d, secs, name):
+              for (n, va, vs, rp, rs) in secs:
+                  if n == name:
+                      return d[rp:rp+rs], va, vs, rp, rs
+              return None
+
+          official_path, ours_path, rva_hex, symbolizer = sys.argv[1:5]
+          rva = int(rva_hex, 16)
+          od, ourd = read(official_path), read(ours_path)
+          obase, osecs = parse_pe(od)
+          rbase, rsecs = parse_pe(ourd)
+          otext, ova, ovs, orp, ors = section(od, osecs, ".text")
+          rtext, rva_txt, rvs, rrp, rrs = section(ourd, rsecs, ".text")
+
+          def sha(b):
+              return hashlib.sha256(b).hexdigest()[:16]
+
+          print("fault RVA           : %#x" % rva)
+          print("OFFICIAL ImageBase %#x  .text VA %#x  size %#x  sha %s" % (obase, ova, ors, sha(otext)))
+          print("OURS     ImageBase %#x  .text VA %#x  size %#x  sha %s" % (rbase, rva_txt, rrs, sha(rtext)))
+
+          same_va = (ova == rva_txt)
+          identical = (otext == rtext)
+          first_diff_rva = None
+          if not identical:
+              n = min(len(otext), len(rtext))
+              fd = next((i for i in range(n) if otext[i] != rtext[i]), n)
+              ndiff = sum(1 for i in range(n) if otext[i] != rtext[i])
+              first_diff_rva = ova + fd
+              print(".text identical     : NO")
+              print("  official/our size : %d / %d" % (len(otext), len(rtext)))
+              print("  first diff at RVA : %#x" % first_diff_rva)
+              print("  differing bytes   : %d / %d (%.4f%%)" % (ndiff, n, 100.0 * ndiff / n))
+          else:
+              print(".text identical     : YES")
+
+          # The offset maps reliably iff .text has the same base VA AND is identical
+          # at least up to and including the fault offset.
+          reliable = same_va and (identical or (first_diff_rva is not None and first_diff_rva > rva))
+          print("same .text VA       : %s" % ("YES" if same_va else "NO"))
+          print("VERDICT             : %s" % ("RELIABLE" if reliable else "UNRELIABLE (do not trust the symbol below)"))
+
+          def symbolize(obj, va):
+              r = subprocess.run([symbolizer, "--obj=" + obj, "--demangle",
+                                  "--functions=linkage", "--inlines", hex(va)],
+                                 capture_output=True, text=True)
+              return (r.stdout or "").strip() or "(no output) " + (r.stderr or "").strip()
+
+          print("\n=== symbolize fault (our PDB @ VA %#x) ===" % (rbase + rva))
+          print(symbolize(ours_path, rbase + rva))
+          PY
+          echo "wrote $RUNNER_TEMP/analyze.py"
+
+      - name: Compare and symbolize
+        continue-on-error: true
+        shell: bash
+        run: |
+          SYM="$(command -v llvm-symbolizer || true)"
+          if [ -z "$SYM" ] && [ -x "/c/Program Files/LLVM/bin/llvm-symbolizer.exe" ]; then
+            SYM="/c/Program Files/LLVM/bin/llvm-symbolizer.exe"
+          fi
+          OUR_PYD="$(ls symbols/chia_rs*.pyd | grep -v official | head -n1)"
+          OFF_PYD="$(ls official/*.pyd | head -n1)"
+          echo "symbolizer : $SYM"
+          echo "our pyd    : $OUR_PYD"
+          echo "official   : $OFF_PYD"
+          python "$RUNNER_TEMP/analyze.py" "$OFF_PYD" "$OUR_PYD" "$FAULT_OFFSET" "$SYM" | tee symbols/symbolize-report.txt
+
+      - name: Upload symbols + report
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols-${{ env.GIT_REF }}-py${{ env.PY_VER }}
+          path: ./symbols/
+          if-no-files-found: error
+
+  repro-check:
+    name: Reproducibility check (no debug info)
+    runs-on: windows-latest
+    env:
+      GIT_REF: ${{ github.event.inputs.git_ref || '0.45.1' }}
+      PYPI_VER: ${{ github.event.inputs.pypi_version || '0.45.1' }}
       PY_VER: ${{ github.event.inputs.python_version || '3.12' }}
       RUST_TC: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
       FAULT_OFFSET: ${{ github.event.inputs.fault_offset || '0x703697' }}
@@ -71,83 +275,74 @@ jobs:
         with:
           toolchain: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
 
-      - name: Record toolchain versions
-        shell: bash
-        run: |
-          rustc --version | tee toolchain.txt
-          cargo --version | tee -a toolchain.txt
-          python --version | tee -a toolchain.txt
-
       - name: Install maturin
         run: |
           python -m pip install --upgrade pip
           python -m pip install maturin
 
-      # Mirror the official Windows build step from build-wheels.yml, but force
-      # release debug info on so the linker emits chia_rs.pdb next to the DLL.
-      - name: Build wheel with debug info
+      - name: Download official wheel from PyPI and extract .pyd
+        shell: bash
+        run: |
+          mkdir -p official
+          python -m pip download "chia_rs==${PYPI_VER}" --no-deps --only-binary=:all: --dest official
+          python - <<'PY'
+          import glob, zipfile, os
+          with zipfile.ZipFile(glob.glob("official/*.whl")[0]) as z:
+              for n in z.namelist():
+                  if n.endswith(".pyd"):
+                      open(os.path.join("official", os.path.basename(n)), "wb").write(z.read(n))
+                      print("official pyd:", n)
+          PY
+
+      # Build EXACTLY like the official wheel (no extra debug info) to see whether
+      # this runner's toolchain reproduces the shipped .text byte-for-byte.
+      - name: Build wheel (no debug info, like the official build)
         env:
           CC: "clang"
           CFLAGS: "-D__BLST_PORTABLE__"
-          CARGO_PROFILE_RELEASE_DEBUG: "2"
         run: |
           maturin build -i python --release -m wheel/Cargo.toml
 
-      - name: Collect artifacts
+      - name: Compare .text to official
         shell: bash
         run: |
-          mkdir -p symbols
-          cp toolchain.txt symbols/ || true
-          cp Cargo.lock symbols/ 2>/dev/null || true
-          # PDB + DLL land in target/release; the wheel lands in target/wheels
-          cp target/release/chia_rs.pdb symbols/ 2>/dev/null || true
-          cp target/release/chia_rs.dll symbols/ 2>/dev/null || true
-          cp target/wheels/*.whl symbols/ 2>/dev/null || true
-          # Also extract the renamed .pyd from the wheel (same binary as the DLL,
-          # matching what ships to users) so offsets line up with the crash report.
           python - <<'PY'
-          import glob, zipfile, os
-          os.makedirs("symbols", exist_ok=True)
+          import glob, zipfile, os, struct, hashlib
+
+          def parse_pe(d):
+              e = struct.unpack_from("<I", d, 0x3C)[0]
+              nsec = struct.unpack_from("<H", d, e + 6)[0]
+              szopt = struct.unpack_from("<H", d, e + 20)[0]
+              secoff = e + 24 + szopt
+              for i in range(nsec):
+                  b = secoff + i * 40
+                  name = d[b:b+8].rstrip(b"\0").decode("latin1")
+                  vaddr = struct.unpack_from("<I", d, b + 12)[0]
+                  rsize = struct.unpack_from("<I", d, b + 16)[0]
+                  rptr = struct.unpack_from("<I", d, b + 20)[0]
+                  if name == ".text":
+                      return d[rptr:rptr+rsize], vaddr
+              raise SystemExit("no .text")
+
+          off = glob.glob("official/*.pyd")[0]
+          ours = None
           for w in glob.glob("target/wheels/*.whl"):
               with zipfile.ZipFile(w) as z:
                   for n in z.namelist():
                       if n.endswith(".pyd"):
-                          data = z.read(n)
-                          out = os.path.join("symbols", os.path.basename(n))
-                          with open(out, "wb") as f:
-                              f.write(data)
-                          print("extracted", out)
+                          ours = z.read(n)
+          ot, ova = parse_pe(open(off, "rb").read())
+          rt, rva = parse_pe(ours)
+          fault = int(os.environ["FAULT_OFFSET"], 16)
+          print("official .text VA %#x size %d sha %s" % (ova, len(ot), hashlib.sha256(ot).hexdigest()[:16]))
+          print("ours     .text VA %#x size %d sha %s" % (rva, len(rt), hashlib.sha256(rt).hexdigest()[:16]))
+          if ot == rt and ova == rva:
+              print("RESULT: no-debug build reproduces official .text EXACTLY.")
+              print("=> Any mismatch in the symbol job is caused purely by the debug flag; use debuginfo=1.")
+          else:
+              n = min(len(ot), len(rt))
+              fd = next((i for i in range(n) if ot[i] != rt[i]), n)
+              print("RESULT: no-debug build does NOT match official .text.")
+              print("  first diff at RVA %#x (fault RVA %#x)" % (ova + fd, fault))
+              print("  => toolchain drift (clang/linker). first-diff vs fault tells us if the fault region is still intact.")
           PY
-          echo "==== symbols/ ===="
-          ls -l symbols
-
-      - name: Try to symbolize fault offset
-        continue-on-error: true
-        shell: bash
-        run: |
-          OFF="${FAULT_OFFSET}"
-          echo "Fault offset (RVA): $OFF"
-          # llvm-symbolizer ships with the LLVM/Clang that is preinstalled on
-          # windows-latest (the build already uses clang). It can read PE + PDB.
-          SYM="$(command -v llvm-symbolizer || true)"
-          if [ -z "$SYM" ] && [ -x "/c/Program Files/LLVM/bin/llvm-symbolizer.exe" ]; then
-            SYM="/c/Program Files/LLVM/bin/llvm-symbolizer.exe"
-          fi
-          if [ -z "$SYM" ]; then
-            echo "llvm-symbolizer not found; download the 'debug-symbols' artifact"
-            echo "and run:  llvm-symbolizer --obj=chia_rs.<...>.pyd $OFF"
-            exit 0
-          fi
-          echo "Using: $SYM"
-          PYD="$(ls symbols/*.pyd 2>/dev/null | head -n1)"
-          echo "==== symbolize against .pyd ($PYD) ===="
-          "$SYM" --obj="$PYD" --demangle --functions=linkage --inlines "$OFF" || true
-          echo "==== symbolize against chia_rs.dll ===="
-          "$SYM" --obj=symbols/chia_rs.dll --demangle --functions=linkage --inlines "$OFF" || true
-
-      - name: Upload debug symbols
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-symbols-${{ env.GIT_REF }}-py${{ env.PY_VER }}
-          path: ./symbols/
-          if-no-files-found: error
