@@ -1,0 +1,153 @@
+name: Debug symbols (Windows)
+
+# Manually-triggered (or push-triggered) helper to rebuild a given tag/ref on a
+# Windows runner WITH debug info, so we get a .pdb to symbolize a crash (e.g. a
+# WER "BEX64" fault offset) in the chia_rs native extension.
+#
+# Enabling debug info (CARGO_PROFILE_RELEASE_DEBUG=2) does not change codegen /
+# optimizations, it only makes the linker also emit a .pdb. For the fault
+# offset to map to the correct function, the rebuild must match the original
+# build's code layout -- keep the same features/flags AND the same rustc.
+#
+# The repo pins the compiler via rust-toolchain.toml (channel = "1.92.0" at the
+# 0.45.1 tag). rustup honors that file when cargo/maturin run in the repo, so
+# the original wheel was built with 1.92.0 regardless of the "@stable" in
+# build-wheels.yml. `rust_toolchain` defaults to 1.92.0 to match.
+#
+# NOTE: workflow_dispatch's "Run workflow" button only appears once this file is
+# on the default branch. The `push` trigger below lets it run from a throwaway
+# branch without merging to main -- just push the branch and it runs with the
+# defaults. Use workflow_dispatch (once on default branch) to override inputs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Tag/branch/SHA to build"
+        required: true
+        default: "0.45.1"
+      python_version:
+        description: "CPython version (determines cpXYZ tag)"
+        required: true
+        default: "3.12"
+      rust_toolchain:
+        description: "Rust toolchain (must match rust-toolchain.toml for exact offsets)"
+        required: true
+        default: "1.92.0"
+      fault_offset:
+        description: "WER fault offset (P7) to symbolize, hex"
+        required: true
+        default: "0x703697"
+  push:
+    branches:
+      - "debug/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-symbols:
+    name: Build with PDB
+    runs-on: windows-latest
+    env:
+      GIT_REF: ${{ github.event.inputs.git_ref || '0.45.1' }}
+      PY_VER: ${{ github.event.inputs.python_version || '3.12' }}
+      RUST_TC: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
+      FAULT_OFFSET: ${{ github.event.inputs.fault_offset || '0x703697' }}
+
+    steps:
+      - name: Checkout ${{ github.event.inputs.git_ref || '0.45.1' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref || '0.45.1' }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ github.event.inputs.python_version || '3.12' }}
+
+      - name: Set up Rust (${{ github.event.inputs.rust_toolchain || '1.92.0' }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ github.event.inputs.rust_toolchain || '1.92.0' }}
+
+      - name: Record toolchain versions
+        shell: bash
+        run: |
+          rustc --version | tee toolchain.txt
+          cargo --version | tee -a toolchain.txt
+          python --version | tee -a toolchain.txt
+
+      - name: Install maturin
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install maturin
+
+      # Mirror the official Windows build step from build-wheels.yml, but force
+      # release debug info on so the linker emits chia_rs.pdb next to the DLL.
+      - name: Build wheel with debug info
+        env:
+          CC: "clang"
+          CFLAGS: "-D__BLST_PORTABLE__"
+          CARGO_PROFILE_RELEASE_DEBUG: "2"
+        run: |
+          maturin build -i python --release -m wheel/Cargo.toml
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p symbols
+          cp toolchain.txt symbols/ || true
+          cp Cargo.lock symbols/ 2>/dev/null || true
+          # PDB + DLL land in target/release; the wheel lands in target/wheels
+          cp target/release/chia_rs.pdb symbols/ 2>/dev/null || true
+          cp target/release/chia_rs.dll symbols/ 2>/dev/null || true
+          cp target/wheels/*.whl symbols/ 2>/dev/null || true
+          # Also extract the renamed .pyd from the wheel (same binary as the DLL,
+          # matching what ships to users) so offsets line up with the crash report.
+          python - <<'PY'
+          import glob, zipfile, os
+          os.makedirs("symbols", exist_ok=True)
+          for w in glob.glob("target/wheels/*.whl"):
+              with zipfile.ZipFile(w) as z:
+                  for n in z.namelist():
+                      if n.endswith(".pyd"):
+                          data = z.read(n)
+                          out = os.path.join("symbols", os.path.basename(n))
+                          with open(out, "wb") as f:
+                              f.write(data)
+                          print("extracted", out)
+          PY
+          echo "==== symbols/ ===="
+          ls -l symbols
+
+      - name: Try to symbolize fault offset
+        continue-on-error: true
+        shell: bash
+        run: |
+          OFF="${FAULT_OFFSET}"
+          echo "Fault offset (RVA): $OFF"
+          # llvm-symbolizer ships with the LLVM/Clang that is preinstalled on
+          # windows-latest (the build already uses clang). It can read PE + PDB.
+          SYM="$(command -v llvm-symbolizer || true)"
+          if [ -z "$SYM" ] && [ -x "/c/Program Files/LLVM/bin/llvm-symbolizer.exe" ]; then
+            SYM="/c/Program Files/LLVM/bin/llvm-symbolizer.exe"
+          fi
+          if [ -z "$SYM" ]; then
+            echo "llvm-symbolizer not found; download the 'debug-symbols' artifact"
+            echo "and run:  llvm-symbolizer --obj=chia_rs.<...>.pyd $OFF"
+            exit 0
+          fi
+          echo "Using: $SYM"
+          PYD="$(ls symbols/*.pyd 2>/dev/null | head -n1)"
+          echo "==== symbolize against .pyd ($PYD) ===="
+          "$SYM" --obj="$PYD" --demangle --functions=linkage --inlines "$OFF" || true
+          echo "==== symbolize against chia_rs.dll ===="
+          "$SYM" --obj=symbols/chia_rs.dll --demangle --functions=linkage --inlines "$OFF" || true
+
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols-${{ env.GIT_REF }}-py${{ env.PY_VER }}
+          path: ./symbols/
+          if-no-files-found: error
