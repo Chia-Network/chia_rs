@@ -13,8 +13,11 @@ use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_ba
 /// Deserialize a generator on the consensus path: the blob must be a
 /// magic-prefixed serde_2026 encoding, with no fallback to classic/backrefs
 /// parsing — with `INTERNED_GENERATOR` active, serde_2026 is the only legal
-/// generator encoding. `max_blob_size` and `strict = false` have the same
-/// meaning (and rationale) as in [`node_from_bytes_auto`].
+/// generator encoding. `max_blob_size` bounds the wire size accepted (derive
+/// it via [`max_canonical_blob_size`]); it doubles as the per-atom cap, since
+/// atoms appear as literals in the canonical serialization, so an atom of
+/// length `L` forces a canonical blob of at least `L` bytes. `strict = false`
+/// has the same meaning (and rationale) as in [`node_from_bytes_auto`].
 pub fn node_from_bytes_2026(
     allocator: &mut Allocator,
     bytes: &[u8],
@@ -66,7 +69,7 @@ pub const SERDE_2026_COMPRESSION_LEVEL: u32 = 0;
 /// because `U_a <= U_p + 1` forces cheap 1-byte pushes to exist whenever the
 /// headers grow. The bound is tight (slack reaches 0 at atom length 2^20)
 /// and requires atom lengths < 2^27 — enforced by the per-atom cap in
-/// [`node_from_bytes_auto`] whenever the derived blob cap is below 2^27
+/// [`node_from_bytes_2026`] whenever the derived blob cap is below 2^27
 /// (at mainnet constants it is ~0.9 MB). The wire blob adds the
 /// [`SERDE_2026_MAGIC_PREFIX`] on top of the body.
 ///
@@ -98,25 +101,26 @@ pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
 /// dispatches to [`deserialize_2026`]. Otherwise falls back to
 /// [`node_from_bytes_backrefs`] (which also accepts plain classic).
 ///
-/// `max_blob_size` bounds the total wire size accepted; blobs above it are
-/// rejected before any parsing. Callers should derive it from the network's
-/// cost constants via [`max_canonical_blob_size`] (any headroom multiplier
-/// on top — e.g. to tolerate non-minimal encodings, which `strict = false`
-/// otherwise admits — is caller policy).
+/// This is a *policy-free reader*: it enforces no consensus rules and must
+/// never be a consensus entry point — consensus validation uses
+/// [`node_from_bytes_2026`], which enforces the cost-derived size cap from
+/// [`max_canonical_blob_size`]. Being policy-free is what lets readers of
+/// historical blocks accept every blob the chain ever accepted, whatever
+/// the rules were when it was created. The classic branch is byte-for-byte
+/// [`node_from_bytes_backrefs`], same as before this dispatcher existed.
 ///
-/// The same value doubles as the per-atom cap: atoms appear as literals in
-/// the canonical serialization, so an atom of length `L` forces a canonical
-/// blob of at least `L` bytes — no atom of a cost-valid generator can ever
-/// exceed the blob bound. There is deliberately no separate atom-length
-/// constant.
-pub fn node_from_bytes_auto(
-    allocator: &mut Allocator,
-    bytes: &[u8],
-    max_blob_size: usize,
-) -> Result<NodePtr> {
-    if bytes.len() > max_blob_size {
-        return Err(EvalErr::SerializationError);
-    }
+/// Parsing itself is safe on *untrusted* input: time and memory are linear
+/// in the blob length for all three formats (every node costs at least one
+/// input byte; shared subtrees are shared, not copied). clvmr's
+/// deserializer still wants a per-atom bound; `bytes.len()` is the natural
+/// policy-free choice, since an atom of length `L` appears as a literal in
+/// the blob and therefore forces `bytes.len() >= L`.
+///
+/// The caveat is downstream: backrefs and serde_2026 can encode trees whose
+/// *expansion* is exponential in the blob size, so anything traversing the
+/// result of an untrusted parse must be DAG-aware (e.g.
+/// [`clvm_utils::tree_hash_cached`] rather than the naive `tree_hash`).
+pub fn node_from_bytes_auto(allocator: &mut Allocator, bytes: &[u8]) -> Result<NodePtr> {
     if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
         // strict = false is deliberate. Post-HF2 the generator's identity and
         // cost come from the interned tree, not its byte encoding, so overlong
@@ -125,7 +129,7 @@ pub fn node_from_bytes_auto(
         // rejecting valid transactions over a self-inflicted encoding choice;
         // a node is free to re-encode strictly before relaying, and to
         // disconnect a peer that habitually sends non-minimal encodings.
-        deserialize_2026(allocator, bytes, max_blob_size, false)
+        deserialize_2026(allocator, bytes, bytes.len(), false)
     } else {
         node_from_bytes_backrefs(allocator, bytes)
     }
@@ -277,8 +281,7 @@ mod tests {
 
         for blob in [classic, backrefs, serde2026] {
             let mut b = Allocator::new();
-            let parsed =
-                node_from_bytes_auto(&mut b, &blob, mainnet_cap()).expect("node_from_bytes_auto");
+            let parsed = node_from_bytes_auto(&mut b, &blob).expect("node_from_bytes_auto");
             assert_eq!(node_to_bytes(&b, parsed).unwrap(), expected);
         }
     }
@@ -301,31 +304,46 @@ mod tests {
 
     #[test]
     fn test_blob_size_cap() {
+        // The cost-derived size cap is a consensus concern, enforced only by
+        // node_from_bytes_2026. The trusted-reader node_from_bytes_auto has
+        // no cap in either branch.
         let mut a = Allocator::new();
         let node = sample_tree(&mut a);
         let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
 
-        // One byte over the cap: rejected before any parsing.
+        // Consensus entry point, one byte over the cap: rejected before any
+        // parsing.
         let mut b = Allocator::new();
         assert!(matches!(
-            node_from_bytes_auto(&mut b, &blob, blob.len() - 1),
+            node_from_bytes_2026(&mut b, &blob, blob.len() - 1),
             Err(EvalErr::SerializationError)
         ));
 
         // At exactly the cap: parses.
         let mut b = Allocator::new();
-        let parsed = node_from_bytes_auto(&mut b, &blob, blob.len()).unwrap();
+        let parsed = node_from_bytes_2026(&mut b, &blob, blob.len()).unwrap();
         assert_eq!(
             node_to_bytes(&b, parsed).unwrap(),
             node_to_bytes(&a, node).unwrap()
         );
 
-        // The size gate applies to non-serde_2026 formats too.
+        // The trusted reader parses the same serde_2026 blob with no cap to
+        // trip over...
+        let mut b = Allocator::new();
+        let parsed = node_from_bytes_auto(&mut b, &blob).unwrap();
+        assert_eq!(
+            node_to_bytes(&b, parsed).unwrap(),
+            node_to_bytes(&a, node).unwrap()
+        );
+
+        // ...and classic blobs likewise load uncapped: historical blocks
+        // must load regardless of current constants.
         let classic = node_to_bytes(&a, node).unwrap();
         let mut b = Allocator::new();
-        assert!(matches!(
-            node_from_bytes_auto(&mut b, &classic, classic.len() - 1),
-            Err(EvalErr::SerializationError)
-        ));
+        let parsed = node_from_bytes_auto(&mut b, &classic).unwrap();
+        assert_eq!(
+            node_to_bytes(&b, parsed).unwrap(),
+            node_to_bytes(&a, node).unwrap()
+        );
     }
 }

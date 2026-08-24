@@ -3,7 +3,7 @@ use libfuzzer_sys::{arbitrary, fuzz_target};
 
 use chia_consensus::generator_cost::interned_vbytes;
 use chia_consensus::serde_2026::{
-    SERDE_2026_COMPRESSION_LEVEL, max_canonical_blob_size, node_from_bytes_auto,
+    SERDE_2026_COMPRESSION_LEVEL, max_canonical_blob_size, node_from_bytes_2026,
 };
 use clvm_fuzzing::make_tree;
 use clvmr::Allocator;
@@ -62,10 +62,10 @@ fuzz_target!(|data: &[u8]| {
     // deterministic and DAG-aware, so equal trees produce equal blobs.
     // (Comparing classic encodings instead would blow up on trees whose
     // classic expansion is huge — compressing those is the format's point.)
-    // Passing `bound` as the size cap doubles as a check that the gate
-    // admits every canonical blob.
+    // Passing `bound` as the size cap doubles as a check that the consensus
+    // gate (node_from_bytes_2026) admits every canonical blob.
     let mut b = Allocator::new();
-    let parsed = node_from_bytes_auto(&mut b, &blob, bound).expect("node_from_bytes_auto");
+    let parsed = node_from_bytes_2026(&mut b, &blob, bound).expect("node_from_bytes_2026");
     let blob2 = serialize_2026(&b, parsed, SERDE_2026_COMPRESSION_LEVEL).expect("serialize_2026");
     assert_eq!(blob, blob2, "round-trip mismatch");
 });

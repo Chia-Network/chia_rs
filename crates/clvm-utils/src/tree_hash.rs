@@ -404,6 +404,106 @@ fn test_tree_hash_from_bytes() {
     assert_eq!(hash1, hash3);
 }
 
+#[test]
+fn test_tree_hash_cached_deep_dag() {
+    // A doubling chain: node_{i+1} = (node_i . node_i), 64 deep. Both
+    // backrefs and serde_2026 encode this in O(depth) bytes, but its
+    // expansion has 2^64 leaves — the uncached tree_hash would never
+    // terminate. tree_hash_cached must complete in O(unique nodes) and
+    // agree with the iteratively computed hash. This is the property the
+    // wheel's tree_hash_auto relies on when hashing unvalidated blobs
+    // (e.g. the post-HF2 generator_root check on blocks off the wire).
+    use clvmr::serde::{deserialize_2026, node_from_bytes_backrefs, node_to_bytes_backrefs};
+
+    const DEPTH: usize = 64;
+
+    let mut a = Allocator::new();
+    let mut node = a.new_atom(&[1, 2, 3]).unwrap();
+    let mut expected = tree_hash_atom(&[1, 2, 3]);
+    for _ in 0..DEPTH {
+        node = a.new_pair(node, node).unwrap();
+        expected = tree_hash_pair(expected, expected);
+    }
+
+    let mut cache = TreeCache::default();
+    assert_eq!(tree_hash_cached(&a, node, &mut cache), expected);
+
+    // Round-trip through both compact serializations and re-hash.
+    let backrefs = node_to_bytes_backrefs(&a, node).expect("node_to_bytes_backrefs");
+    let serde_2026 = clvmr::serde::serialize_2026(&a, node, 0).expect("serialize_2026");
+    for (label, blob, is_2026) in [
+        ("backrefs", &backrefs, false),
+        ("serde_2026", &serde_2026, true),
+    ] {
+        assert!(blob.len() < 1024, "{label}: expected a compact encoding");
+        let mut b = Allocator::new();
+        let parsed = if is_2026 {
+            deserialize_2026(&mut b, blob, blob.len(), false).expect("deserialize_2026")
+        } else {
+            node_from_bytes_backrefs(&mut b, blob).expect("node_from_bytes_backrefs")
+        };
+        let mut cache = TreeCache::default();
+        assert_eq!(
+            tree_hash_cached(&b, parsed, &mut cache),
+            expected,
+            "{label}: hash mismatch"
+        );
+    }
+}
+
+#[test]
+fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
+    use clvmr::serde::{
+        SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
+        node_to_bytes_backrefs, serialize_2026,
+    };
+
+    // 1 MiB matches the legacy clvm_rs default; this test isn't consensus.
+    const TEST_MAX_ATOM_LEN: usize = 1 << 20;
+    let auto = |a: &mut Allocator, bytes: &[u8]| {
+        if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
+            deserialize_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
+        } else {
+            node_from_bytes_backrefs(a, bytes)
+        }
+    };
+
+    let mut a = Allocator::new();
+    let atom1 = a.new_atom(&[1, 2, 3]).unwrap();
+    let atom2 = a.new_atom(&[4, 5, 6]).unwrap();
+    let node1 = a.new_pair(atom1, atom2).unwrap();
+    let node2 = a.new_pair(atom2, atom1).unwrap();
+    let node1 = a.new_pair(node1, node1).unwrap();
+    let node2 = a.new_pair(node2, node2).unwrap();
+    let root = a.new_pair(node1, node2).unwrap();
+
+    let canonical_hash = tree_hash(&a, root);
+
+    let standard = node_to_bytes(&a, root).unwrap();
+    let backrefs = node_to_bytes_backrefs(&a, root).unwrap();
+    let serde_2026 = serialize_2026(&a, root, 0).unwrap();
+
+    // tree_hash_from_bytes only handles standard + backrefs
+    assert_eq!(tree_hash_from_bytes(&standard).unwrap(), canonical_hash);
+    assert_eq!(tree_hash_from_bytes(&backrefs).unwrap(), canonical_hash);
+    // tree_hash_from_bytes rejects serde_2026
+    assert!(tree_hash_from_bytes(&serde_2026).is_err());
+
+    // sniff-and-dispatch + tree_hash works for ALL formats (mirrors
+    // chia_rs::serde_2026::node_from_bytes_auto, which clvm-utils can't
+    // depend on without pulling in chia-consensus).
+    for (label, bytes) in [
+        ("standard", &standard),
+        ("backrefs", &backrefs),
+        ("serde_2026", &serde_2026),
+    ] {
+        let mut a2 = Allocator::new();
+        let node = auto(&mut a2, bytes).unwrap_or_else(|e| panic!("{label}: auto failed: {e}"));
+        let hash = tree_hash(&a2, node);
+        assert_eq!(hash, canonical_hash, "{label}: tree_hash mismatch");
+    }
+}
+
 #[cfg(test)]
 use rstest::rstest;
 
