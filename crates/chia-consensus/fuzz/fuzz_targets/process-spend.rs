@@ -34,6 +34,8 @@ fuzz_target!(|args: (ArbitraryClvmTree, [u8; 32], [u8; 32], u64)| {
             *flags,
             &mut cost_left,
             0, // clvm_cost
+            0, // atom_count
+            0, // pair_count
             &TEST_CONSTANTS,
         );
     }

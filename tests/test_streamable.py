@@ -49,6 +49,8 @@ def test_hash_spend() -> None:
         False,
         0,
         0,
+        0,
+        0,
         b"",
     )
     a2 = SpendConditions(
@@ -73,6 +75,8 @@ def test_hash_spend() -> None:
         False,
         0,
         0,
+        0,
+        0,
         b"",
     )
     b = hash(a1)
@@ -82,11 +86,11 @@ def test_hash_spend() -> None:
     assert b != c
 
     assert a1.get_hash() == bytes32.fromhex(
-        "7a3a98594db01c5130c442a03ada9d0b9d81a23f9a7d93a740c4de38f9d04b68"
+        "9e36c56649fffeda5bbd89f0ef6b095bcccae47629cc6df99d15f496cc749fd6"
     )
     assert (
         str(a1.get_hash())
-        == "7a3a98594db01c5130c442a03ada9d0b9d81a23f9a7d93a740c4de38f9d04b68"
+        == "9e36c56649fffeda5bbd89f0ef6b095bcccae47629cc6df99d15f496cc749fd6"
     )
 
 
@@ -159,6 +163,8 @@ def test_json_spend() -> None:
         False,
         0,
         0,
+        0,
+        0,
         b"",
     )
 
@@ -184,6 +190,8 @@ def test_json_spend() -> None:
         "flags": 0,
         "execution_cost": 0,
         "condition_cost": 0,
+        "atom_count": 0,
+        "pair_count": 0,
         "fingerprint": "",
     }
 
@@ -212,6 +220,8 @@ def test_from_json_spend() -> None:
         False,
         0,
         0,
+        0,
+        0,
         b"\xaa\xbb",
     )
 
@@ -238,6 +248,8 @@ def test_from_json_spend() -> None:
             "flags": 0,
             "execution_cost": 0,
             "condition_cost": 0,
+            "atom_count": 0,
+            "pair_count": 0,
             "fingerprint": "0xaabb",
         }
     )
@@ -268,6 +280,8 @@ def test_from_json_spend_set_optional() -> None:
         False,
         0,
         0,
+        0,
+        0,
         b"",
     )
 
@@ -294,6 +308,8 @@ def test_from_json_spend_set_optional() -> None:
             "flags": 0,
             "execution_cost": 0,
             "condition_cost": 0,
+            "atom_count": 0,
+            "pair_count": 0,
             "fingerprint": "",
         }
     )
@@ -556,6 +572,8 @@ def test_copy_spend() -> None:
         [],
         [],
         False,
+        0,
+        0,
         0,
         0,
         b"",

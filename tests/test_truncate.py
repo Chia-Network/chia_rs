@@ -45,6 +45,8 @@ def make_spend_conditions(
         False,
         0,
         0,
+        0,
+        0,
         b"",
     )
 

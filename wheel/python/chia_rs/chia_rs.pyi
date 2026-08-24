@@ -408,6 +408,8 @@ class SpendConditions:
     flags: int
     execution_cost: int
     condition_cost: int
+    atom_count: int
+    pair_count: int
     fingerprint: bytes
     def __new__(
         cls,
@@ -432,6 +434,8 @@ class SpendConditions:
         flags: int,
         execution_cost: int,
         condition_cost: int,
+        atom_count: int,
+        pair_count: int,
         fingerprint: bytes
     ) -> Self: ...
     def __hash__(self) -> int: ...
@@ -472,6 +476,8 @@ class SpendConditions:
         flags: Union[ int, _Unspec] = _Unspec(),
         execution_cost: Union[ int, _Unspec] = _Unspec(),
         condition_cost: Union[ int, _Unspec] = _Unspec(),
+        atom_count: Union[ int, _Unspec] = _Unspec(),
+        pair_count: Union[ int, _Unspec] = _Unspec(),
         fingerprint: Union[ bytes, _Unspec] = _Unspec()) -> SpendConditions: ...
     def truncate(self, field: str, length: int) -> None: ...
 

@@ -81,7 +81,11 @@ fn run_puzzle(
 
     let dialect = ChiaDialect::new(ClvmFlags::empty());
     let max_cost = 11_000_000_000;
+    let atoms_before = a.atom_count();
+    let pairs_before = a.pair_count();
     let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puzzle, solution, max_cost)?;
+    let atom_count = (a.atom_count() - atoms_before) as u64;
+    let pair_count = (a.pair_count() - pairs_before) as u64;
 
     let mut ret = SpendBundleConditions {
         removal_amount: amount as u128,
@@ -104,7 +108,9 @@ fn run_puzzle(
         amount,
         a.new_atom(&puzzle_hash)?,
         coin_id,
-        0,
+        clvm_cost,
+        atom_count,
+        pair_count,
     );
 
     let mut visitor = MempoolVisitor::new_spend(&mut spend);
