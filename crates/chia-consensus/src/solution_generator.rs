@@ -459,8 +459,7 @@ mod tests {
 
     #[test]
     fn test_solution_generator_2026() {
-        use crate::consensus_constants::TEST_CONSTANTS;
-        use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_auto};
+        use crate::serde_2026::node_from_bytes_auto;
         use clvmr::serde::SERDE_2026_MAGIC_PREFIX;
 
         let coin1: Coin = Coin::new(
@@ -481,14 +480,10 @@ mod tests {
         let result = solution_generator_2026(spends).expect("solution_generator_2026");
         assert!(result.starts_with(&SERDE_2026_MAGIC_PREFIX));
 
-        // Round-trip through the consensus auto-deserializer and confirm the
-        // tree is identical to the one behind the classic encoding.
-        let cap = max_canonical_blob_size(
-            TEST_CONSTANTS.max_block_cost_clvm,
-            TEST_CONSTANTS.cost_per_byte,
-        );
+        // Round-trip through the auto-deserializer and confirm the tree is
+        // identical to the one behind the classic encoding.
         let mut a = Allocator::new();
-        let node = node_from_bytes_auto(&mut a, &result, cap).expect("node_from_bytes_auto");
+        let node = node_from_bytes_auto(&mut a, &result).expect("node_from_bytes_auto");
         let classic = solution_generator(spends).expect("solution_generator");
         assert_eq!(node_to_bytes(&a, node).expect("node_to_bytes"), classic);
     }

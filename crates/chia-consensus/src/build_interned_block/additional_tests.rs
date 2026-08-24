@@ -6,6 +6,7 @@ use crate::run_block_generator::run_block_generator2;
 use crate::solution_generator::calculate_generator_length;
 use crate::spendbundle_conditions::run_spendbundle;
 use chia_traits::Streamable;
+use clvmr::serde::node_to_bytes_backrefs;
 use std::fs;
 use std::path::Path;
 
@@ -328,4 +329,139 @@ fn test_byte_cost_tracking() {
         upper_bound >= exact_cost,
         "upper bound ({upper_bound}) should be >= exact cost ({exact_cost})"
     );
+}
+
+/// Deterministic set of bundles with shared puzzle bytes, used by the
+/// serde_2026 emission tests below.
+fn serde_2026_test_bundles() -> Vec<SpendBundle> {
+    (0..5)
+        .map(|i| {
+            SpendBundle::new(
+                vec![make_test_coin_spend([i + 1; 32], 1000 + i as u64)],
+                Signature::default(),
+            )
+        })
+        .collect()
+}
+
+fn build_block(bundles: &[SpendBundle]) -> (Vec<u8>, Signature, u64) {
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+    for bundle in bundles {
+        let exec_cost = clvm_execution_cost(bundle);
+        let (added, _) = builder
+            .add_spend_bundles([bundle], exec_cost)
+            .expect("add_spend_bundles");
+        assert!(added, "bundle should fit");
+    }
+    builder.finalize().expect("finalize")
+}
+
+/// Independently constructs the classic-serialization reference generator
+/// for the same spend list the builder would build, without going through
+/// `InternedBlockBuilder` (which only ever emits serde_2026). Used to compare
+/// serde_2026 output against a classic-format generator for the same
+/// bundles, run under classic (pre-HF2) consensus rules.
+fn build_classic_reference(bundles: &[SpendBundle]) -> (Vec<u8>, Signature) {
+    let mut a = Allocator::new();
+    let mut spend_list = a.nil();
+    let mut signature = Signature::default();
+    for bundle in bundles {
+        for spend in &bundle.coin_spends {
+            let solution = node_from_bytes_backrefs(&mut a, spend.solution.as_ref()).unwrap();
+            let item = a.new_pair(solution, NodePtr::NIL).unwrap();
+            let amount = a.new_number(spend.coin.amount.into()).unwrap();
+            let item = a.new_pair(amount, item).unwrap();
+            let puzzle = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref()).unwrap();
+            let item = a.new_pair(puzzle, item).unwrap();
+            let parent_id = a.new_atom(&spend.coin.parent_coin_info).unwrap();
+            let item = a.new_pair(parent_id, item).unwrap();
+            spend_list = a.new_pair(item, spend_list).unwrap();
+        }
+        signature.aggregate(&bundle.aggregated_signature);
+    }
+    let inner = a.new_pair(spend_list, a.nil()).unwrap();
+    let root = a.new_pair(a.one(), inner).unwrap();
+    (node_to_bytes_backrefs(&a, root).unwrap(), signature)
+}
+
+fn normalized_spends(
+    generator: &[u8],
+    signature: &Signature,
+    flags: ConsensusFlags,
+) -> (Vec<crate::owned_conditions::OwnedSpendConditions>, u64) {
+    let (a, conds) = run_block_generator2::<&[u8], _>(
+        generator,
+        [],
+        TEST_CONSTANTS.max_block_cost_clvm,
+        MEMPOOL_MODE | flags,
+        signature,
+        None,
+        &TEST_CONSTANTS,
+    )
+    .expect("run_block_generator2");
+    let cost = conds.cost;
+    let mut conds = crate::owned_conditions::OwnedSpendBundleConditions::from(&a, conds);
+    conds.spends.sort_by_key(|s| s.coin_id);
+    for s in &mut conds.spends {
+        s.create_coin.sort();
+        s.flags = 0;
+        s.fingerprint = chia_protocol::Bytes::default();
+    }
+    (conds.spends, cost)
+}
+
+/// The builder's serde_2026 output round-trips through the
+/// INTERNED_GENERATOR consensus path and yields the same spends/conditions
+/// as an independently-built classic generator for the same bundles, run
+/// under classic rules.
+#[test]
+fn test_serde_2026_round_trip() {
+    use clvmr::serde::SERDE_2026_MAGIC_PREFIX;
+
+    let bundles = serde_2026_test_bundles();
+
+    let (generator_2026, sig_2026, cost_2026) = build_block(&bundles);
+    assert!(
+        generator_2026.starts_with(&SERDE_2026_MAGIC_PREFIX),
+        "builder output must always carry the serde_2026 magic prefix"
+    );
+
+    let (generator_classic, sig_classic) = build_classic_reference(&bundles);
+    assert!(!generator_classic.starts_with(&SERDE_2026_MAGIC_PREFIX));
+
+    let (spends_2026, run_cost_2026) = normalized_spends(
+        &generator_2026,
+        &sig_2026,
+        ConsensusFlags::INTERNED_GENERATOR,
+    );
+    assert_eq!(
+        run_cost_2026, cost_2026,
+        "finalize() cost must match the INTERNED_GENERATOR consensus path"
+    );
+
+    // classic reference generator, run under classic (pre-HF2) rules
+    let (spends_classic, _) =
+        normalized_spends(&generator_classic, &sig_classic, ConsensusFlags::empty());
+
+    assert_eq!(spends_2026, spends_classic);
+}
+
+/// tree_hash_auto semantics: hashing the serde_2026 generator agrees with the
+/// tree hash of the classic serialization of the same tree.
+#[test]
+fn test_serde_2026_tree_hash_auto_agrees() {
+    use crate::serde_2026::node_from_bytes_auto;
+    use clvm_utils::{tree_hash, tree_hash_from_bytes};
+
+    let bundles = serde_2026_test_bundles();
+    let (generator_2026, _, _) = build_block(&bundles);
+    let (generator_classic, _) = build_classic_reference(&bundles);
+
+    // same dispatch as the wheel's tree_hash_auto()
+    let mut a = Allocator::new();
+    let node = node_from_bytes_auto(&mut a, &generator_2026).expect("node_from_bytes_auto");
+    let hash_2026 = tree_hash(&a, node);
+
+    let hash_classic = tree_hash_from_bytes(&generator_classic).expect("tree_hash_from_bytes");
+    assert_eq!(hash_2026, hash_classic);
 }
