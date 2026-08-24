@@ -75,6 +75,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::serde_2026::node_from_bytes_auto;
 use chia_consensus::validation_error::ValidationErr;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -83,9 +84,7 @@ use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program;
 use clvmr::serde::is_canonical_serialization;
-use clvmr::serde::{
-    SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_from_bytes_backrefs, node_to_bytes,
-};
+use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_from_bytes, node_to_bytes};
 
 use chia_bls::{
     BlsCache, DerivableKey, G1Element, GTElement, PublicKey, SecretKey, Signature,
@@ -132,6 +131,22 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
     )
+}
+
+#[pyfunction]
+pub fn tree_hash_auto<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
+    let slice = py_to_slice::<'a>(blob);
+    let mut a = clvmr::Allocator::new();
+    let node = node_from_bytes_auto(&mut a, slice).map_err(map_pyerr)?;
+    // This is called on unvalidated blobs (e.g. the generator_root check on
+    // blocks straight off the wire), so the hash must be DAG-aware: backrefs
+    // and serde_2026 can encode trees whose expansion is exponential in the
+    // blob size. tree_hash_cached memoizes shared pairs, keeping the work
+    // linear in the number of unique nodes (which parsing already bounds by
+    // the blob length). The uncached tree_hash would walk the full expansion.
+    let mut cache = clvm_utils::TreeCache::default();
+    let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
+    ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
 
 #[pyfunction]
@@ -196,8 +211,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     let program = py_to_slice::<'a>(program);
     let args = py_to_slice::<'a>(args);
 
-    let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
-    let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
+    let program = node_from_bytes_auto(&mut allocator, program).map_err(map_pyerr)?;
+    let args = node_from_bytes_auto(&mut allocator, args).map_err(map_pyerr)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
@@ -250,8 +265,7 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         py_to_slice::<'a>(buf)
     });
 
-    let generator =
-        node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
+    let generator = node_from_bytes_auto(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
@@ -816,6 +830,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         chia_consensus::conditions::ELIGIBLE_FOR_FF,
     )?;
     m.add_class::<OwnedSpendConditions>()?;
+    m.add(
+        "SERDE_2026_MAGIC_PREFIX",
+        PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
+    )?;
 
     // pot functions
     m.add_function(wrap_pyfunction!(py_calculate_sp_interval_iters, m)?)?;
@@ -880,10 +898,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("COST_CONDITIONS", ConsensusFlags::COST_CONDITIONS.bits())?;
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
     m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
-    m.add(
-        "SERDE_2026_MAGIC_PREFIX",
-        PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
-    )?;
 
     // flags from clvm_rs, affecting execution
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
@@ -1035,6 +1049,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash_auto, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
