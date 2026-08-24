@@ -8,7 +8,7 @@ use std::time::Instant;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_tools::iterate_blocks;
+use chia_tools::{THREAD_STACK_SIZE, iterate_blocks};
 
 /// Analyze the blocks in a chia blockchain database
 #[derive(Parser, Debug)]
@@ -50,6 +50,7 @@ fn main() {
 
     let pool = blocking_threadpool::Builder::new()
         .num_threads(num_cores)
+        .thread_stack_size(THREAD_STACK_SIZE)
         .queue_len(num_cores * 2)
         .build();
 
