@@ -61,11 +61,13 @@ pub(crate) fn print_conditions(a: &Allocator, c: &SpendBundleConditions, a2: &Al
     for s in spends {
         writeln!(
             ret,
-            "- coin id: {} ph: {} exe-cost: {} cond-cost: {}",
+            "- coin id: {} ph: {} exe-cost: {} cond-cost: {} atoms: {} pairs: {}",
             hex::encode(*s.coin_id),
             hex::encode(a.atom(s.puzzle_hash)),
             s.execution_cost,
             s.condition_cost,
+            s.atom_count,
+            s.pair_count,
         )
         .unwrap();
 
@@ -447,6 +449,8 @@ fn run_generator(#[case] name: &str) {
                             for ms in &mut conditions.spends {
                                 if ms.coin_id == s.coin_id {
                                     ms.execution_cost = s.execution_cost;
+                                    ms.atom_count = s.atom_count;
+                                    ms.pair_count = s.pair_count;
                                     break;
                                 }
                             }
