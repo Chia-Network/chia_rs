@@ -6,7 +6,7 @@
 use chia_puzzles::SINGLETON_TOP_LAYER_V1_1_HASH;
 use clap::Parser;
 
-use chia_tools::{iterate_blocks, visit_spends};
+use chia_tools::{THREAD_STACK_SIZE, iterate_blocks, visit_spends};
 use chia_traits::streamable::Streamable;
 
 use chia_bls::G2Element;
@@ -69,6 +69,7 @@ fn main() {
         .unwrap_or_else(|| available_parallelism().unwrap().into());
     let pool = blocking_threadpool::Builder::new()
         .num_threads(num_cores)
+        .thread_stack_size(THREAD_STACK_SIZE)
         .queue_len(num_cores + 5)
         .build();
 

@@ -8,6 +8,20 @@ use pyo3::{PyResult, Python, pyclass, pymethods};
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// Stack size for worker threads created by chia_rs.
+const THREAD_STACK_SIZE: usize = 8 * 1024 * 1024;
+
+fn thread_pool() -> &'static rayon::ThreadPool {
+    static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .stack_size(THREAD_STACK_SIZE)
+            .build()
+            .expect("failed to create rayon thread pool")
+    })
+}
 
 pub enum DeltaReaderNode {
     Internal { left: Hash, right: Hash },
@@ -126,16 +140,18 @@ impl DeltaReader {
         hashes: &HashSet<Hash>,
     ) -> Result<Vec<(Hash, NodeHashToIndex)>, Error> {
         let mut grouped_results = Vec::new();
-        grouped_results.par_extend(jobs.into_par_iter().map(
-            |(hash, path)| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
-                Ok((
-                    *hash,
-                    crate::collect_and_return_from_merkle_blob(path, hashes, |key| {
-                        self.nodes.contains_key(key)
-                    })?,
-                ))
-            },
-        ));
+        thread_pool().install(|| {
+            grouped_results.par_extend(jobs.into_par_iter().map(
+                |(hash, path)| -> Result<(Hash, (NodeHashToDeltaReaderNode, NodeHashToIndex)), Error> {
+                    Ok((
+                        *hash,
+                        crate::collect_and_return_from_merkle_blob(path, hashes, |key| {
+                            self.nodes.contains_key(key)
+                        })?,
+                    ))
+                },
+            ));
+        });
 
         let mut results: Vec<(Hash, NodeHashToIndex)> = Vec::new();
         let mut seen_hashes: HashSet<Hash> = HashSet::new();
@@ -160,12 +176,14 @@ impl DeltaReader {
     ) -> Result<(), Error> {
         let mut results = Vec::new();
 
-        results.par_extend(jobs.into_par_iter().map(
-            |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
-                let vector = crate::zstd_decode_path(path)?;
-                crate::get_internal_terminal(&vector, indexes)
-            },
-        ));
+        thread_pool().install(|| {
+            results.par_extend(jobs.into_par_iter().map(
+                |(path, indexes)| -> Result<HashMap<Hash, (TreeIndex, DeltaReaderNode)>, Error> {
+                    let vector = crate::zstd_decode_path(path)?;
+                    crate::get_internal_terminal(&vector, indexes)
+                },
+            ));
+        });
 
         for result in results {
             // admittedly just spitting out the first error here

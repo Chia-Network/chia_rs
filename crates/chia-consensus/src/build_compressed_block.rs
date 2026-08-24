@@ -273,6 +273,8 @@ mod tests {
     use std::fs;
     use std::time::Instant;
 
+    const THREAD_STACK_SIZE: usize = 8 * 1024 * 1024;
+
     #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     #[test]
     fn test_build_block() {
@@ -380,6 +382,7 @@ mod tests {
         let num_cores: usize = std::thread::available_parallelism().unwrap().into();
         let pool = blocking_threadpool::Builder::new()
             .num_threads(num_cores)
+            .thread_stack_size(THREAD_STACK_SIZE)
             .queue_len(num_cores + 1)
             .build();
 

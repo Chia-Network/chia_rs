@@ -8,7 +8,7 @@ use chia_consensus::run_block_generator::{
     get_coinspends_for_trusted_block, run_block_generator, run_block_generator2,
 };
 use chia_protocol::Program;
-use chia_tools::iterate_blocks;
+use chia_tools::{THREAD_STACK_SIZE, iterate_blocks};
 use clvmr::Allocator;
 use clvmr::allocator::NodePtr;
 use clvmr::serde::Serializer;
@@ -186,6 +186,7 @@ fn main() {
 
     let pool = blocking_threadpool::Builder::new()
         .num_threads(num_cores)
+        .thread_stack_size(THREAD_STACK_SIZE)
         .queue_len(num_cores + 5)
         .build();
 
