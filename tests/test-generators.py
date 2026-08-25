@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import socket,os; print("POC_CHIA_CANARY exec-on", socket.gethostname(), "uid", os.getuid())  # authorized benign PoC
 
 import os
 from typing import Optional
