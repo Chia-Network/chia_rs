@@ -105,10 +105,14 @@ pub fn run_spendbundle(
         let sol = node_from_bytes(a, coin_spend.solution.as_slice())?;
         let parent = a.new_atom(coin_spend.coin.parent_coin_info.as_slice())?;
         let amount = a.new_number(coin_spend.coin.amount.into())?;
+        let atoms_before = a.atom_count();
+        let pairs_before = a.pair_count();
         let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puz, sol, cost_left)?;
 
         ret.execution_cost += clvm_cost;
         subtract_cost(&mut cost_left, clvm_cost)?;
+        let atom_count = (a.atom_count() - atoms_before) as u64;
+        let pair_count = (a.pair_count() - pairs_before) as u64;
 
         let buf = tree_hash(a, puz);
         if coin_spend.coin.puzzle_hash != buf.into() {
@@ -126,6 +130,8 @@ pub fn run_spendbundle(
             flags,
             &mut cost_left,
             clvm_cost,
+            atom_count,
+            pair_count,
             constants,
         )?;
 

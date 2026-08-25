@@ -68,6 +68,8 @@ fuzz_target!(|data: &[u8]| {
             flags: 0_u32,
             execution_cost: 0_u64,
             condition_cost: 0_u64,
+            atom_count: 0_u64,
+            pair_count: 0_u64,
             fingerprint: [0; 32],
         };
         let mut visitor = MempoolVisitor::new_spend(&mut coin_spend);

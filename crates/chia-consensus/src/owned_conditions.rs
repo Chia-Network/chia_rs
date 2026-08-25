@@ -45,6 +45,9 @@ pub struct OwnedSpendConditions {
     /// per-spend execution and condition cost
     pub execution_cost: u64,
     pub condition_cost: u64,
+    /// the number of atoms and pairs allocated by running this puzzle
+    pub atom_count: u64,
+    pub pair_count: u64,
     pub fingerprint: Bytes,
 }
 
@@ -135,6 +138,8 @@ impl OwnedSpendConditions {
             flags: spend.flags,
             execution_cost: spend.execution_cost,
             condition_cost: spend.condition_cost,
+            atom_count: spend.atom_count,
+            pair_count: spend.pair_count,
             fingerprint,
         }
     }

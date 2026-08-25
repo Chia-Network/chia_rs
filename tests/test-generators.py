@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from sys import stdout, exit
 import glob
+import re
 
 failed = 0
 
@@ -74,6 +75,13 @@ def validate_except_cost(output1: str, output2: str) -> None:
             idx = columns.index("exe-cost:")
             columns[idx + 1] = "0"
             l2 = " ".join(columns)
+        if l1.startswith("- coin id:") and l2.startswith("- coin id:"):
+            # generator v1 reports zero per-spend allocation counts
+            if " atoms: 0 pairs: 0" in l1:
+                if " atoms: " not in l2:
+                    l2 = l2 + " atoms: 0 pairs: 0"
+                else:
+                    l2 = re.sub(r" atoms: \d+ pairs: \d+", " atoms: 0 pairs: 0", l2)
         if l1 != l2:
             print(l1)
             print(l2)

@@ -180,6 +180,8 @@ mod tests {
                 .expect("test should pass"),
             Arc::new(Bytes32::try_from(coin.coin_id()).expect("test should pass")),
             0,
+            0,
+            0,
         );
 
         let spend = OwnedSpendConditions::from(&a, spend);

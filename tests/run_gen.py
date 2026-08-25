@@ -166,7 +166,7 @@ def print_spend_bundle_conditions(result: SpendBundleConditions) -> str:
         ret += f"AGG_SIG_UNSAFE pk: {a[0]} msg: {a[1].hex()}\n"
     ret += "SPENDS:\n"
     for s in sorted(result.spends, key=lambda x: x.coin_id):
-        ret += f"- coin id: {s.coin_id.hex()} ph: {s.puzzle_hash.hex()} exe-cost: {s.execution_cost} cond-cost: {s.condition_cost}\n"
+        ret += f"- coin id: {s.coin_id.hex()} ph: {s.puzzle_hash.hex()} exe-cost: {s.execution_cost} cond-cost: {s.condition_cost} atoms: {s.atom_count} pairs: {s.pair_count}\n"
 
         if s.height_relative is not None:
             ret += f"  ASSERT_HEIGHT_RELATIVE {s.height_relative}\n"

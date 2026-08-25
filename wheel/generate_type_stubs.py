@@ -660,6 +660,8 @@ def quality_string_from_proof(plot_id: bytes32, size: int, plot_strength: int, p
             "flags: int",
             "execution_cost: int",
             "condition_cost: int",
+            "atom_count: int",
+            "pair_count: int",
             "fingerprint: bytes",
         ],
     )
