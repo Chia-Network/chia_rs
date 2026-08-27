@@ -329,8 +329,8 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
 // comes in as raw bytes, parsed unconditionally as serde_2026 (no
 // magic-prefix sniffing — the caller already knows the format, e.g. from
 // block.version). serde_2026 only concerns the generator's own encoding, so
-// the outputs (individual puzzle reveal / solution) stay Program-typed
-// serialized CLVM, same as the "2" variant.
+// everything else (including the find_coin/outputs shape) matches the "2"
+// variant exactly.
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
 pub fn get_puzzle_and_solution_for_coin_2026<'a>(
@@ -338,9 +338,7 @@ pub fn get_puzzle_and_solution_for_coin_2026<'a>(
     generator: PyBuffer<u8>,
     block_refs: &Bound<'a, PySequence>,
     max_cost: Cost,
-    find_coin_parent: Bytes32,
-    find_coin_amount: u64,
-    find_coin_puzzle_hash: Bytes32,
+    find_coin: &Coin,
     flags: ConsensusFlags,
 ) -> PyResult<(Program, Program)> {
     let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
@@ -356,7 +354,6 @@ pub fn get_puzzle_and_solution_for_coin_2026<'a>(
     let generator =
         node_from_bytes_2026_trusted(&mut allocator, generator_slice).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
-    let find_coin = Coin::new(find_coin_parent, find_coin_puzzle_hash, find_coin_amount);
 
     run_generator_and_find_coin(
         py,
@@ -364,7 +361,7 @@ pub fn get_puzzle_and_solution_for_coin_2026<'a>(
         generator,
         args,
         max_cost,
-        &find_coin,
+        find_coin,
         flags,
     )
 }
