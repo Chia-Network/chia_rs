@@ -3,10 +3,9 @@ use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::ConsensusFlags;
 use crate::flags::MEMPOOL_MODE;
 use crate::run_block_generator::run_block_generator2;
-use crate::solution_generator::calculate_generator_length;
+use crate::solution_generator::{calculate_generator_length, solution_generator_backrefs};
 use crate::spendbundle_conditions::run_spendbundle;
 use chia_traits::Streamable;
-use clvmr::serde::node_to_bytes_backrefs;
 use std::fs;
 use std::path::Path;
 
@@ -142,14 +141,7 @@ fn test_finalize_cost_matches_consensus() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
 
     // Five spends: same puzzle bytes (shared subtree) with different coins.
-    let bundles: Vec<SpendBundle> = (0..5)
-        .map(|i| {
-            SpendBundle::new(
-                vec![make_test_coin_spend([i + 1; 32], 1000 + i as u64)],
-                Signature::default(),
-            )
-        })
-        .collect();
+    let bundles = serde_2026_test_bundles();
 
     for bundle in &bundles {
         let exec_cost = clvm_execution_cost(bundle);
@@ -360,28 +352,25 @@ fn build_block(bundles: &[SpendBundle]) -> (Vec<u8>, Signature, u64) {
 /// for the same spend list the builder would build, without going through
 /// `InternedBlockBuilder` (which only ever emits serde_2026). Used to compare
 /// serde_2026 output against a classic-format generator for the same
-/// bundles, run under classic (pre-HF2) consensus rules.
+/// bundles, run under classic (pre-HF2) consensus rules. Delegates the
+/// actual encoding to `solution_generator_backrefs`, the same-crate function
+/// the mempool uses for this — the tuple conversion and signature
+/// aggregation here are the only test-specific bits.
 fn build_classic_reference(bundles: &[SpendBundle]) -> (Vec<u8>, Signature) {
-    let mut a = Allocator::new();
-    let mut spend_list = a.nil();
     let mut signature = Signature::default();
+    let mut spends = Vec::new();
     for bundle in bundles {
         for spend in &bundle.coin_spends {
-            let solution = node_from_bytes_backrefs(&mut a, spend.solution.as_ref()).unwrap();
-            let item = a.new_pair(solution, NodePtr::NIL).unwrap();
-            let amount = a.new_number(spend.coin.amount.into()).unwrap();
-            let item = a.new_pair(amount, item).unwrap();
-            let puzzle = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref()).unwrap();
-            let item = a.new_pair(puzzle, item).unwrap();
-            let parent_id = a.new_atom(&spend.coin.parent_coin_info).unwrap();
-            let item = a.new_pair(parent_id, item).unwrap();
-            spend_list = a.new_pair(item, spend_list).unwrap();
+            spends.push((
+                spend.coin,
+                spend.puzzle_reveal.as_ref(),
+                spend.solution.as_ref(),
+            ));
         }
         signature.aggregate(&bundle.aggregated_signature);
     }
-    let inner = a.new_pair(spend_list, a.nil()).unwrap();
-    let root = a.new_pair(a.one(), inner).unwrap();
-    (node_to_bytes_backrefs(&a, root).unwrap(), signature)
+    let generator = solution_generator_backrefs(spends).expect("solution_generator_backrefs");
+    (generator, signature)
 }
 
 fn normalized_spends(
@@ -446,20 +435,21 @@ fn test_serde_2026_round_trip() {
     assert_eq!(spends_2026, spends_classic);
 }
 
-/// tree_hash_auto semantics: hashing the serde_2026 generator agrees with the
+/// tree_hash_2026 semantics: hashing the serde_2026 generator agrees with the
 /// tree hash of the classic serialization of the same tree.
 #[test]
-fn test_serde_2026_tree_hash_auto_agrees() {
-    use crate::serde_2026::node_from_bytes_auto;
+fn test_serde_2026_tree_hash_2026_agrees() {
+    use crate::serde_2026::node_from_bytes_2026_trusted;
     use clvm_utils::{tree_hash, tree_hash_from_bytes};
 
     let bundles = serde_2026_test_bundles();
     let (generator_2026, _, _) = build_block(&bundles);
     let (generator_classic, _) = build_classic_reference(&bundles);
 
-    // same dispatch as the wheel's tree_hash_auto()
+    // same parse as the wheel's tree_hash_2026()
     let mut a = Allocator::new();
-    let node = node_from_bytes_auto(&mut a, &generator_2026).expect("node_from_bytes_auto");
+    let node = node_from_bytes_2026_trusted(&mut a, &generator_2026)
+        .expect("node_from_bytes_2026_trusted");
     let hash_2026 = tree_hash(&a, node);
 
     let hash_classic = tree_hash_from_bytes(&generator_classic).expect("tree_hash_from_bytes");

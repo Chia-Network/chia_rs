@@ -411,7 +411,7 @@ fn test_tree_hash_cached_deep_dag() {
     // expansion has 2^64 leaves — the uncached tree_hash would never
     // terminate. tree_hash_cached must complete in O(unique nodes) and
     // agree with the iteratively computed hash. This is the property the
-    // wheel's tree_hash_auto relies on when hashing unvalidated blobs
+    // wheel's tree_hash_2026 relies on when hashing a serde_2026 generator
     // (e.g. the post-HF2 generator_root check on blocks off the wire).
     use clvmr::serde::{deserialize_2026, node_from_bytes_backrefs, node_to_bytes_backrefs};
 
@@ -452,7 +452,7 @@ fn test_tree_hash_cached_deep_dag() {
 }
 
 #[test]
-fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
+fn test_format_dispatched_tree_hash_agrees_for_all_formats() {
     use clvmr::serde::{
         SERDE_2026_MAGIC_PREFIX, deserialize_2026, node_from_bytes_backrefs, node_to_bytes,
         node_to_bytes_backrefs, serialize_2026,
@@ -460,7 +460,11 @@ fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
 
     // 1 MiB matches the legacy clvm_rs default; this test isn't consensus.
     const TEST_MAX_ATOM_LEN: usize = 1 << 20;
-    let auto = |a: &mut Allocator, bytes: &[u8]| {
+    // Local stand-in for "pick the right explicit parser for this blob's
+    // format" (clvm-utils can't depend on chia-consensus to call the real
+    // per-format functions chia_rs exposes there); this test only cares that
+    // tree_hash/tree_hash_cached agree across whichever format was used.
+    let parse_by_format = |a: &mut Allocator, bytes: &[u8]| {
         if bytes.starts_with(&SERDE_2026_MAGIC_PREFIX) {
             deserialize_2026(a, bytes, TEST_MAX_ATOM_LEN, false)
         } else {
@@ -489,16 +493,16 @@ fn test_tree_hash_auto_matches_tree_hash_for_all_formats() {
     // tree_hash_from_bytes rejects serde_2026
     assert!(tree_hash_from_bytes(&serde_2026).is_err());
 
-    // sniff-and-dispatch + tree_hash works for ALL formats (mirrors
-    // chia_rs::serde_2026::node_from_bytes_auto, which clvm-utils can't
-    // depend on without pulling in chia-consensus).
+    // format-dispatched parse + tree_hash agrees with the canonical hash for
+    // every wire format.
     for (label, bytes) in [
         ("standard", &standard),
         ("backrefs", &backrefs),
         ("serde_2026", &serde_2026),
     ] {
         let mut a2 = Allocator::new();
-        let node = auto(&mut a2, bytes).unwrap_or_else(|e| panic!("{label}: auto failed: {e}"));
+        let node = parse_by_format(&mut a2, bytes)
+            .unwrap_or_else(|e| panic!("{label}: parse failed: {e}"));
         let hash = tree_hash(&a2, node);
         assert_eq!(hash, canonical_hash, "{label}: tree_hash mismatch");
     }

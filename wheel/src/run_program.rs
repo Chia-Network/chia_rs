@@ -1,13 +1,14 @@
 use crate::error::map_pyerr;
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::flags::ConsensusFlags;
-use chia_consensus::serde_2026::node_from_bytes_auto;
 use chia_protocol::LazyNode;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Response;
 use clvmr::run_program::run_program;
-use clvmr::serde::{serialized_length_from_bytes, serialized_length_from_bytes_trusted};
+use clvmr::serde::{
+    node_from_bytes_backrefs, serialized_length_from_bytes, serialized_length_from_bytes_trusted,
+};
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use std::rc::Rc;
@@ -43,11 +44,8 @@ pub fn run_chia_program(
     let flags = flags.to_clvm_flags();
 
     let reduction = (|| -> PyResult<Response> {
-        // Non-consensus path: the blob is already in memory, so cap the frame
-        // (and per-atom preallocation) at its physical size. Consensus caps
-        // are enforced at run_block_generator time.
-        let program = node_from_bytes_auto(&mut allocator, program).map_err(map_pyerr)?;
-        let args = node_from_bytes_auto(&mut allocator, args).map_err(map_pyerr)?;
+        let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
+        let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
         let dialect = ChiaDialect::new(flags);
 
         Ok(py.detach(|| run_program(&mut allocator, &dialect, program, args, max_cost)))
