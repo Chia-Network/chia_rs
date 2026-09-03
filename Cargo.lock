@@ -476,8 +476,7 @@ dependencies = [
 [[package]]
 name = "chia-pos2"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1339d81e9d02b42597f314786fea68bd4b5e91b082d5de36eeee5372e6d61b80"
+source = "git+https://github.com/Chia-Network/pos2-chip.git?rev=17bd31ce6229a15f178e1326ec8fbbbf5334ca62#17bd31ce6229a15f178e1326ec8fbbbf5334ca62"
 dependencies = [
  "cc",
  "serde",
