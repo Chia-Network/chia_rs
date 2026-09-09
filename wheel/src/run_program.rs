@@ -62,6 +62,9 @@ pub fn run_chia_program(
 /// `timeout` is in seconds. The timeout is checked roughly every 1_000_000 cost
 /// units; programs that finish before the first check are unaffected. If the
 /// elapsed time exceeds `timeout`, raises `ValueError("timeout")`.
+///
+/// Values larger than [`Duration::MAX`] (including `+inf`) are clamped to the
+/// maximum. Negative values and NaN raise `ValueError`.
 #[allow(clippy::borrow_deref_ref)]
 #[pyfunction]
 pub fn run_chia_program_with_timeout(
@@ -72,12 +75,14 @@ pub fn run_chia_program_with_timeout(
     flags: ConsensusFlags,
     timeout: f64,
 ) -> PyResult<(Cost, LazyNode)> {
-    if !(timeout.is_finite() && timeout >= 0.0) {
+    let timeout = if timeout.is_nan() || timeout < 0.0 {
         return Err(PyValueError::new_err(
-            "timeout must be a non-negative finite number of seconds",
+            "timeout must be a non-negative number of seconds",
         ));
-    }
-    let timeout = Duration::from_secs_f64(timeout);
+    } else {
+        // Overflow and +inf are clamped to Duration::MAX instead of panicking.
+        Duration::try_from_secs_f64(timeout).unwrap_or(Duration::MAX)
+    };
     let mut allocator = make_allocator(flags);
     let flags = flags.to_clvm_flags();
 

@@ -106,5 +106,14 @@ def test_run_chia_program_with_timeout_rejects_invalid_timeout() -> None:
         run_chia_program_with_timeout(prg, args, 1000, 0, -1.0)
     with pytest.raises(ValueError, match="timeout must be"):
         run_chia_program_with_timeout(prg, args, 1000, 0, float("nan"))
-    with pytest.raises(ValueError, match="timeout must be"):
-        run_chia_program_with_timeout(prg, args, 1000, 0, float("inf"))
+
+
+def test_run_chia_program_with_timeout_clamps_large_timeout() -> None:
+    # Values too large for Duration (including +inf) are clamped to Duration::MAX
+    # and must not panic.
+    prg = bytes(Program.to((1, 42)))
+    args = bytes.fromhex("80")
+    for timeout in (float("inf"), 1e308, 2**100):
+        cost, result = run_chia_program_with_timeout(prg, args, 1000, 0, timeout)
+        assert cost == 20
+        assert result.atom == bytes([42])
