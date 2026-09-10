@@ -18,7 +18,6 @@ use chia_protocol::{Bytes, SpendBundle};
 use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
-use clvmr::error::EvalErr;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::{run_program, run_program_with_timeout};
 use clvmr::serde::intern_tree_limited;
@@ -121,7 +120,7 @@ pub fn run_spendbundle(
         let Reduction(clvm_cost, conditions) = match (timeout, start) {
             (Some(limit), Some(start)) => {
                 if start.elapsed() >= limit {
-                    return Err(ValidationErr::Eval(EvalErr::Timeout));
+                    return Err(ValidationErr::Err(ErrorCode::Timeout));
                 }
                 let remaining = limit.saturating_sub(start.elapsed());
                 run_program_with_timeout(a, &dialect, puz, sol, cost_left, remaining)?

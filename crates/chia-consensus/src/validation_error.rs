@@ -163,8 +163,12 @@ pub enum ErrorCode {
     InvalidMessageMode,
     InvalidCoinId,
     MessageNotSentOrReceived,
+    /// Non-canonical CLVM serialization (e.g. overlong atom length prefixes).
+    /// Matches `Err.INVALID_TRANSACTIONS_GENERATOR_ENCODING` in chia-blockchain.
+    InvalidTransactionsGeneratorEncoding,
     ComplexGeneratorReceived,
     TooManySpends,
+    Timeout,
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -179,6 +183,10 @@ impl From<EvalErr> for ValidationErr {
     fn from(e: EvalErr) -> Self {
         match e {
             EvalErr::CostExceeded => ValidationErr::Err(ErrorCode::CostExceeded),
+            EvalErr::Timeout => ValidationErr::Err(ErrorCode::Timeout),
+            EvalErr::NonCanonicalSerialization => {
+                ValidationErr::Err(ErrorCode::InvalidTransactionsGeneratorEncoding)
+            }
             other => ValidationErr::Eval(other),
         }
     }
@@ -202,9 +210,6 @@ impl From<std::io::Error> for ValidationErr {
 #[cfg(feature = "py-bindings")]
 impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
-        if matches!(&err, ValidationErr::Eval(EvalErr::Timeout)) {
-            return pyo3::exceptions::PyValueError::new_err("timeout");
-        }
         let code = err.error_code();
         pyo3::exceptions::PyValueError::new_err((
             "ValidationError",
@@ -381,8 +386,11 @@ impl From<ErrorCode> for u32 {
             ErrorCode::InvalidMessageMode => 145,
             ErrorCode::InvalidCoinId => 146,
             ErrorCode::MessageNotSentOrReceived => 147,
-            ErrorCode::ComplexGeneratorReceived => 148,
+            ErrorCode::InvalidTransactionsGeneratorEncoding => 148,
             ErrorCode::TooManySpends => 149,
+            // 150 = INVALID_HEADER_MMR_ROOT, 151 = INVALID_BLOCK_VERSION (chia-blockchain)
+            ErrorCode::Timeout => 152,
+            ErrorCode::ComplexGeneratorReceived => 153,
         }
     }
 }

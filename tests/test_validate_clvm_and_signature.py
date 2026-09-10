@@ -111,7 +111,7 @@ def test_validate_clvm_and_signature_timeout() -> None:
     spend = CoinSpend(test_coin, puzzle, Program.from_bytes(expensive_solution))
     spend_bundle = SpendBundle([spend], AugSchemeMPL.aggregate([]))
 
-    with pytest.raises(ValueError, match="timeout"):
+    with pytest.raises(ValueError) as excinfo:
         validate_clvm_and_signature(
             spend_bundle,
             DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
@@ -119,3 +119,5 @@ def test_validate_clvm_and_signature_timeout() -> None:
             MEMPOOL_MODE,
             0.0,
         )
+    error_code = excinfo.value.args[1]
+    assert error_code == 152  # 152 = Timeout

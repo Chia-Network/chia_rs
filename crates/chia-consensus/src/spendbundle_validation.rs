@@ -8,7 +8,6 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
-use clvmr::error::EvalErr;
 use std::time::{Duration, Instant};
 
 // type definition makes clippy happy
@@ -38,7 +37,7 @@ pub fn validate_clvm_and_signature(
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
 
     if start.elapsed() >= timeout {
-        return Err(ValidationErr::Eval(EvalErr::Timeout));
+        return Err(ValidationErr::Err(ErrorCode::Timeout));
     }
 
     // Collect all pairs in a single vector to avoid multiple iterations
@@ -554,7 +553,6 @@ ff843B9ACA00\
     fn test_validate_timeout() {
         use clvm_utils::tree_hash;
         use clvmr::allocator::Allocator;
-        use clvmr::error::EvalErr;
         use clvmr::serde::node_from_bytes;
 
         let mut a = Allocator::new();
@@ -583,6 +581,34 @@ ff843B9ACA00\
             MEMPOOL_MODE,
             Duration::from_nanos(1),
         );
-        assert_eq!(result, Err(ValidationErr::Eval(EvalErr::Timeout)));
+        assert_eq!(result, Err(ValidationErr::Err(ErrorCode::Timeout)));
+    }
+
+    #[test]
+    fn test_validate_non_canonical_clvm() {
+        // atom 1 with a non-canonical length prefix (0xc0 0x01 0x01 instead of 0x01)
+        let puzzle = hex!("c00101");
+        let spend = mk_spend(&puzzle, &hex!("80"));
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE,
+            Duration::MAX,
+        );
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(
+                ErrorCode::InvalidTransactionsGeneratorEncoding
+            ))
+        );
+        assert_eq!(
+            u32::from(ErrorCode::InvalidTransactionsGeneratorEncoding),
+            148
+        );
     }
 }
