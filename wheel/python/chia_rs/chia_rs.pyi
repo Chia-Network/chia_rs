@@ -151,9 +151,6 @@ NO_UNKNOWN_OPS: int = ...
 def run_chia_program(
     program: bytes, args: bytes, max_cost: int, flags: int
 ) -> tuple[int, LazyNode]: ...
-def run_chia_program_with_timeout(
-    program: bytes, args: bytes, max_cost: int, flags: int, timeout: float
-) -> tuple[int, LazyNode]: ...
 
 @final
 class LazyNode:

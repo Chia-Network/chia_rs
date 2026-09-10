@@ -71,9 +71,7 @@ use std::path::Path;
 use std::iter::zip;
 use std::time::{Duration, Instant};
 
-use crate::run_program::{
-    run_chia_program, run_chia_program_with_timeout, serialized_length, serialized_length_trusted,
-};
+use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
@@ -899,7 +897,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // flags from clvm_rs, affecting execution
     m.add_function(wrap_pyfunction!(run_chia_program, m)?)?;
-    m.add_function(wrap_pyfunction!(run_chia_program_with_timeout, m)?)?;
     m.add("CANONICAL_INTS", ConsensusFlags::CANONICAL_INTS.bits())?;
     m.add("NO_UNKNOWN_OPS", ConsensusFlags::NO_UNKNOWN_OPS.bits())?;
     m.add("LIMIT_HEAP", ConsensusFlags::LIMIT_HEAP.bits())?;
