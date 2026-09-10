@@ -19,6 +19,7 @@ fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
         11_000_000_000,
         ConsensusFlags::empty(),
         &TEST_CONSTANTS,
+        None,
     )
     .expect("run_spendbundle")
     .0;
@@ -127,6 +128,7 @@ fn clvm_execution_cost(bundle: &SpendBundle) -> u64 {
         11_000_000_000,
         ConsensusFlags::empty(),
         &TEST_CONSTANTS,
+        None,
     )
     .expect("run_spendbundle")
     .0;

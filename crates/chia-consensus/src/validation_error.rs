@@ -202,6 +202,9 @@ impl From<std::io::Error> for ValidationErr {
 #[cfg(feature = "py-bindings")]
 impl From<ValidationErr> for PyErr {
     fn from(err: ValidationErr) -> PyErr {
+        if matches!(&err, ValidationErr::Eval(EvalErr::Timeout)) {
+            return pyo3::exceptions::PyValueError::new_err("timeout");
+        }
         let code = err.error_code();
         pyo3::exceptions::PyValueError::new_err((
             "ValidationError",
