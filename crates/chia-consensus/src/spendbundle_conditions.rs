@@ -19,9 +19,10 @@ use clvm_utils::tree_hash;
 use clvmr::allocator::Allocator;
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
-use clvmr::run_program::run_program;
+use clvmr::run_program::{run_program, run_program_with_timeout};
 use clvmr::serde::intern_tree_limited;
 use clvmr::serde::node_from_bytes;
+use std::time::{Duration, Instant};
 
 const QUOTE_BYTES: usize = 2;
 
@@ -39,6 +40,7 @@ pub fn get_conditions_from_spendbundle(
         max_cost,
         flags | MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
         constants,
+        None,
     )?
     .0)
 }
@@ -74,8 +76,13 @@ fn calculate_base_cost(
     }
 }
 
-// returns the conditions for the spendbundle, along with the (public key,
-// message) pairs emitted by the spends (for validating the aggregate signature)
+/// Returns the conditions for the spendbundle, along with the (public key,
+/// message) pairs emitted by the spends (for validating the aggregate signature).
+///
+/// `timeout`, when set, is a wall-clock limit for the whole spend bundle. Each
+/// puzzle is run with the remaining time from a shared deadline. The timeout is
+/// checked roughly every 1_000_000 cost units; programs that finish before the
+/// first check are unaffected.
 #[allow(clippy::type_complexity)]
 pub fn run_spendbundle(
     a: &mut Allocator,
@@ -83,6 +90,7 @@ pub fn run_spendbundle(
     max_cost: u64,
     flags: ConsensusFlags,
     constants: &ConsensusConstants,
+    timeout: Option<Duration>,
 ) -> Result<(SpendBundleConditions, Vec<(PublicKey, Bytes)>), ValidationErr> {
     // below is an adapted version of the code from run_block_generators::run_block_generator2()
     // it assumes no block references are passed in
@@ -99,6 +107,8 @@ pub fn run_spendbundle(
         return Err(ValidationErr::Err(ErrorCode::TooManySpends));
     }
 
+    let start = timeout.map(|_| Instant::now());
+
     for coin_spend in &spend_bundle.coin_spends {
         // process the spend
         let puz = node_from_bytes(a, coin_spend.puzzle_reveal.as_slice())?;
@@ -107,7 +117,16 @@ pub fn run_spendbundle(
         let amount = a.new_number(coin_spend.coin.amount.into())?;
         let atoms_before = a.atom_count();
         let pairs_before = a.pair_count();
-        let Reduction(clvm_cost, conditions) = run_program(a, &dialect, puz, sol, cost_left)?;
+        let Reduction(clvm_cost, conditions) = match (timeout, start) {
+            (Some(limit), Some(start)) => {
+                if start.elapsed() >= limit {
+                    return Err(ValidationErr::Err(ErrorCode::Timeout));
+                }
+                let remaining = limit.saturating_sub(start.elapsed());
+                run_program_with_timeout(a, &dialect, puz, sol, cost_left, remaining)?
+            }
+            _ => run_program(a, &dialect, puz, sol, cost_left)?,
+        };
 
         ret.execution_cost += clvm_cost;
         subtract_cost(&mut cost_left, clvm_cost)?;
@@ -180,6 +199,7 @@ mod tests {
             11_000_000_000,
             flags,
             &TEST_CONSTANTS,
+            None,
         )
         .expect("run_spendbundle");
 
@@ -414,9 +434,15 @@ mod tests {
         let bundle = SpendBundle::new(vec![spend_a], Signature::default());
         let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
-        let (conds, _) =
-            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
-                .expect("run_spendbundle");
+        let (conds, _) = run_spendbundle(
+            &mut alloc,
+            &bundle,
+            11_000_000_000,
+            flags,
+            &TEST_CONSTANTS,
+            None,
+        )
+        .expect("run_spendbundle");
 
         assert_eq!(conds.spends.len(), 1);
         assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
@@ -442,9 +468,15 @@ mod tests {
         let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
         let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
-        let (conds, _) =
-            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
-                .expect("run_spendbundle");
+        let (conds, _) = run_spendbundle(
+            &mut alloc,
+            &bundle,
+            11_000_000_000,
+            flags,
+            &TEST_CONSTANTS,
+            None,
+        )
+        .expect("run_spendbundle");
 
         assert_eq!(conds.spends.len(), 2);
         assert_eq!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
@@ -476,9 +508,15 @@ mod tests {
         let bundle = SpendBundle::new(vec![spend_a, spend_b], Signature::default());
         let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let flags = MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE;
-        let (conds, _) =
-            run_spendbundle(&mut alloc, &bundle, 11_000_000_000, flags, &TEST_CONSTANTS)
-                .expect("run_spendbundle");
+        let (conds, _) = run_spendbundle(
+            &mut alloc,
+            &bundle,
+            11_000_000_000,
+            flags,
+            &TEST_CONSTANTS,
+            None,
+        )
+        .expect("run_spendbundle");
 
         assert_eq!(conds.spends.len(), 2);
         assert_eq!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
@@ -751,7 +789,7 @@ mod tests {
         let bundle = SpendBundle::new(coin_spends, Signature::default());
         let mut alloc = make_allocator(ConsensusFlags::LIMIT_HEAP);
         let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | extra_flags;
-        let result = run_spendbundle(&mut alloc, &bundle, u64::MAX, flags, &TEST_CONSTANTS);
+        let result = run_spendbundle(&mut alloc, &bundle, u64::MAX, flags, &TEST_CONSTANTS, None);
         match (expected_err, result) {
             (Some(err), Err(e)) => {
                 assert_eq!(e.error_code(), err);

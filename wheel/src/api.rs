@@ -69,7 +69,7 @@ use pyo3::wrap_pyfunction;
 use std::path::Path;
 
 use std::iter::zip;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::run_program::{run_chia_program, serialized_length, serialized_length_trusted};
 
@@ -466,6 +466,7 @@ fn fast_forward_singleton<'p>(
 
 #[pyfunction]
 #[pyo3(name = "validate_clvm_and_signature")]
+#[pyo3(signature = (new_spend, max_cost, constants, flags, timeout=f64::INFINITY))]
 #[allow(clippy::type_complexity)]
 pub fn py_validate_clvm_and_signature(
     py: Python<'_>,
@@ -473,10 +474,19 @@ pub fn py_validate_clvm_and_signature(
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: ConsensusFlags,
+    timeout: f64,
 ) -> PyResult<(OwnedSpendBundleConditions, Vec<([u8; 32], GTElement)>, f64)> {
+    let timeout = if timeout.is_nan() || timeout < 0.0 {
+        return Err(PyValueError::new_err(
+            "timeout must be a non-negative number of seconds",
+        ));
+    } else {
+        // Overflow and +inf are clamped to Duration::MAX instead of panicking.
+        Duration::try_from_secs_f64(timeout).unwrap_or(Duration::MAX)
+    };
     let start_time = Instant::now();
     let (owned_conditions, additions) =
-        py.detach(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags))?;
+        py.detach(|| validate_clvm_and_signature(new_spend, max_cost, constants, flags, timeout))?;
     let duration = start_time.elapsed();
     Ok((owned_conditions, additions, duration.as_secs_f64()))
 }

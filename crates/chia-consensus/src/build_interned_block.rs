@@ -330,6 +330,7 @@ mod tests {
                 11_000_000_000,
                 ConsensusFlags::empty(),
                 &TEST_CONSTANTS,
+                None,
             )
             .expect("run_spendbundle")
             .0;

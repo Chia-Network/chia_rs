@@ -797,9 +797,9 @@ dependencies = [
 
 [[package]]
 name = "clvm-fuzzing"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de29478366d9c96ef90eb2690d1faef52805f5586701f4e7d079fa60cba14d5c"
+checksum = "28dcbb0255f82d6967caac888710e670aafe93a20c9dbad4d74b64229b329a1f"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -862,9 +862,9 @@ dependencies = [
 
 [[package]]
 name = "clvmr"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a9d2342687e3210c4b7f8556966ee80e4106d451dd4d8b14b1e446412c640a4"
+checksum = "7e5ddf0ce9041ab659c17915bca362a2d1e9e78052809bf17975e07748df7ab2"
 dependencies = [
  "bitflags",
  "bitvec",

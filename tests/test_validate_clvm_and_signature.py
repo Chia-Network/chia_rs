@@ -49,6 +49,7 @@ def test_validate_clvm_and_signature() -> None:
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
         MEMPOOL_MODE,
+        60.0,
     )
 
     # Invalid message
@@ -63,6 +64,7 @@ def test_validate_clvm_and_signature() -> None:
             DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
             DEFAULT_CONSTANTS,
             MEMPOOL_MODE,
+            60.0,
         )
     error_code = excinfo.value.args[1]
     assert error_code == 7  # 7 = BadAggregateSignature
@@ -83,6 +85,39 @@ def test_validate_clvm_and_signature() -> None:
             DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
             DEFAULT_CONSTANTS,
             MEMPOOL_MODE,
+            60.0,
         )
     error_code = excinfo.value.args[1]
     assert error_code == 7  # 7 = BadAggregateSignature
+
+
+def test_validate_clvm_and_signature_timeout() -> None:
+    # Same ~25M-cost program used by clvmr's run_program_with_timeout tests.
+    expensive_puzzle = bytes.fromhex(
+        "ff02ffff01ff02ff02ffff04ff02ffff04ff05ffff04ff0bff8080808080"
+        "ffff04ffff01ff02ffff03ffff09ff0bff8080ffff01ff0101ffff01ff10"
+        "ff05ffff02ff02ffff04ff02ffff04ff05ffff04ffff11ff0bffff010180"
+        "ff80808080808080ff0180ff018080"
+    )
+    expensive_solution = bytes.fromhex("ff8213a9ff82271080")
+    puzzle = Program.from_bytes(expensive_puzzle)
+    test_coin = Coin(
+        bytes.fromhex(
+            "4444444444444444444444444444444444444444444444444444444444444444"
+        ),
+        puzzle.get_tree_hash(),
+        uint64(1),
+    )
+    spend = CoinSpend(test_coin, puzzle, Program.from_bytes(expensive_solution))
+    spend_bundle = SpendBundle([spend], AugSchemeMPL.aggregate([]))
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_clvm_and_signature(
+            spend_bundle,
+            DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
+            DEFAULT_CONSTANTS,
+            MEMPOOL_MODE,
+            0.0,
+        )
+    error_code = excinfo.value.args[1]
+    assert error_code == 152  # 152 = Timeout

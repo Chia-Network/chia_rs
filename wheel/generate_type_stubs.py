@@ -373,6 +373,7 @@ def validate_clvm_and_signature(
     max_cost: int,
     constants: ConsensusConstants,
     flags: int,
+    timeout: float = float("inf"),
 ) -> tuple[SpendBundleConditions, list[tuple[bytes32, GTElement]], float]: ...
 
 def get_conditions_from_spendbundle(

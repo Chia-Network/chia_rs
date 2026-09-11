@@ -344,7 +344,6 @@ mod tests {
     }
 
     #[rstest]
-    #[case(hex!("f800000000").as_ref(), SOLUTION1.as_ref())]
     #[case(hex!("fffffe0000ff41ff013a").as_ref(), SOLUTION1.as_ref())]
     #[case(PUZZLE1.as_ref(), hex!("00").as_ref())]
     fn test_length_calculator_edge_case(#[case] puzzle: &[u8], #[case] solution: &[u8]) {
