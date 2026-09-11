@@ -5,10 +5,12 @@ use chia_streamable_macro::streamable;
 #[cfg(feature = "py-bindings")]
 use pyo3::pymethods;
 
+const NUM_CHAIN_LINKS: usize = 16;
+
 #[streamable]
 pub struct PartialProof {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
-    fragments: [u64; 16],
+    fragments: [u64; NUM_CHAIN_LINKS],
 }
 
 impl PartialProof {
@@ -19,11 +21,9 @@ impl PartialProof {
     }
 }
 
-const NUM_CHAIN_LINKS: usize = 16;
-
 /// out must point to exactly 129 bytes
 /// serializes the QualityProof into the form that will be hashed together with
-/// the challenge to determine the quality of ths proof. The quality is used to
+/// the challenge to determine the quality of this proof. The quality is used to
 /// check if it passes the current difficulty. The format is:
 /// 1 byte: plot strength
 /// repeat 16 times:
