@@ -652,26 +652,30 @@ pub fn py_is_canonical_serialization(buf: &[u8]) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 #[pyo3::pyfunction]
-pub fn create_v2_plot(
+pub fn create_v2_single_plot_group(
     filename: &str,
     k: u8,
     strength: u8,
-    plot_id: Bytes32,
+    plot_group_id: Bytes32,
     plot_index: u16,
     meta_group: u8,
     memo: &[u8],
-    testnet: bool,
 ) -> PyResult<()> {
-    Ok(chia_pos2::create_v2_plot(
+    Ok(chia_pos2::create_v2_single_plot_group(
         Path::new(filename),
         k,
         strength,
-        &plot_id.to_bytes(),
+        &plot_group_id.to_bytes(),
         plot_index,
         meta_group,
         memo,
-        testnet,
     )?)
+}
+
+#[pyclass(get_all)]
+pub struct PlotQualityChain {
+    pub chain: PartialProof,
+    pub plot_index: u16,
 }
 
 #[pyclass]
@@ -684,12 +688,18 @@ impl Prover {
         Ok(Self(chia_pos2::Prover::new(Path::new(plot_path))?))
     }
 
-    pub fn get_qualities_for_challenge(&self, challenge: Bytes32) -> PyResult<Vec<PartialProof>> {
+    pub fn get_qualities_for_challenge(
+        &self,
+        challenge: Bytes32,
+    ) -> PyResult<Vec<PlotQualityChain>> {
         let qualities = self.0.get_qualities_for_challenge(&challenge.to_bytes())?;
         Ok(qualities
             .into_iter()
-            .map(|q| PartialProof {
-                fragments: q.chain_links,
+            .map(|q| PlotQualityChain {
+                chain: PartialProof {
+                    fragments: q.chain.chain_links,
+                },
+                plot_index: q.plot_index,
             })
             .collect())
     }
@@ -698,8 +708,12 @@ impl Prover {
         self.0.size()
     }
 
-    pub fn plot_id(&self) -> Bytes32 {
-        self.0.plot_id().into()
+    pub fn plot_group_id(&self) -> Bytes32 {
+        self.0.plot_group_id().into()
+    }
+
+    pub fn plot_id_for_index(&self, plot_index: u16) -> Bytes32 {
+        self.0.plot_id_for_index(plot_index).into()
     }
 
     pub fn get_strength(&self) -> u8 {
@@ -718,8 +732,8 @@ impl Prover {
         self.0.get_meta_group()
     }
 
-    pub fn get_plot_index(&self) -> u16 {
-        self.0.get_plot_index()
+    pub fn get_group_size(&self) -> u16 {
+        self.0.get_group_size()
     }
 
     pub fn to_bytes(&self) -> PyResult<Vec<u8>> {
@@ -737,20 +751,22 @@ impl Prover {
 
 #[pyo3::pyfunction]
 pub fn validate_proof_v2(
-    plot_id: Bytes32,
+    plot_group_id: Bytes32,
+    plot_index: u16,
     size: u8,
-    challenge: Bytes32,
     plot_strength: u8,
+    meta_group: u8,
+    challenge: Bytes32,
     proof: &[u8],
-    testnet: bool,
 ) -> Option<Bytes32> {
     chia_pos2::validate_proof_v2(
-        &plot_id.to_bytes(),
+        &plot_group_id.to_bytes(),
+        plot_index,
         size,
-        &challenge.to_bytes(),
         plot_strength,
+        meta_group,
+        &challenge.to_bytes(),
         proof,
-        testnet,
     )
     .map(|quality| -> Bytes32 {
         let mut sha256 = Sha256::new();
@@ -763,13 +779,7 @@ pub fn validate_proof_v2(
 }
 
 #[pyo3::pyfunction]
-pub fn solve_proof(
-    fragments: &PartialProof,
-    plot_id: Bytes32,
-    strength: u8,
-    k: u8,
-    testnet: bool,
-) -> Vec<u8> {
+pub fn solve_proof(fragments: &PartialProof, plot_id: Bytes32, strength: u8, k: u8) -> Vec<u8> {
     chia_pos2::solve_proof(
         &chia_pos2::QualityChain {
             chain_links: fragments.fragments,
@@ -777,7 +787,6 @@ pub fn solve_proof(
         &plot_id.to_bytes(),
         k,
         strength,
-        testnet,
     )
 }
 
@@ -835,12 +844,13 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_expected_plot_size, m)?)?;
 
     // pos2 functions
-    m.add_function(wrap_pyfunction!(create_v2_plot, m)?)?;
+    m.add_function(wrap_pyfunction!(create_v2_single_plot_group, m)?)?;
     m.add_function(wrap_pyfunction!(validate_proof_v2, m)?)?;
     m.add_function(wrap_pyfunction!(solve_proof, m)?)?;
     m.add_function(wrap_pyfunction!(quality_string_from_proof, m)?)?;
     m.add_class::<Prover>()?;
     m.add_class::<PartialProof>()?;
+    m.add_class::<PlotQualityChain>()?;
 
     // check time lock
     m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
