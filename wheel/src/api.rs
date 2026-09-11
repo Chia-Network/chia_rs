@@ -264,27 +264,25 @@ fn run_generator_and_find_coin(
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
     let (puzzle, solution) = py
-        .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
+        .detach(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
             let Reduction(_cost, result) =
                 run_program(allocator, dialect, generator, args, max_cost)?;
-            match parse_puzzle_solution(allocator, result, find_coin) {
+            let (puzzle, solution) = match parse_puzzle_solution(allocator, result, find_coin) {
                 Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
                     NodePtr::NIL,
                     "coin not found".to_string(),
                 )),
                 Err(ValidationErr::Eval(e)) => Err(e),
                 Ok(pair) => Ok(pair),
-            }
+            }?;
+            Ok((
+                node_to_bytes(allocator, puzzle)?,
+                node_to_bytes(allocator, solution)?,
+            ))
         })
         .map_err(map_pyerr)?;
 
-    // keep serializing normally, until wallets support backrefs
-    Ok((
-        node_to_bytes(allocator, puzzle).map_err(map_pyerr)?.into(),
-        node_to_bytes(allocator, solution)
-            .map_err(map_pyerr)?
-            .into(),
-    ))
+    Ok((puzzle.into(), solution.into()))
 }
 
 // This is a new version of get_puzzle_and_solution_for_coin() which uses the

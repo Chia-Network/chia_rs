@@ -1,10 +1,13 @@
 #![no_main]
 use chia_bls::Signature;
 use chia_consensus::build_interned_block::InternedBlockBuilder;
+use chia_consensus::conditions::SpendBundleConditions;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
+use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::{get_coinspends_for_trusted_block, run_block_generator2};
-use chia_protocol::{CoinSpend, Program, SpendBundle};
+use chia_consensus::solution_generator::solution_generator_backrefs;
+use chia_protocol::{Bytes, CoinSpend, Program, SpendBundle};
 use clvmr::{
     Allocator,
     chia_dialect::ChiaDialect,
@@ -31,6 +34,23 @@ fn puzzle_execution_cost(spends: &[CoinSpend]) -> Result<u64, ()> {
         cost_left = cost_left.saturating_sub(cost);
     }
     Ok(total)
+}
+
+/// Same normalization as `additional_tests.rs::normalized_spends`: sort by
+/// coin_id, sort each spend's create_coin, and zero out fields that
+/// legitimately differ between the interned and classic encodings.
+fn normalized_spends(
+    allocator: &Allocator,
+    conds: SpendBundleConditions,
+) -> Vec<OwnedSpendConditions> {
+    let mut conds = OwnedSpendBundleConditions::from(allocator, conds);
+    conds.spends.sort_by_key(|s| s.coin_id);
+    for s in &mut conds.spends {
+        s.create_coin.sort();
+        s.flags = 0;
+        s.fingerprint = Bytes::default();
+    }
+    conds.spends
 }
 
 fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
@@ -75,7 +95,7 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         "cost() upper bound {upper_bound} must be >= finalize() cost {cost}"
     );
 
-    let Ok((_, conds)) = run_block_generator2::<&[u8], _>(
+    let Ok((interned_a, conds)) = run_block_generator2::<&[u8], _>(
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
@@ -91,6 +111,45 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         conds.cost, cost,
         "finalize() cost must match consensus INTERNED_GENERATOR path"
     );
+
+    // Independently build a classic-serialization reference generator for
+    // the same spends (cf. additional_tests.rs::build_classic_reference) and
+    // run it under classic (non-INTERNED_GENERATOR) rules. Cost legitimately
+    // differs between the two encodings and isn't compared, but spends and
+    // conditions must agree; either run erroring while the other succeeds is
+    // a finding.
+    let classic_spends: Vec<_> = spends
+        .iter()
+        .map(|s| (s.coin, s.puzzle_reveal.as_ref(), s.solution.as_ref()))
+        .collect();
+    let Ok(classic_generator) = solution_generator_backrefs(classic_spends) else {
+        return Corpus::Reject;
+    };
+
+    let classic_result = run_block_generator2::<&[u8], _>(
+        classic_generator.as_slice(),
+        [],
+        TEST_CONSTANTS.max_block_cost_clvm,
+        MEMPOOL_MODE,
+        &signature,
+        None,
+        &TEST_CONSTANTS,
+    );
+
+    match classic_result {
+        Ok((classic_a, classic_conds)) => {
+            assert_eq!(
+                normalized_spends(&interned_a, conds),
+                normalized_spends(&classic_a, classic_conds),
+                "interned and classic generators disagree on spends for the same spend bundle"
+            );
+        }
+        Err(e) => {
+            panic!(
+                "classic reference generator errored where the interned generator succeeded: {e:?}"
+            );
+        }
+    }
 
     // Round-trip: generator bytes must decode back to the same spends (cf. generator.rs).
     // finalize() emits serde_2026, so INTERNED_GENERATOR is needed to parse it.

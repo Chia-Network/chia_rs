@@ -6,6 +6,7 @@ use chia_consensus::serde_2026::{
     SERDE_2026_COMPRESSION_LEVEL, max_canonical_blob_size, node_from_bytes_2026,
 };
 use clvm_fuzzing::make_tree;
+use clvm_utils::{TreeCache, tree_hash_cached};
 use clvmr::Allocator;
 use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, intern_tree, serialize_2026};
 
@@ -66,6 +67,9 @@ fuzz_target!(|data: &[u8]| {
     // gate (node_from_bytes_2026) admits every canonical blob.
     let mut b = Allocator::new();
     let parsed = node_from_bytes_2026(&mut b, &blob, bound).expect("node_from_bytes_2026");
+    // Also hash the parsed node: libfuzzer's per-input timeout then catches
+    // any input that parses within the size bound but hashes slowly.
+    std::hint::black_box(tree_hash_cached(&b, parsed, &mut TreeCache::default()));
     let blob2 = serialize_2026(&b, parsed, SERDE_2026_COMPRESSION_LEVEL).expect("serialize_2026");
     assert_eq!(blob, blob2, "round-trip mismatch");
 });

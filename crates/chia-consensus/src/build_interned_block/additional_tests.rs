@@ -399,12 +399,13 @@ fn normalized_spends(
     (conds.spends, cost)
 }
 
-/// The builder's serde_2026 output round-trips through the
-/// INTERNED_GENERATOR consensus path and yields the same spends/conditions
-/// as an independently-built classic generator for the same bundles, run
-/// under classic rules.
+/// Agreement test: the interned builder's serde_2026 output, run under the
+/// INTERNED_GENERATOR consensus path, yields the same spends/conditions as
+/// an independently-built classic generator for the same bundles, run under
+/// classic rules. serde_2026 has no canonical encoding, so this is not a
+/// round trip.
 #[test]
-fn test_serde_2026_round_trip() {
+fn test_serde_2026_builder_matches_classic() {
     use clvmr::serde::SERDE_2026_MAGIC_PREFIX;
 
     let bundles = serde_2026_test_bundles();
@@ -440,17 +441,17 @@ fn test_serde_2026_round_trip() {
 #[test]
 fn test_serde_2026_tree_hash_2026_agrees() {
     use crate::serde_2026::node_from_bytes_2026_trusted;
-    use clvm_utils::{tree_hash, tree_hash_from_bytes};
+    use clvm_utils::{TreeCache, tree_hash_cached, tree_hash_from_bytes};
 
     let bundles = serde_2026_test_bundles();
     let (generator_2026, _, _) = build_block(&bundles);
     let (generator_classic, _) = build_classic_reference(&bundles);
 
-    // same parse as the wheel's tree_hash_2026()
+    // same parse and hash as the wheel's tree_hash_2026()
     let mut a = Allocator::new();
     let node = node_from_bytes_2026_trusted(&mut a, &generator_2026)
         .expect("node_from_bytes_2026_trusted");
-    let hash_2026 = tree_hash(&a, node);
+    let hash_2026 = tree_hash_cached(&a, node, &mut TreeCache::default());
 
     let hash_classic = tree_hash_from_bytes(&generator_classic).expect("tree_hash_from_bytes");
     assert_eq!(hash_2026, hash_classic);
