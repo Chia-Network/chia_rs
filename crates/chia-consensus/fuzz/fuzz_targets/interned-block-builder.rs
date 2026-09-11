@@ -7,7 +7,9 @@ use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::{get_coinspends_for_trusted_block, run_block_generator2};
 use chia_consensus::solution_generator::solution_generator_backrefs;
+use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::{Bytes, CoinSpend, Program, SpendBundle};
+use clvmr::cost::Cost;
 use clvmr::{
     Allocator,
     chia_dialect::ChiaDialect,
@@ -95,7 +97,7 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         "cost() upper bound {upper_bound} must be >= finalize() cost {cost}"
     );
 
-    let Ok((interned_a, conds)) = run_block_generator2::<&[u8], _>(
+    let interned_result = run_block_generator2::<&[u8], _>(
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
@@ -103,21 +105,15 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         &signature,
         None,
         &TEST_CONSTANTS,
-    ) else {
-        return Corpus::Reject;
-    };
-
-    assert_eq!(
-        conds.cost, cost,
-        "finalize() cost must match consensus INTERNED_GENERATOR path"
     );
 
     // Independently build a classic-serialization reference generator for
     // the same spends (cf. additional_tests.rs::build_classic_reference) and
-    // run it under classic (non-INTERNED_GENERATOR) rules. Cost legitimately
-    // differs between the two encodings and isn't compared, but spends and
-    // conditions must agree; either run erroring while the other succeeds is
-    // a finding.
+    // run it under classic (non-INTERNED_GENERATOR) rules. The two encodings
+    // charge different base costs, so the reference runs uncapped: it is a
+    // semantic reference, not a budget check (the interned run above already
+    // covers the real cap). Cost isn't compared, but the two runs must agree
+    // on validity, and when both succeed, on spends and conditions.
     let classic_spends: Vec<_> = spends
         .iter()
         .map(|s| (s.coin, s.puzzle_reveal.as_ref(), s.solution.as_ref()))
@@ -129,22 +125,36 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     let classic_result = run_block_generator2::<&[u8], _>(
         classic_generator.as_slice(),
         [],
-        TEST_CONSTANTS.max_block_cost_clvm,
+        Cost::MAX,
         MEMPOOL_MODE,
         &signature,
         None,
         &TEST_CONSTANTS,
     );
 
-    match classic_result {
-        Ok((classic_a, classic_conds)) => {
+    match (interned_result, classic_result) {
+        (Ok((interned_a, conds)), Ok((classic_a, classic_conds))) => {
+            assert_eq!(
+                conds.cost, cost,
+                "finalize() cost must match consensus INTERNED_GENERATOR path"
+            );
             assert_eq!(
                 normalized_spends(&interned_a, conds),
                 normalized_spends(&classic_a, classic_conds),
                 "interned and classic generators disagree on spends for the same spend bundle"
             );
         }
-        Err(e) => {
+        // Both encodings reject the input: uninteresting, same as before.
+        // Interned-only CostExceeded is also uninteresting: the harness
+        // estimates exec_cost itself, so the builder admitting a bundle that
+        // then exceeds the real cap is a harness artifact, not a builder bug.
+        (Err(_), Err(_)) | (Err(ValidationErr::Err(ErrorCode::CostExceeded)), Ok(_)) => {
+            return Corpus::Reject;
+        }
+        (Err(e), Ok(_)) => {
+            panic!("interned generator errored where the classic reference succeeded: {e:?}");
+        }
+        (Ok(_), Err(e)) => {
             panic!(
                 "classic reference generator errored where the interned generator succeeded: {e:?}"
             );
