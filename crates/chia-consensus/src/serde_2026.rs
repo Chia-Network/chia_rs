@@ -127,6 +127,7 @@ pub fn node_from_bytes_2026_trusted(allocator: &mut Allocator, bytes: &[u8]) -> 
 mod tests {
     use super::*;
     use crate::generator_cost::interned_vbytes;
+    use clvm_fuzzing::node_eq_two;
     use clvmr::serde::{
         intern_tree, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs,
         serialize_2026,
@@ -326,19 +327,15 @@ mod tests {
         // At exactly the cap: parses.
         let mut b = Allocator::new();
         let parsed = node_from_bytes_2026(&mut b, &blob, blob.len()).unwrap();
-        assert_eq!(
-            node_to_bytes(&b, parsed).unwrap(),
-            node_to_bytes(&a, node).unwrap()
-        );
+        // Classic serialization of a DAG with shared subtrees expands it, so
+        // compare trees directly rather than via their classic byte encoding.
+        assert!(node_eq_two(&b, parsed, &a, node));
 
         // The trusted reader parses the same serde_2026 blob with no cap to
         // trip over...
         let mut b = Allocator::new();
         let parsed = node_from_bytes_2026_trusted(&mut b, &blob).unwrap();
-        assert_eq!(
-            node_to_bytes(&b, parsed).unwrap(),
-            node_to_bytes(&a, node).unwrap()
-        );
+        assert!(node_eq_two(&b, parsed, &a, node));
 
         // ...and node_from_bytes_backrefs likewise loads classic blobs
         // uncapped: historical blocks must load regardless of current
@@ -346,9 +343,6 @@ mod tests {
         let classic = node_to_bytes(&a, node).unwrap();
         let mut b = Allocator::new();
         let parsed = node_from_bytes_backrefs(&mut b, &classic).unwrap();
-        assert_eq!(
-            node_to_bytes(&b, parsed).unwrap(),
-            node_to_bytes(&a, node).unwrap()
-        );
+        assert!(node_eq_two(&b, parsed, &a, node));
     }
 }
