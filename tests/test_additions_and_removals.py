@@ -1,5 +1,13 @@
 from typing import Optional
-from chia_rs import additions_and_removals
+from chia_rs import (
+    Coin,
+    additions_and_removals,
+    solution_generator,
+    solution_generator_2026,
+    tree_hash,
+)
+from chia_rs.sized_bytes import bytes32
+from chia_rs.sized_ints import uint64
 from run_gen import DEFAULT_CONSTANTS
 from pathlib import Path
 import glob
@@ -86,3 +94,32 @@ def test_additions_and_removals() -> None:
             assert expected_removals == set()
         except ValueError as e:
             assert "FAILED: " in test_file
+
+
+def test_additions_and_removals_serde_2026() -> None:
+    # post-HF2 blocks (INTERNED_GENERATOR) encode their transactions
+    # generator with serde_2026. This trusted helper detects the encoding
+    # from the magic prefix, so both encodings of the same spends must
+    # produce identical results.
+    target_ph = b"\xab" * 32
+    # ((51 target_ph 1000)) - a single CREATE_COIN condition
+    solution = bytes.fromhex("ffff33ffa0" + target_ph.hex() + "ff8203e88080")
+    puzzle = b"\x01"  # identity
+    coin = Coin(bytes32(b"\xcc" * 32), tree_hash(puzzle), uint64(1000))
+    spends = [(coin, puzzle, solution)]
+
+    classic = solution_generator(spends)
+    serde2026 = solution_generator_2026(spends)
+    assert classic[:1] != b"\xfd"
+    assert serde2026[:1] == b"\xfd"
+
+    expected = additions_and_removals(classic, [], 0, DEFAULT_CONSTANTS)
+    result = additions_and_removals(serde2026, [], 0, DEFAULT_CONSTANTS)
+    assert result == expected
+
+    additions, removals = result
+    assert len(additions) == 1
+    assert additions[0][0].puzzle_hash == target_ph
+    assert additions[0][0].amount == 1000
+    assert len(removals) == 1
+    assert removals[0][1] == coin

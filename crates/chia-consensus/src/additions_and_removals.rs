@@ -6,6 +6,7 @@ use chia_protocol::Coin;
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_auto};
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
@@ -14,7 +15,6 @@ use clvmr::allocator::{NodePtr, SExp};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes_backrefs;
 
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
@@ -36,7 +36,12 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let program = node_from_bytes_backrefs(&mut a, program)?;
+    // this helper is only used on already-validated blocks, so (unlike the
+    // consensus path, which requires the exact encoding for the block's era)
+    // we sniff the serde_2026 magic prefix and accept any generator encoding
+    let max_blob_size =
+        max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
+    let program = node_from_bytes_auto(&mut a, program, max_blob_size)?;
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
@@ -334,5 +339,53 @@ mod test {
         .unwrap();
         assert_eq!(additions.len(), 1);
         assert!(additions[0].1.is_none(), "pair hint should be ignored");
+    }
+
+    /// A serde_2026-encoded generator (the only encoding of post-HF2 blocks)
+    /// must produce the same additions and removals as the classic encoding
+    /// of the same spends, regardless of the flags passed in.
+    #[rstest]
+    #[case(ConsensusFlags::empty())]
+    #[case(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR)]
+    fn test_serde_2026_generator_equivalence(#[case] flags: ConsensusFlags) {
+        use crate::solution_generator::{solution_generator, solution_generator_2026};
+        use clvm_traits::ToClvm;
+        use clvmr::allocator::Allocator;
+        use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
+
+        let mut a = Allocator::new();
+        let ph = Bytes32::from([0xab; 32]);
+        let hint = Bytes::new(vec![0x42; 32]);
+        // ((51 puzzle_hash amount (hint)))
+        let conditions = ((51u8, (ph, (1000u64, ((hint, ()), ())))), ())
+            .to_clvm(&mut a)
+            .unwrap();
+        let solution = node_to_bytes(&a, conditions).unwrap();
+
+        let spends = (0..2u8)
+            .map(|i| {
+                (
+                    Coin::new([i; 32].into(), [0xdd; 32].into(), 1000),
+                    vec![0x01],
+                    solution.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let classic = solution_generator(spends.clone()).unwrap();
+        let serde2026 = solution_generator_2026(spends).unwrap();
+        assert!(!classic.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        assert!(serde2026.starts_with(&SERDE_2026_MAGIC_PREFIX));
+
+        let no_blocks: &[&[u8]] = &[];
+        let from_classic =
+            additions_and_removals(&classic, no_blocks, flags, &TEST_CONSTANTS).unwrap();
+        let from_2026 =
+            additions_and_removals(&serde2026, no_blocks, flags, &TEST_CONSTANTS).unwrap();
+        assert_eq!(from_classic, from_2026);
+
+        let (additions, removals) = from_2026;
+        assert_eq!(additions.len(), 2);
+        assert_eq!(removals.len(), 2);
     }
 }
