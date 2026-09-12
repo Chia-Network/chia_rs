@@ -103,7 +103,8 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
             | ConsensusFlags::NEW_COST_MODEL
-            | ConsensusFlags::RELAXED_BLS;
+            | ConsensusFlags::RELAXED_BLS
+            | ConsensusFlags::INTERNED_GENERATOR;
     } else if prev_tx_height >= constants.soft_fork8_height {
         // once the hard fork activates, we no longer disable the operators
         flags |= ConsensusFlags::DISABLE_OP;
@@ -280,8 +281,9 @@ mod tests {
             .union(ConsensusFlags::LIMIT_SPENDS)
             .union(ConsensusFlags::LIMITS)
     )]
-    // hard fork 2 window: keccak/secp/cost flags + generator flags,
-    // but NOT DISABLE_OP and NOT LIMITS (mutually exclusive with hard fork 2)
+    // hard fork 2 window: keccak/secp/cost flags + generator flags +
+    // INTERNED_GENERATOR, but NOT DISABLE_OP and NOT LIMITS (mutually
+    // exclusive with hard fork 2)
     #[case(
         300,
         ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
@@ -292,6 +294,7 @@ mod tests {
             .union(ConsensusFlags::SIMPLE_GENERATOR)
             .union(ConsensusFlags::CANONICAL_INTS)
             .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::INTERNED_GENERATOR)
     )]
     #[case(
         u32::MAX,
@@ -303,6 +306,7 @@ mod tests {
             .union(ConsensusFlags::SIMPLE_GENERATOR)
             .union(ConsensusFlags::CANONICAL_INTS)
             .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::INTERNED_GENERATOR)
     )]
     fn test_get_flags_at_forks(#[case] prev_tx_height: u32, #[case] expected: ConsensusFlags) {
         assert_eq!(
@@ -324,6 +328,11 @@ mod tests {
             ..FORK_CONSTANTS.hard_fork2_height)
             .contains(&prev_tx_height);
         assert_eq!(has_disable_op, expected_disable_op);
+
+        // INTERNED_GENERATOR turns on at (and stays on from) hard fork 2.
+        let has_interned_generator = expected.contains(ConsensusFlags::INTERNED_GENERATOR);
+        let expected_interned_generator = prev_tx_height >= FORK_CONSTANTS.hard_fork2_height;
+        assert_eq!(has_interned_generator, expected_interned_generator);
     }
 
     #[test]

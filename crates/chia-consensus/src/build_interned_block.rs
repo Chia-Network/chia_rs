@@ -48,6 +48,13 @@ pub enum BuildBlockResult {
 /// By the triangle inequality (vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), the
 /// running sum is an upper bound on the true interned cost of all spends
 /// combined. finalize() computes the exact cost.
+///
+/// finalize() always emits the generator in serde_2026 format (interned
+/// serialization, magic-prefixed). There is no classic-emission mode: this
+/// builder's cost accounting charges by interned vbytes, which is only
+/// correct once INTERNED_GENERATOR is active, and serde_2026 acceptance
+/// activates at that same height (single activation) — so there is no valid
+/// height at which this builder's output could be classic-serialized.
 #[cfg_attr(feature = "py-bindings", pyclass)]
 pub struct InternedBlockBuilder {
     allocator: Allocator,

@@ -75,6 +75,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
 use chia_consensus::validation_error::ValidationErr;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -132,6 +133,25 @@ pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, P
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
     )
+}
+
+#[pyfunction]
+pub fn tree_hash_2026<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
+    let slice = py_to_slice::<'a>(blob);
+    let mut a = clvmr::Allocator::new();
+    // Unconditional serde_2026 parse, no magic-prefix sniffing: the caller
+    // (chia-blockchain's generator_root(version=1, ...)) already knows this
+    // blob is serde_2026 from the block's version, and has already validated
+    // the block, so this is a trusted read.
+    let node = node_from_bytes_2026_trusted(&mut a, slice).map_err(map_pyerr)?;
+    // serde_2026 can encode trees whose expansion is exponential in the blob
+    // size, so the hash must be DAG-aware: tree_hash_cached memoizes shared
+    // pairs, keeping the work linear in the number of unique nodes (which
+    // parsing already bounds by the blob length). The uncached tree_hash
+    // would walk the full expansion.
+    let mut cache = clvm_utils::TreeCache::default();
+    let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
+    ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
 
 #[pyfunction]
@@ -227,6 +247,44 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     ))
 }
 
+/// Shared tail of `get_puzzle_and_solution_for_coin2` and
+/// `get_puzzle_and_solution_for_coin_2026`: run the (already-parsed)
+/// generator against `args`, find `find_coin`'s puzzle reveal and solution
+/// in the output, and serialize both. The two callers differ only in how
+/// `generator` and `args` were produced (classic/backrefs vs. serde_2026).
+fn run_generator_and_find_coin(
+    py: Python<'_>,
+    allocator: &mut clvmr::Allocator,
+    generator: NodePtr,
+    args: NodePtr,
+    max_cost: Cost,
+    find_coin: &Coin,
+    flags: ConsensusFlags,
+) -> PyResult<(Program, Program)> {
+    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
+
+    let (puzzle, solution) = py
+        .detach(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
+            let Reduction(_cost, result) =
+                run_program(allocator, dialect, generator, args, max_cost)?;
+            let (puzzle, solution) = match parse_puzzle_solution(allocator, result, find_coin) {
+                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
+                    NodePtr::NIL,
+                    "coin not found".to_string(),
+                )),
+                Err(ValidationErr::Eval(e)) => Err(e),
+                Ok(pair) => Ok(pair),
+            }?;
+            Ok((
+                node_to_bytes(allocator, puzzle)?,
+                node_to_bytes(allocator, solution)?,
+            ))
+        })
+        .map_err(map_pyerr)?;
+
+    Ok((puzzle.into(), solution.into()))
+}
+
 // This is a new version of get_puzzle_and_solution_for_coin() which uses the
 // right types for generator, blocks_refs and the return value.
 // The old version was written when Program was a python type had to be
@@ -253,30 +311,57 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     let generator =
         node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
     let args = setup_generator_args(&mut allocator, refs, flags)?;
-    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
-    let (puzzle, solution) = py
-        .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
-            let Reduction(_cost, result) =
-                run_program(&mut allocator, dialect, generator, args, max_cost)?;
-            match parse_puzzle_solution(&allocator, result, find_coin) {
-                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
-                    NodePtr::NIL,
-                    "coin not found".to_string(),
-                )),
-                Err(ValidationErr::Eval(e)) => Err(e),
-                Ok(pair) => Ok(pair),
-            }
-        })
-        .map_err(map_pyerr)?;
+    run_generator_and_find_coin(
+        py,
+        &mut allocator,
+        generator,
+        args,
+        max_cost,
+        find_coin,
+        flags,
+    )
+}
 
-    // keep serializing normally, until wallets support backrefs
-    Ok((
-        node_to_bytes(&allocator, puzzle).map_err(map_pyerr)?.into(),
-        node_to_bytes(&allocator, solution)
-            .map_err(map_pyerr)?
-            .into(),
-    ))
+// Byte-native sibling of get_puzzle_and_solution_for_coin2(): the generator
+// comes in as raw bytes, parsed unconditionally as serde_2026 (no
+// magic-prefix sniffing — the caller already knows the format, e.g. from
+// block.version). serde_2026 only concerns the generator's own encoding, so
+// everything else (including the find_coin/outputs shape) matches the "2"
+// variant exactly.
+#[allow(clippy::too_many_arguments)]
+#[pyfunction]
+pub fn get_puzzle_and_solution_for_coin_2026<'a>(
+    py: Python<'a>,
+    generator: PyBuffer<u8>,
+    block_refs: &Bound<'a, PySequence>,
+    max_cost: Cost,
+    find_coin: &Coin,
+    flags: ConsensusFlags,
+) -> PyResult<(Program, Program)> {
+    let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
+
+    let generator_slice = py_to_slice::<'a>(generator);
+    let refs = block_refs.to_list()?.into_iter().map(|b| {
+        let buf = b
+            .extract::<PyBuffer<u8>>()
+            .expect("block_refs should be a sequence of buffers");
+        py_to_slice::<'a>(buf)
+    });
+
+    let generator =
+        node_from_bytes_2026_trusted(&mut allocator, generator_slice).map_err(map_pyerr)?;
+    let args = setup_generator_args(&mut allocator, refs, flags)?;
+
+    run_generator_and_find_coin(
+        py,
+        &mut allocator,
+        generator,
+        args,
+        max_cost,
+        find_coin,
+        flags,
+    )
 }
 
 // this is like a CoinSpend but with references to the puzzle and solution,
@@ -891,6 +976,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
     m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
     m.add(
+        "INTERNED_GENERATOR",
+        ConsensusFlags::INTERNED_GENERATOR.bits(),
+    )?;
+    m.add(
         "SERDE_2026_MAGIC_PREFIX",
         PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
     )?;
@@ -1045,8 +1134,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
+    m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin_2026, m)?)?;
 
     // facilities from chia-bls
 
