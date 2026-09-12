@@ -67,7 +67,7 @@ jobs:
           name: crate
           path: ./target/package/*-*.crate
 
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: rust-lang/crates-io-auth-action@v1.0.4
         if: startsWith(github.event.ref, 'refs/tags')
         id: auth
 
