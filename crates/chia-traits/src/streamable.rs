@@ -124,19 +124,28 @@ impl<T: Streamable> Streamable for Vec<T> {
     }
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
-        let len = u32::parse::<TRUSTED>(input)?;
-
-        let mut ret = if mem::size_of::<T>() == 0 {
-            Vec::<T>::new()
-        } else {
-            let limit = 2 * 1024 * 1024 / mem::size_of::<T>();
-            Vec::<T>::with_capacity(std::cmp::min(limit, len as usize))
-        };
-        for _ in 0..len {
-            ret.push(T::parse::<TRUSTED>(input)?);
-        }
-        Ok(ret)
+        parse_vec_with_max_length::<T, TRUSTED>(input, u32::MAX as usize)
     }
+}
+
+pub fn parse_vec_with_max_length<T: Streamable, const TRUSTED: bool>(
+    input: &mut Cursor<&[u8]>,
+    max_length: usize,
+) -> Result<Vec<T>> {
+    let len = u32::parse::<TRUSTED>(input)?;
+    if (len as usize) > max_length {
+        return Err(Error::SequenceTooLarge);
+    }
+    let mut ret = if mem::size_of::<T>() == 0 {
+        Vec::<T>::new()
+    } else {
+        let limit = 2 * 1024 * 1024 / mem::size_of::<T>();
+        Vec::<T>::with_capacity(std::cmp::min(limit, len as usize))
+    };
+    for _ in 0..len {
+        ret.push(T::parse::<TRUSTED>(input)?);
+    }
+    Ok(ret)
 }
 
 impl Streamable for String {
@@ -783,4 +792,58 @@ fn test_stream_enum() {
     assert_eq!(stream::<TestEnum>(&TestEnum::A), &[0_u8]);
     assert_eq!(stream::<TestEnum>(&TestEnum::B), &[1_u8]);
     assert_eq!(stream::<TestEnum>(&TestEnum::C), &[255_u8]);
+}
+
+#[cfg(test)]
+#[derive(Streamable, PartialEq, Debug)]
+struct TestBoundedVec {
+    #[chia(max_length = 3)]
+    items: Vec<u32>,
+}
+
+#[test]
+fn test_parse_bounded_vec() {
+    let buf: &[u8] = &[0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3];
+    from_bytes::<TestBoundedVec>(
+        buf,
+        TestBoundedVec {
+            items: vec![1, 2, 3],
+        },
+    );
+}
+
+#[test]
+fn test_parse_bounded_vec_too_large() {
+    let buf: &[u8] = &[0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4];
+    from_bytes_fail::<TestBoundedVec>(buf, Error::SequenceTooLarge);
+}
+
+#[cfg(test)]
+#[derive(Streamable, PartialEq, Debug)]
+struct TestBoundedOptionVec {
+    #[chia(max_length = 2)]
+    items: Option<Vec<u32>>,
+}
+
+#[test]
+fn test_parse_bounded_option_vec_none() {
+    let buf: &[u8] = &[0];
+    from_bytes::<TestBoundedOptionVec>(buf, TestBoundedOptionVec { items: None });
+}
+
+#[test]
+fn test_parse_bounded_option_vec_some() {
+    let buf: &[u8] = &[1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 2];
+    from_bytes::<TestBoundedOptionVec>(
+        buf,
+        TestBoundedOptionVec {
+            items: Some(vec![1, 2]),
+        },
+    );
+}
+
+#[test]
+fn test_parse_bounded_option_vec_too_large() {
+    let buf: &[u8] = &[1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3];
+    from_bytes_fail::<TestBoundedOptionVec>(buf, Error::SequenceTooLarge);
 }

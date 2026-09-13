@@ -72,6 +72,7 @@ pub struct RejectHeaderRequest {
 pub struct RequestRemovals {
     height: u32,
     header_hash: Bytes32,
+    #[chia(max_length = 30000)]
     coin_names: Option<Vec<Bytes32>>,
 }
 
@@ -79,7 +80,9 @@ pub struct RequestRemovals {
 pub struct RespondRemovals {
     height: u32,
     header_hash: Bytes32,
+    #[chia(max_length = 30000)]
     coins: Vec<(Bytes32, Option<Coin>)>,
+    #[chia(max_length = 30000)]
     proofs: Option<Vec<(Bytes32, Bytes)>>,
 }
 
@@ -93,6 +96,7 @@ pub struct RejectRemovalsRequest {
 pub struct RequestAdditions {
     height: u32,
     header_hash: Option<Bytes32>,
+    #[chia(max_length = 30000)]
     puzzle_hashes: Option<Vec<Bytes32>>,
 }
 
@@ -100,7 +104,9 @@ pub struct RequestAdditions {
 pub struct RespondAdditions {
     height: u32,
     header_hash: Bytes32,
+    #[chia(max_length = 30000)]
     coins: Vec<(Bytes32, Vec<Coin>)>,
+    #[chia(max_length = 30000)]
     proofs: Option<Vec<(Bytes32, Bytes, Option<Bytes>)>>,
 }
 
@@ -114,6 +120,7 @@ pub struct RejectAdditionsRequest {
 pub struct RespondBlockHeaders {
     start_height: u32,
     end_height: u32,
+    #[chia(max_length = 128)]
     header_blocks: Vec<HeaderBlock>,
 }
 
@@ -146,32 +153,39 @@ pub struct RejectHeaderBlocks {
 pub struct RespondHeaderBlocks {
     start_height: u32,
     end_height: u32,
+    #[chia(max_length = 64)]
     header_blocks: Vec<HeaderBlock>,
 }
 
 #[streamable(message)]
 pub struct RegisterForPhUpdates {
+    #[chia(max_length = 1600000)]
     puzzle_hashes: Vec<Bytes32>,
     min_height: u32,
 }
 
 #[streamable(message)]
 pub struct RespondToPhUpdates {
+    #[chia(max_length = 1600000)]
     puzzle_hashes: Vec<Bytes32>,
     min_height: u32,
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
 #[streamable(message)]
 pub struct RegisterForCoinUpdates {
+    #[chia(max_length = 1600000)]
     coin_ids: Vec<Bytes32>,
     min_height: u32,
 }
 
 #[streamable(message)]
 pub struct RespondToCoinUpdates {
+    #[chia(max_length = 1600000)]
     coin_ids: Vec<Bytes32>,
     min_height: u32,
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -180,6 +194,7 @@ pub struct CoinStateUpdate {
     height: u32,
     fork_height: u32,
     peak_hash: Bytes32,
+    #[chia(max_length = 30000)]
     items: Vec<CoinState>,
 }
 
@@ -190,6 +205,7 @@ pub struct RequestChildren {
 
 #[streamable(message)]
 pub struct RespondChildren {
+    #[chia(max_length = 30000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -217,21 +233,25 @@ pub struct RespondFeeEstimates {
 
 #[streamable(message)]
 pub struct RequestRemovePuzzleSubscriptions {
+    #[chia(max_length = 1600000)]
     puzzle_hashes: Option<Vec<Bytes32>>,
 }
 
 #[streamable(message)]
 pub struct RespondRemovePuzzleSubscriptions {
+    #[chia(max_length = 1600000)]
     puzzle_hashes: Vec<Bytes32>,
 }
 
 #[streamable(message)]
 pub struct RequestRemoveCoinSubscriptions {
+    #[chia(max_length = 1600000)]
     coin_ids: Option<Vec<Bytes32>>,
 }
 
 #[streamable(message)]
 pub struct RespondRemoveCoinSubscriptions {
+    #[chia(max_length = 1600000)]
     coin_ids: Vec<Bytes32>,
 }
 
@@ -245,6 +265,7 @@ pub struct CoinStateFilters {
 
 #[streamable(message)]
 pub struct RequestPuzzleState {
+    #[chia(max_length = 35000)]
     puzzle_hashes: Vec<Bytes32>,
     previous_height: Option<u32>,
     header_hash: Bytes32,
@@ -254,10 +275,12 @@ pub struct RequestPuzzleState {
 
 #[streamable(message)]
 pub struct RespondPuzzleState {
+    #[chia(max_length = 33000)]
     puzzle_hashes: Vec<Bytes32>,
     height: u32,
     header_hash: Bytes32,
     is_finished: bool,
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -268,6 +291,7 @@ pub struct RejectPuzzleState {
 
 #[streamable(message)]
 pub struct RequestCoinState {
+    #[chia(max_length = 500000)]
     coin_ids: Vec<Bytes32>,
     previous_height: Option<u32>,
     header_hash: Bytes32,
@@ -276,7 +300,9 @@ pub struct RequestCoinState {
 
 #[streamable(message)]
 pub struct RespondCoinState {
+    #[chia(max_length = 500000)]
     coin_ids: Vec<Bytes32>,
+    #[chia(max_length = 500000)]
     coin_states: Vec<CoinState>,
 }
 
@@ -334,11 +360,13 @@ pub struct RemovedMempoolItem {
 
 #[streamable(message)]
 pub struct MempoolItemsAdded {
+    #[chia(max_length = 30000)]
     transaction_ids: Vec<Bytes32>,
 }
 
 #[streamable(message)]
 pub struct MempoolItemsRemoved {
+    #[chia(max_length = 30000)]
     removed_items: Vec<RemovedMempoolItem>,
 }
 
