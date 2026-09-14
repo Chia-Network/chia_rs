@@ -338,7 +338,7 @@ where
 // returning serialized puzzles, which may not be possible. They will simply ignore many of the bad cases.
 pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
     constants: &ConsensusConstants,
-    generator: &Program,
+    generator: &[u8],
     refs: I,
     flags: ConsensusFlags,
 ) -> Result<Vec<CoinSpend>, ValidationErr>
@@ -346,7 +346,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator.as_ref(), flags)?;
+    check_generator_quote(generator, flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
     let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
@@ -443,7 +443,7 @@ pub fn get_coinspends_with_conditions_for_trusted_block<
     I: IntoIterator<Item = GenBuf>,
 >(
     constants: &ConsensusConstants,
-    generator: &Program,
+    generator: &[u8],
     refs: I,
     flags: ConsensusFlags,
 ) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr>
@@ -451,7 +451,7 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator.as_ref(), flags)?;
+    check_generator_quote(generator, flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
 
     let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
