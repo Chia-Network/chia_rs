@@ -17,7 +17,7 @@ use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PySequence, PySequenceMethods};
 
-pub fn py_to_slice<'a>(buf: PyBuffer<u8>) -> &'a [u8] {
+pub fn py_to_slice<'a>(buf: &PyBuffer<u8>) -> &'a [u8] {
     assert!(buf.is_c_contiguous(), "buffer must be contiguous");
     unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) }
 }
@@ -47,10 +47,10 @@ pub fn run_block_generator<'a>(
             let buf = b
                 .extract::<PyBuffer<u8>>()
                 .expect("block_refs should be a sequence of buffers");
-            py_to_slice::<'a>(buf)
+            py_to_slice(&buf)
         })
         .collect::<Vec<&'a [u8]>>();
-    let program = py_to_slice::<'a>(program);
+    let program: &'a [u8] = py_to_slice(&program);
 
     py.detach(|| {
         match native_run_block_generator(
@@ -97,11 +97,11 @@ pub fn run_block_generator2<'a>(
             let buf = b
                 .extract::<PyBuffer<u8>>()
                 .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
+            py_to_slice(&buf)
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let program = py_to_slice::<'a>(program);
+    let program: &'a [u8] = py_to_slice(&program);
 
     py.detach(|| {
         match native_run_block_generator2(
@@ -139,11 +139,11 @@ pub fn additions_and_removals<'a>(
             let buf = b
                 .extract::<PyBuffer<u8>>()
                 .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
+            py_to_slice(&buf)
         })
         .collect::<Vec<&'a [u8]>>();
 
-    let program = py_to_slice::<'a>(program);
+    let program: &'a [u8] = py_to_slice(&program);
 
     py.detach(|| {
         native_additions_and_removals(program, refs, flags, constants)
@@ -158,7 +158,7 @@ pub fn additions_and_removals<'a>(
 /// `cost_per_byte` from consensus constants to get the full generator size cost.
 #[pyfunction]
 pub fn generator_interned_vbytes(py: Python<'_>, program: PyBuffer<u8>) -> PyResult<u64> {
-    let program = py_to_slice(program);
+    let program = py_to_slice(&program);
     py.detach(|| {
         let mut a = Allocator::new();
         let node = node_from_bytes_backrefs(&mut a, program)

@@ -127,7 +127,7 @@ pub fn confirm_not_included_already_hashed(
 
 #[pyfunction]
 pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
-    let slice = py_to_slice::<'a>(blob);
+    let slice: &'a [u8] = py_to_slice(&blob);
     ChiaToPython::to_python(
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
@@ -193,8 +193,8 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
 ) -> PyResult<(Bound<'a, PyBytes>, Bound<'a, PyBytes>)> {
     let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
-    let program = py_to_slice::<'a>(program);
-    let args = py_to_slice::<'a>(args);
+    let program: &'a [u8] = py_to_slice(&program);
+    let args: &'a [u8] = py_to_slice(&args);
 
     let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
     let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
@@ -247,7 +247,8 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
         let buf = b
             .extract::<PyBuffer<u8>>()
             .expect("block_refs should be a sequence of buffers");
-        py_to_slice::<'a>(buf)
+        let slice: &'a [u8] = py_to_slice(&buf);
+        slice
     });
 
     let generator =
@@ -587,7 +588,7 @@ pub fn get_spends_for_trusted_block<'a>(
             let buf = b
                 .extract::<PyBuffer<u8>>()
                 .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
+            py_to_slice(&buf)
         })
         .collect::<Vec<&'a [u8]>>();
 
@@ -614,7 +615,7 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
             let buf = b
                 .extract::<PyBuffer<u8>>()
                 .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
+            py_to_slice(&buf)
         })
         .collect::<Vec<&'a [u8]>>();
 
