@@ -17,39 +17,29 @@ use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PySequence, PySequenceMethods};
 
-pub fn py_to_slice<'a>(buf: &PyBuffer<u8>) -> &'a [u8] {
+pub fn py_to_slice(buf: &PyBuffer<u8>) -> &[u8] {
     assert!(buf.is_c_contiguous(), "buffer must be contiguous");
     unsafe { std::slice::from_raw_parts(buf.buf_ptr() as *const u8, buf.len_bytes()) }
 }
 
-/// Keep the returned `PyBuffer`s alive while using the slices; dropping them
-/// releases the export and can invalidate views (e.g. `memoryview`).
-type BufferSlices<'a> = (Vec<PyBuffer<u8>>, Vec<&'a [u8]>);
-
-pub fn extract_buffer_slices<'a>(block_refs: &Bound<'_, PySequence>) -> PyResult<BufferSlices<'a>> {
-    let buffers = block_refs
+/// Keep these alive while using slices from `py_to_slice`; dropping releases the
+/// export and can invalidate views (e.g. `memoryview`).
+pub fn extract_buffers(block_refs: &Bound<'_, PySequence>) -> PyResult<Vec<PyBuffer<u8>>> {
+    Ok(block_refs
         .to_list()?
         .into_iter()
         .map(|b| {
             b.extract::<PyBuffer<u8>>()
                 .expect("block_refs must be a sequence of buffers")
         })
-        .collect::<Vec<_>>();
-    let slices = buffers
-        .iter()
-        .map(|buf| {
-            let slice: &'a [u8] = py_to_slice(buf);
-            slice
-        })
-        .collect();
-    Ok((buffers, slices))
+        .collect())
 }
 
 #[pyfunction]
 #[pyo3(signature = (program, block_refs, max_cost, flags, signature, bls_cache, constants))]
 #[allow(clippy::too_many_arguments)]
-pub fn run_block_generator<'a>(
-    py: Python<'a>,
+pub fn run_block_generator(
+    py: Python<'_>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PySequence>,
     max_cost: Cost,
@@ -62,11 +52,11 @@ pub fn run_block_generator<'a>(
     Option<String>,
     Option<OwnedSpendBundleConditions>,
 ) {
-    let (block_ref_buffers, refs) =
-        extract_buffer_slices(block_refs).expect("block_refs should be a sequence");
-    let program: &'a [u8] = py_to_slice(&program);
+    let block_ref_buffers = extract_buffers(block_refs).expect("block_refs should be a sequence");
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
+    let program = py_to_slice(&program);
 
-    let result = py.detach(|| {
+    py.detach(|| {
         match native_run_block_generator(
             program, refs, max_cost, flags, signature, bls_cache, constants,
         ) {
@@ -83,17 +73,14 @@ pub fn run_block_generator<'a>(
                 (Some(code.into()), Some(format!("{e}")), None)
             }
         }
-    });
-    // Keep buffer exports alive across the detach above.
-    drop(block_ref_buffers);
-    result
+    })
 }
 
 #[pyfunction]
 #[pyo3(signature = (program, block_refs, max_cost, flags, signature, bls_cache, constants))]
 #[allow(clippy::too_many_arguments)]
-pub fn run_block_generator2<'a>(
-    py: Python<'a>,
+pub fn run_block_generator2(
+    py: Python<'_>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PySequence>,
     max_cost: Cost,
@@ -106,12 +93,11 @@ pub fn run_block_generator2<'a>(
     Option<String>,
     Option<OwnedSpendBundleConditions>,
 ) {
-    let (block_ref_buffers, refs) =
-        extract_buffer_slices(block_refs).expect("block_refs should be a sequence");
+    let block_ref_buffers = extract_buffers(block_refs).expect("block_refs should be a sequence");
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
+    let program = py_to_slice(&program);
 
-    let program: &'a [u8] = py_to_slice(&program);
-
-    let result = py.detach(|| {
+    py.detach(|| {
         match native_run_block_generator2(
             program, refs, max_cost, flags, signature, bls_cache, constants,
         ) {
@@ -128,32 +114,26 @@ pub fn run_block_generator2<'a>(
                 (Some(code.into()), Some(format!("{e}")), None)
             }
         }
-    });
-    // Keep buffer exports alive across the detach above.
-    drop(block_ref_buffers);
-    result
+    })
 }
 
 #[pyfunction]
 #[allow(clippy::type_complexity)]
-pub fn additions_and_removals<'a>(
-    py: Python<'a>,
+pub fn additions_and_removals(
+    py: Python<'_>,
     program: PyBuffer<u8>,
     block_refs: &Bound<'_, PySequence>,
     flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> PyResult<(Vec<(Coin, Option<Bytes>)>, Vec<(Bytes32, Coin)>)> {
-    let (block_ref_buffers, refs) = extract_buffer_slices(block_refs)?;
+    let block_ref_buffers = extract_buffers(block_refs)?;
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
+    let program = py_to_slice(&program);
 
-    let program: &'a [u8] = py_to_slice(&program);
-
-    let result = py.detach(|| {
+    py.detach(|| {
         native_additions_and_removals(program, refs, flags, constants)
             .map_err(|e| -> pyo3::PyErr { e.into() })
-    });
-    // Keep buffer exports alive across the detach above.
-    drop(block_ref_buffers);
-    result
+    })
 }
 
 /// Return the byte-weight-equivalent of a serialized generator program.
