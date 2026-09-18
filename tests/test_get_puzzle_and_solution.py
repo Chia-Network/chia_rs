@@ -3,10 +3,13 @@ from chia_rs import (
     get_puzzle_and_solution_for_coin2,
     run_block_generator2,
     run_chia_program,
+    solution_generator,
+    solution_generator_2026,
     Program,
     Coin,
     G2Element,
     DONT_VALIDATE_SIGNATURE,
+    INTERNED_GENERATOR,
 )
 from run_gen import DEFAULT_CONSTANTS
 from chia_rs.sized_bytes import bytes32
@@ -74,7 +77,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
             0,
         )
         puzzle2, solution2 = get_puzzle_and_solution_for_coin2(
-            Program.from_bytes(block),
+            block,
             [],
             11000000000,
             Coin(bytes32(s.parent_id), bytes32(s.puzzle_hash), uint64(s.coin_amount)),
@@ -109,3 +112,30 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
 
             ret = ret.pair[1]
         assert expected_additions == set()
+
+
+def test_get_puzzle_and_solution_for_coin2_serde_2026() -> None:
+    # get_puzzle_and_solution_for_coin2() dispatches on INTERNED_GENERATOR,
+    # so a serde_2026 generator must find the same puzzle/solution as the
+    # equivalent classic one.
+    identity_puzzle = bytes([1])
+    solution = bytes([0x80])
+    coin = Coin(
+        bytes32(b"\x01" * 32),
+        bytes32(Program.from_bytes(identity_puzzle).get_tree_hash()),
+        uint64(0),
+    )
+    spends = [(coin, identity_puzzle, solution)]
+
+    classic_generator = solution_generator(spends)
+    interned_generator = solution_generator_2026(spends)
+
+    puzzle, sol = get_puzzle_and_solution_for_coin2(
+        classic_generator, [], MAX_COST, coin, 0
+    )
+    puzzle_2026, sol_2026 = get_puzzle_and_solution_for_coin2(
+        interned_generator, [], MAX_COST, coin, INTERNED_GENERATOR
+    )
+
+    assert bytes(puzzle) == bytes(puzzle_2026) == identity_puzzle
+    assert bytes(sol) == bytes(sol_2026) == solution
