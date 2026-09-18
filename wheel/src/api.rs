@@ -1,7 +1,7 @@
 use crate::error::map_pyerr;
 use crate::run_generator::{
-    additions_and_removals, generator_interned_vbytes, py_to_slice, run_block_generator,
-    run_block_generator2,
+    additions_and_removals, extract_buffers, generator_interned_vbytes, py_to_slice,
+    run_block_generator, run_block_generator2,
 };
 use chia_consensus::allocator::make_allocator;
 use chia_consensus::build_compressed_block::BlockBuilder;
@@ -64,7 +64,7 @@ use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedBytes;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyDict};
-use pyo3::types::{PyList, PySequence, PySequenceMethods};
+use pyo3::types::{PyList, PySequence};
 use pyo3::wrap_pyfunction;
 use std::path::Path;
 
@@ -126,8 +126,8 @@ pub fn confirm_not_included_already_hashed(
 }
 
 #[pyfunction]
-pub fn tree_hash<'a>(py: Python<'a>, blob: PyBuffer<u8>) -> PyResult<Bound<'a, PyAny>> {
-    let slice = py_to_slice::<'a>(blob);
+pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyAny>> {
+    let slice = py_to_slice(&blob);
     ChiaToPython::to_python(
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
@@ -181,8 +181,8 @@ fn compute_plot_group_id_v2(
 // and deserializing the generator and arguments.
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-pub fn get_puzzle_and_solution_for_coin<'a>(
-    py: Python<'a>,
+pub fn get_puzzle_and_solution_for_coin(
+    py: Python<'_>,
     program: PyBuffer<u8>,
     args: PyBuffer<u8>,
     max_cost: Cost,
@@ -190,11 +190,11 @@ pub fn get_puzzle_and_solution_for_coin<'a>(
     find_amount: u64,
     find_ph: Bytes32,
     flags: ConsensusFlags,
-) -> PyResult<(Bound<'a, PyBytes>, Bound<'a, PyBytes>)> {
+) -> PyResult<(Bound<'_, PyBytes>, Bound<'_, PyBytes>)> {
     let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
-    let program = py_to_slice::<'a>(program);
-    let args = py_to_slice::<'a>(args);
+    let program = py_to_slice(&program);
+    let args = py_to_slice(&args);
 
     let program = node_from_bytes_backrefs(&mut allocator, program).map_err(map_pyerr)?;
     let args = node_from_bytes_backrefs(&mut allocator, args).map_err(map_pyerr)?;
@@ -243,12 +243,8 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
 ) -> PyResult<(Program, Program)> {
     let mut allocator = make_allocator(ConsensusFlags::LIMIT_HEAP);
 
-    let refs = block_refs.to_list()?.into_iter().map(|b| {
-        let buf = b
-            .extract::<PyBuffer<u8>>()
-            .expect("block_refs should be a sequence of buffers");
-        py_to_slice::<'a>(buf)
-    });
+    let block_ref_buffers = extract_buffers(block_refs)?;
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
     let generator =
         node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
@@ -573,23 +569,15 @@ pub fn py_calculate_ip_iters(
 }
 
 #[pyo3::pyfunction]
-pub fn get_spends_for_trusted_block<'a>(
-    py: Python<'a>,
+pub fn get_spends_for_trusted_block(
+    py: Python<'_>,
     constants: &ConsensusConstants,
     generator: Program,
     block_refs: &Bound<'_, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
-    let refs = block_refs
-        .to_list()?
-        .into_iter()
-        .map(|b| {
-            let buf = b
-                .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
-        })
-        .collect::<Vec<&'a [u8]>>();
+    let block_ref_buffers = extract_buffers(block_refs)?;
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
     let output =
         py.detach(|| get_coinspends_for_trusted_block(constants, &generator, &refs, flags))?;
@@ -607,16 +595,8 @@ pub fn get_spends_for_trusted_block_with_conditions<'a>(
     block_refs: &Bound<'a, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
-    let refs = block_refs
-        .to_list()?
-        .into_iter()
-        .map(|b| {
-            let buf = b
-                .extract::<PyBuffer<u8>>()
-                .expect("block_refs must be sequence of buffers");
-            py_to_slice::<'a>(buf)
-        })
-        .collect::<Vec<&'a [u8]>>();
+    let block_ref_buffers = extract_buffers(block_refs)?;
+    let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
     let output = py.detach(|| {
         get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)
