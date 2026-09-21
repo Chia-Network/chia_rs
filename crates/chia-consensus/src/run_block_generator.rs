@@ -188,13 +188,20 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
 
 // this function is mostly the same as above but is a double check in case of
 // discrepancies in serialized vs deserialized forms
+//
+// INTERNED_GENERATOR always implies the quote requirement too: serde_2026
+// generators can't be quote-checked at the byte level (see
+// check_generator_quote() above), so this is their only enforcement point. In
+// practice SIMPLE_GENERATOR (soft_fork9) is always active by the time
+// INTERNED_GENERATOR (hard_fork2) is, but callers can construct flags
+// directly (tests, wheel bindings), so don't rely on that coupling here.
 #[inline]
 pub fn check_generator_node(
     a: &Allocator,
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.contains(ConsensusFlags::SIMPLE_GENERATOR) {
+    if !flags.intersects(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR) {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
@@ -768,6 +775,27 @@ mod tests {
         // blobs (whose byte encoding can't be checked for the quote shape),
         // so it must NOT be bypassed when INTERNED_GENERATOR is set.
         let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let mut a = Allocator::new();
+        let atom = a.new_atom(&[42]).unwrap();
+        assert_eq!(
+            check_generator_node(&a, atom, flags)
+                .unwrap_err()
+                .error_code(),
+            ErrorCode::ComplexGeneratorReceived,
+        );
+        let one = a.new_atom(&[1]).unwrap();
+        let nil = a.nil();
+        let pair = a.new_pair(one, nil).unwrap();
+        assert!(check_generator_node(&a, pair, flags).is_ok());
+    }
+
+    #[test]
+    fn test_check_generator_node_enforced_with_interned_flag_alone() {
+        // Quote enforcement must not depend on SIMPLE_GENERATOR also being
+        // set: on deployed nodes it always is by the time INTERNED_GENERATOR
+        // is (hard_fork2_height >= soft_fork9_height), but callers can pass
+        // flags directly (tests, wheel bindings) without that coupling.
+        let flags = ConsensusFlags::INTERNED_GENERATOR;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
