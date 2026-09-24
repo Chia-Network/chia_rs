@@ -3,6 +3,9 @@ from chia_rs import (
     get_puzzle_and_solution_for_coin2,
     run_block_generator2,
     run_chia_program,
+    solution_generator,
+    solution_generator_2026,
+    tree_hash,
     Program,
     Coin,
     G2Element,
@@ -109,3 +112,33 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
 
             ret = ret.pair[1]
         assert expected_additions == set()
+
+
+def test_get_puzzle_and_solution_for_coin_serde_2026() -> None:
+    # post-HF2 blocks (INTERNED_GENERATOR) encode their transactions
+    # generator with serde_2026. This trusted helper detects the encoding
+    # from the magic prefix, so both encodings of the same spends must
+    # produce identical results.
+    # get_puzzle_and_solution_for_coin2() accepts serde_2026 the same way,
+    # but it takes the generator as a Program, which cannot hold a
+    # serde_2026 blob yet, so it cannot be exercised from here.
+    target_ph = b"\xab" * 32
+    # ((51 target_ph 1000)) - a single CREATE_COIN condition
+    solution = bytes.fromhex("ffff33ffa0" + target_ph.hex() + "ff8203e88080")
+    puzzle = b"\x01"  # identity
+    parent = bytes32(b"\xcc" * 32)
+    ph = tree_hash(puzzle)
+    spends = [(Coin(parent, ph, uint64(1000)), puzzle, solution)]
+
+    classic = solution_generator(spends)
+    serde2026 = solution_generator_2026(spends)
+    assert classic[:1] != b"\xfd"
+    assert serde2026[:1] == b"\xfd"
+
+    args = b"\xff" + DESERIALIZE_MOD + b"\xff\x80\x80"
+    for generator in [classic, serde2026]:
+        puz, sol = get_puzzle_and_solution_for_coin(
+            generator, args, MAX_COST, parent, 1000, ph, 0
+        )
+        assert puz == puzzle
+        assert sol == solution

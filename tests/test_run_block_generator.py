@@ -4,9 +4,15 @@ from chia_rs import (
     generator_interned_vbytes,
     run_block_generator,
     run_block_generator2,
+    solution_generator,
+    solution_generator_2026,
+    tree_hash,
+    Coin,
     G2Element,
     DONT_VALIDATE_SIGNATURE,
 )
+from chia_rs.sized_bytes import bytes32
+from chia_rs.sized_ints import uint64
 from run_gen import print_spend_bundle_conditions, DEFAULT_CONSTANTS
 
 
@@ -171,3 +177,22 @@ def test_generator_interned_vbytes_real_block() -> None:
 def test_generator_interned_vbytes_bad_input() -> None:
     with pytest.raises(ValueError):
         generator_interned_vbytes(b"\xff\xff")
+
+
+def test_generator_interned_vbytes_serde_2026() -> None:
+    # the interned weight is a property of the tree, not its encoding, so
+    # the classic and serde_2026 encodings of the same generator must have
+    # the same weight
+    target_ph = b"\xab" * 32
+    # ((51 target_ph 1000)) - a single CREATE_COIN condition
+    solution = bytes.fromhex("ffff33ffa0" + target_ph.hex() + "ff8203e88080")
+    puzzle = b"\x01"  # identity
+    coin = Coin(bytes32(b"\xcc" * 32), tree_hash(puzzle), uint64(1000))
+    spends = [(coin, puzzle, solution)]
+
+    classic = solution_generator(spends)
+    serde2026 = solution_generator_2026(spends)
+    assert classic[:1] != b"\xfd"
+    assert serde2026[:1] == b"\xfd"
+
+    assert generator_interned_vbytes(serde2026) == generator_interned_vbytes(classic)
