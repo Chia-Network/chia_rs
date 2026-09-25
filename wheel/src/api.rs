@@ -75,6 +75,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
+use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
 use chia_consensus::validation_error::ValidationErr;
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -132,6 +133,25 @@ pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyAny
         &Bytes32::from(&tree_hash_from_bytes(slice).map_err(map_pyerr)?.into()),
         py,
     )
+}
+
+#[pyfunction]
+pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyAny>> {
+    let slice = py_to_slice(&blob);
+    let mut a = clvmr::Allocator::new();
+    // Unconditional serde_2026 parse, no magic-prefix sniffing: the caller
+    // (chia-blockchain's generator_root(version=1, ...)) already knows this
+    // blob is serde_2026 from the block's version, and has already validated
+    // the block, so this is a trusted read.
+    let node = node_from_bytes_2026_trusted(&mut a, slice).map_err(map_pyerr)?;
+    // serde_2026 can encode trees whose expansion is exponential in the blob
+    // size, so the hash must be DAG-aware: tree_hash_cached memoizes shared
+    // pairs, keeping the work linear in the number of unique nodes (which
+    // parsing already bounds by the blob length). The uncached tree_hash
+    // would walk the full expansion.
+    let mut cache = clvm_utils::TreeCache::default();
+    let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
+    ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
 
 #[pyfunction]
@@ -227,16 +247,65 @@ pub fn get_puzzle_and_solution_for_coin(
     ))
 }
 
+/// Borrow the bytes out of a Python buffer (bytes, bytearray, memoryview,
+/// ...) for the lifetime of `buf`. Non-contiguous buffers (e.g. a strided
+/// memoryview) are a `ValueError`.
+fn generator_as_slice(buf: &PyBuffer<u8>) -> PyResult<&[u8]> {
+    if !buf.is_c_contiguous() {
+        return Err(PyValueError::new_err("generator buffer must be contiguous"));
+    }
+    // SAFETY: `buf` is a C-contiguous Python buffer of `u8`, and the slice
+    // borrows from `buf`, so it can't outlive it.
+    Ok(unsafe { std::slice::from_raw_parts(buf.buf_ptr().cast(), buf.len_bytes()) })
+}
+
+/// Shared tail of `get_puzzle_and_solution_for_coin2`: run the
+/// (already-parsed) generator against `args`, find `find_coin`'s puzzle
+/// reveal and solution in the output, and serialize both.
+fn run_generator_and_find_coin(
+    py: Python<'_>,
+    allocator: &mut clvmr::Allocator,
+    generator: NodePtr,
+    args: NodePtr,
+    max_cost: Cost,
+    find_coin: &Coin,
+    flags: ConsensusFlags,
+) -> PyResult<(Program, Program)> {
+    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
+
+    let (puzzle, solution) = py
+        .detach(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
+            let Reduction(_cost, result) =
+                run_program(allocator, dialect, generator, args, max_cost)?;
+            let (puzzle, solution) = match parse_puzzle_solution(allocator, result, find_coin) {
+                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
+                    NodePtr::NIL,
+                    "coin not found".to_string(),
+                )),
+                Err(ValidationErr::Eval(e)) => Err(e),
+                Ok(pair) => Ok(pair),
+            }?;
+            Ok((
+                node_to_bytes(allocator, puzzle)?,
+                node_to_bytes(allocator, solution)?,
+            ))
+        })
+        .map_err(map_pyerr)?;
+
+    Ok((puzzle.into(), solution.into()))
+}
+
 // This is a new version of get_puzzle_and_solution_for_coin() which uses the
 // right types for generator, blocks_refs and the return value.
 // The old version was written when Program was a python type had to be
 // serialized to bytes through rust boundary.
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-pub fn get_puzzle_and_solution_for_coin2<'a>(
-    py: Python<'a>,
-    generator: &Program,
-    block_refs: &Bound<'a, PySequence>,
+pub fn get_puzzle_and_solution_for_coin2(
+    py: Python<'_>,
+    // the serialized generator; `flags` decides classic vs serde_2026 decoding
+    generator: PyBuffer<u8>,
+    block_refs: &Bound<'_, PySequence>,
     max_cost: Cost,
     find_coin: &Coin,
     flags: ConsensusFlags,
@@ -246,33 +315,23 @@ pub fn get_puzzle_and_solution_for_coin2<'a>(
     let block_ref_buffers = extract_buffers(block_refs)?;
     let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
-    let generator =
-        node_from_bytes_backrefs(&mut allocator, generator.as_ref()).map_err(map_pyerr)?;
+    let generator_bytes = generator_as_slice(&generator)?;
+    let generator = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        node_from_bytes_2026_trusted(&mut allocator, generator_bytes).map_err(map_pyerr)?
+    } else {
+        node_from_bytes_backrefs(&mut allocator, generator_bytes).map_err(map_pyerr)?
+    };
     let args = setup_generator_args(&mut allocator, refs, flags)?;
-    let dialect = &ChiaDialect::new(flags.to_clvm_flags());
 
-    let (puzzle, solution) = py
-        .detach(|| -> Result<(NodePtr, NodePtr), EvalErr> {
-            let Reduction(_cost, result) =
-                run_program(&mut allocator, dialect, generator, args, max_cost)?;
-            match parse_puzzle_solution(&allocator, result, find_coin) {
-                Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
-                    NodePtr::NIL,
-                    "coin not found".to_string(),
-                )),
-                Err(ValidationErr::Eval(e)) => Err(e),
-                Ok(pair) => Ok(pair),
-            }
-        })
-        .map_err(map_pyerr)?;
-
-    // keep serializing normally, until wallets support backrefs
-    Ok((
-        node_to_bytes(&allocator, puzzle).map_err(map_pyerr)?.into(),
-        node_to_bytes(&allocator, solution)
-            .map_err(map_pyerr)?
-            .into(),
-    ))
+    run_generator_and_find_coin(
+        py,
+        &mut allocator,
+        generator,
+        args,
+        max_cost,
+        find_coin,
+        flags,
+    )
 }
 
 // this is like a CoinSpend but with references to the puzzle and solution,
@@ -572,15 +631,17 @@ pub fn py_calculate_ip_iters(
 pub fn get_spends_for_trusted_block(
     py: Python<'_>,
     constants: &ConsensusConstants,
-    generator: Program,
+    // the serialized generator; `flags` decides classic vs serde_2026 decoding
+    generator: PyBuffer<u8>,
     block_refs: &Bound<'_, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let block_ref_buffers = extract_buffers(block_refs)?;
     let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
+    let generator_bytes = generator_as_slice(&generator)?;
     let output =
-        py.detach(|| get_coinspends_for_trusted_block(constants, &generator, &refs, flags))?;
+        py.detach(|| get_coinspends_for_trusted_block(constants, generator_bytes, &refs, flags))?;
 
     let dict = PyDict::new(py);
     dict.set_item("block_spends", output)?;
@@ -591,15 +652,17 @@ pub fn get_spends_for_trusted_block(
 pub fn get_spends_for_trusted_block_with_conditions<'a>(
     py: Python<'a>,
     constants: &ConsensusConstants,
-    generator: Program,
+    // the serialized generator; `flags` decides classic vs serde_2026 decoding
+    generator: PyBuffer<u8>,
     block_refs: &Bound<'a, PySequence>,
     flags: ConsensusFlags,
 ) -> pyo3::PyResult<Py<PyAny>> {
     let block_ref_buffers = extract_buffers(block_refs)?;
     let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
+    let generator_bytes = generator_as_slice(&generator)?;
     let output = py.detach(|| {
-        get_coinspends_with_conditions_for_trusted_block(constants, &generator, &refs, flags)
+        get_coinspends_with_conditions_for_trusted_block(constants, generator_bytes, &refs, flags)
     })?;
 
     let pylist = PyList::empty(py);
@@ -871,6 +934,10 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
     m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
     m.add(
+        "INTERNED_GENERATOR",
+        ConsensusFlags::INTERNED_GENERATOR.bits(),
+    )?;
+    m.add(
         "SERDE_2026_MAGIC_PREFIX",
         PyBytes::new(py, &SERDE_2026_MAGIC_PREFIX),
     )?;
@@ -1025,6 +1092,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(serialized_length_trusted, m)?)?;
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 

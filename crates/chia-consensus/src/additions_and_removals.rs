@@ -6,6 +6,7 @@ use chia_protocol::Coin;
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
+use crate::serde_2026::node_from_bytes_2026_trusted;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
@@ -36,7 +37,13 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let program = node_from_bytes_backrefs(&mut a, program)?;
+    // Only the generator blob itself is format-switched here; refs/args
+    // downstream (via setup_generator_args) stay classic regardless.
+    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+        node_from_bytes_2026_trusted(&mut a, program)?
+    } else {
+        node_from_bytes_backrefs(&mut a, program)?
+    };
 
     let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
