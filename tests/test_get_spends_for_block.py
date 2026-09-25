@@ -4,7 +4,7 @@ from chia_rs import solution_generator
 from chia_rs import solution_generator_2026
 from chia_rs import Coin
 from chia_rs import Program
-from chia_rs import INTERNED_GENERATOR
+from chia_rs import INTERNED_SPEND_LIST
 from chia_rs.sized_bytes import bytes32
 from chia_rs.sized_ints import uint64
 
@@ -103,7 +103,7 @@ def test_generator_parsing() -> None:
 def test_serde_2026_generator() -> None:
     # get_spends_for_trusted_block() and
     # get_spends_for_trusted_block_with_conditions() dispatch on
-    # INTERNED_GENERATOR, so a serde_2026 generator must produce the same
+    # INTERNED_SPEND_LIST, so a serde_2026 generator must produce the same
     # spends/conditions as the equivalent classic one.
     identity_puzzle = bytes([1])
     solution = bytes([0x80])
@@ -122,7 +122,7 @@ def test_serde_2026_generator() -> None:
         DEFAULT_CONSTANTS, classic_generator, args, 0
     )
     interned_dict = get_spends_for_trusted_block(
-        DEFAULT_CONSTANTS, interned_generator, args, INTERNED_GENERATOR
+        DEFAULT_CONSTANTS, interned_generator, args, INTERNED_SPEND_LIST
     )
     assert str(classic_dict) == str(interned_dict)
 
@@ -130,6 +130,6 @@ def test_serde_2026_generator() -> None:
         DEFAULT_CONSTANTS, classic_generator, args, 0
     )
     interned_list = get_spends_for_trusted_block_with_conditions(
-        DEFAULT_CONSTANTS, interned_generator, args, INTERNED_GENERATOR
+        DEFAULT_CONSTANTS, interned_generator, args, INTERNED_SPEND_LIST
     )
     assert str(classic_list) == str(interned_list)

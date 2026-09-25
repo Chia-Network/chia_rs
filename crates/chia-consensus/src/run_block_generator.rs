@@ -172,7 +172,7 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
         // nothing to check at the byte level: serde_2026 (the only legal
         // encoding, enforced by node_from_bytes_2026 at parse time) can't be
         // examined for the quote shape; quote enforcement happens
@@ -189,11 +189,15 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
 // this function is mostly the same as above but is a double check in case of
 // discrepancies in serialized vs deserialized forms
 //
-// INTERNED_GENERATOR always implies the quote requirement too: serde_2026
-// generators can't be quote-checked at the byte level (see
-// check_generator_quote() above), so this is their only enforcement point. In
-// practice SIMPLE_GENERATOR (soft_fork9) is always active by the time
-// INTERNED_GENERATOR (hard_fork2) is, but callers can construct flags
+// callers that still treat the generator field as a runnable, quoted program
+// (run_block_generator(), get_coinspends_for_trusted_block(), ...) rely on
+// this as their quote-shape enforcement point when INTERNED_SPEND_LIST is
+// set, since serde_2026 generators can't be quote-checked at the byte level
+// (see check_generator_quote() above). run_block_generator2(), however, never
+// calls this for INTERNED_SPEND_LIST: the generator field is a spend list,
+// not a runnable program, and there's no quote wrapper to check. In practice
+// SIMPLE_GENERATOR (soft_fork9) is always active by the time
+// INTERNED_SPEND_LIST (hard_fork2) is, but callers can construct flags
 // directly (tests, wheel bindings), so don't rely on that coupling here.
 #[inline]
 pub fn check_generator_node(
@@ -201,7 +205,7 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.intersects(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR) {
+    if !flags.intersects(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST) {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
@@ -234,43 +238,53 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    check_generator_quote(program, flags)?;
+    let (mut a, mut cost_left, all_spends, top_level_cost) =
+        if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
+            // the generator field is a serialized spend list, not a program:
+            // there's no quote to check and nothing to run. Deserialize the
+            // blob, intern it, and read the spend list directly out of the
+            // interned tree.
+            if block_refs.into_iter().next().is_some() {
+                return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+            }
+            let mut decode_allocator = Allocator::new();
+            let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
+            let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
+            let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
+                .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
+            let base_cost = interned_vbytes(&interned) * constants.cost_per_byte;
+            let InternedTree {
+                allocator: a, root, ..
+            } = interned;
+            drop(decode_allocator);
 
-    let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        let mut decode_allocator = Allocator::new();
-        let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
-        let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
-        let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
-            .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        let cost = interned_vbytes(&interned) * constants.cost_per_byte;
-        let InternedTree {
-            allocator, root, ..
-        } = interned;
-        drop(decode_allocator);
-        (allocator, cost, root)
-    } else {
-        let mut a = make_allocator(flags);
-        let byte_cost = program.len() as u64 * constants.cost_per_byte;
-        let program = node_from_bytes_backrefs(&mut a, program)?;
-        (a, byte_cost, program)
-    };
+            let mut cost_left = max_cost;
+            subtract_cost(&mut cost_left, base_cost)?;
+            let all_spends = first(&a, root)?;
+            (a, cost_left, all_spends, 0)
+        } else {
+            check_generator_quote(program, flags)?;
+            let mut a = make_allocator(flags);
+            let byte_cost = program.len() as u64 * constants.cost_per_byte;
+            let program = node_from_bytes_backrefs(&mut a, program)?;
 
-    let mut cost_left = max_cost;
-    subtract_cost(&mut cost_left, base_cost)?;
+            let mut cost_left = max_cost;
+            subtract_cost(&mut cost_left, byte_cost)?;
 
-    check_generator_node(&a, program, flags)?;
+            check_generator_node(&a, program, flags)?;
 
-    let args = setup_generator_args(&mut a, block_refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
-
-    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
-
-    subtract_cost(&mut cost_left, clvm_cost)?;
+            let args = setup_generator_args(&mut a, block_refs, flags)?;
+            let dialect = ChiaDialect::new(flags.to_clvm_flags());
+            let Reduction(clvm_cost, generator_output) =
+                run_program(&mut a, &dialect, program, args, cost_left)?;
+            subtract_cost(&mut cost_left, clvm_cost)?;
+            let all_spends = first(&a, generator_output)?;
+            (a, cost_left, all_spends, clvm_cost)
+        };
 
     let mut ret = SpendBundleConditions::default();
-
-    let all_spends = first(&a, all_spends)?;
-    ret.execution_cost += clvm_cost;
+    ret.execution_cost += top_level_cost;
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
@@ -359,27 +373,34 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator, flags)?;
     let mut output = Vec::<CoinSpend>::new();
 
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    let res = if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
+        // the generator field is a serialized spend list, not a program:
+        // there's nothing to quote-check or run. Deserialize it and read the
+        // spend list directly (matching the shape run_program() below would
+        // otherwise produce).
+        if refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
         node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
-        node_from_bytes_backrefs(&mut a, generator)?
+        check_generator_quote(generator, flags)?;
+        let program = node_from_bytes_backrefs(&mut a, generator)?;
+        check_generator_node(&a, program, flags)?;
+        let args = setup_generator_args(&mut a, refs, flags)?;
+        let dialect = ChiaDialect::new(flags.to_clvm_flags());
+        let Reduction(_clvm_cost, res) = run_program(
+            &mut a,
+            &dialect,
+            program,
+            args,
+            constants.max_block_cost_clvm,
+        )?;
+        res
     };
-    check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
-
-    let Reduction(_clvm_cost, res) = run_program(
-        &mut a,
-        &dialect,
-        program,
-        args,
-        constants.max_block_cost_clvm,
-    )?;
 
     let (first, _rest) = a
         .next(res)
@@ -464,28 +485,35 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator, flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    let res = if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
+        // the generator field is a serialized spend list, not a program:
+        // there's nothing to quote-check or run. Deserialize it and read the
+        // spend list directly (matching the shape run_program() below would
+        // otherwise produce).
+        if refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
         node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
-        node_from_bytes_backrefs(&mut a, generator)?
+        check_generator_quote(generator, flags)?;
+        let program = node_from_bytes_backrefs(&mut a, generator)?;
+        check_generator_node(&a, program, flags)?;
+        let args = setup_generator_args(&mut a, refs, flags)?;
+        let Reduction(_clvm_cost, res) = run_program(
+            &mut a,
+            &dialect,
+            program,
+            args,
+            constants.max_block_cost_clvm,
+        )
+        .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
+        res
     };
-    check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
-
-    let Reduction(_clvm_cost, res) = run_program(
-        &mut a,
-        &dialect,
-        program,
-        args,
-        constants.max_block_cost_clvm,
-    )
-    .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
 
     let (first, _rest) = a
         .next(res)
@@ -717,10 +745,10 @@ mod tests {
 
     #[test]
     fn test_check_generator_quote_interned_defers_to_parse_and_node_checks() {
-        // with INTERNED_GENERATOR set, there is nothing to check at the byte
+        // with INTERNED_SPEND_LIST set, there is nothing to check at the byte
         // level: encoding is enforced by node_from_bytes_2026 at parse time
         // and the quote shape by check_generator_node() after decode
-        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST;
         assert!(check_generator_quote(&SERDE_2026_MAGIC_PREFIX, flags).is_ok());
         assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
         assert!(check_generator_quote(&[0x80], flags).is_ok());
@@ -728,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_serde_2026_blob_rejected_without_interned_flag() {
-        // Without INTERNED_GENERATOR, a serde_2026-prefixed blob must fail the
+        // Without INTERNED_SPEND_LIST, a serde_2026-prefixed blob must fail the
         // same way as on deployed nodes: the magic prefix starts with 0xfd,
         // which is an invalid header byte in classic CLVM serialization, so
         // node_from_bytes_backrefs() fails and maps to GeneratorRuntimeError.
@@ -751,7 +779,7 @@ mod tests {
             ErrorCode::GeneratorRuntimeError,
         );
 
-        // SIMPLE_GENERATOR active but INTERNED_GENERATOR not yet: the blob
+        // SIMPLE_GENERATOR active but INTERNED_SPEND_LIST not yet: the blob
         // fails the quote check first (it doesn't start with [0xff, 0x01]),
         // exactly as on deployed nodes.
         let result = run_block_generator2(
@@ -773,8 +801,8 @@ mod tests {
     fn test_check_generator_node_enforced_with_interned_flag() {
         // The node-level check is the quote enforcement point for serde_2026
         // blobs (whose byte encoding can't be checked for the quote shape),
-        // so it must NOT be bypassed when INTERNED_GENERATOR is set.
-        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        // so it must NOT be bypassed when INTERNED_SPEND_LIST is set.
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
@@ -792,10 +820,10 @@ mod tests {
     #[test]
     fn test_check_generator_node_enforced_with_interned_flag_alone() {
         // Quote enforcement must not depend on SIMPLE_GENERATOR also being
-        // set: on deployed nodes it always is by the time INTERNED_GENERATOR
+        // set: on deployed nodes it always is by the time INTERNED_SPEND_LIST
         // is (hard_fork2_height >= soft_fork9_height), but callers can pass
         // flags directly (tests, wheel bindings) without that coupling.
-        let flags = ConsensusFlags::INTERNED_GENERATOR;
+        let flags = ConsensusFlags::INTERNED_SPEND_LIST;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
@@ -811,16 +839,21 @@ mod tests {
     }
 
     #[test]
-    fn test_serde_2026_quote_enforcement_end_to_end() {
+    fn test_serde_2026_spend_list_parsed_without_execution() {
+        // with INTERNED_SPEND_LIST set, the generator field is a serialized
+        // spend list, not a program: run_block_generator2 must not quote-check
+        // or execute it (there's no `(q . ...)` wrapper any more), it just
+        // deserializes, interns, and parses the spend list directly.
         use crate::solution_generator::solution_generator_2026;
         use clvmr::serde::serialize_2026;
 
         let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
             | ConsensusFlags::SIMPLE_GENERATOR
-            | ConsensusFlags::INTERNED_GENERATOR;
+            | ConsensusFlags::INTERNED_SPEND_LIST;
         let blocks: &[&[u8]] = &[];
 
-        // a quoted spend list in serde_2026 encoding is accepted
+        // an unquoted spend list in serde_2026 encoding is accepted and its
+        // spend is parsed out
         let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
         let empty_solution: &[u8] = &[0x80];
         let spends = [(
@@ -830,6 +863,9 @@ mod tests {
         )];
         let program = solution_generator_2026(spends).expect("solution_generator_2026");
         assert!(program.starts_with(&SERDE_2026_MAGIC_PREFIX));
+        // it is NOT quoted: unlike the classic/backrefs generator, it doesn't
+        // start with the `(q . ...)` prefix bytes.
+        assert!(!program.starts_with(&[0xff, 0x01]));
         let (_, conds) = run_block_generator2(
             &program,
             blocks,
@@ -842,8 +878,8 @@ mod tests {
         .expect("run_block_generator2");
         assert_eq!(conds.spends.len(), 1);
 
-        // a non-quoted serde_2026 generator is rejected by the node-level
-        // quote check
+        // a blob that doesn't even decode to a list is rejected while
+        // reading the (would-be) spend list, not by any quote/node check
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         let blob = serialize_2026(&a, atom, 0).expect("serialize_2026");
@@ -859,13 +895,13 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err().error_code(),
-            ErrorCode::ComplexGeneratorReceived,
+            ErrorCode::InvalidCondition,
         );
     }
 
     #[test]
     fn test_old_serialization_rejected_with_interned_flag() {
-        // with INTERNED_GENERATOR active, an otherwise-valid generator in the
+        // with INTERNED_SPEND_LIST active, an otherwise-valid generator in the
         // old (classic/backrefs) serialization is a consensus failure
         let program = make_generator(1);
         assert!(program.starts_with(&[0xff, 0x01]));
@@ -881,9 +917,9 @@ mod tests {
             None,
             &TEST_CONSTANTS,
         );
-        assert!(result.is_ok(), "sanity: valid without INTERNED_GENERATOR");
+        assert!(result.is_ok(), "sanity: valid without INTERNED_SPEND_LIST");
 
-        let flags = flags | ConsensusFlags::INTERNED_GENERATOR;
+        let flags = flags | ConsensusFlags::INTERNED_SPEND_LIST;
         let result = run_block_generator2(
             &program,
             blocks,
@@ -897,5 +933,59 @@ mod tests {
             result.unwrap_err(),
             ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
         );
+    }
+
+    /// get_coinspends_for_trusted_block() and
+    /// get_coinspends_with_conditions_for_trusted_block() must not
+    /// quote-check or execute the generator field either, when
+    /// INTERNED_SPEND_LIST is set: they should read the same coin spends out
+    /// of an unquoted solution_generator_2026() blob as out of the
+    /// equivalent classic (quoted) generator.
+    #[test]
+    fn test_get_coinspends_for_trusted_block_interned_spend_list() {
+        use crate::solution_generator::solution_generator_2026;
+
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80];
+        let coin = Coin::new([0u8; 32].into(), puzzle_hash.into(), 0);
+        let spends = [(coin, IDENTITY_PUZZLE, empty_solution)];
+
+        let classic_generator = solution_generator(spends).expect("solution_generator");
+        let interned_generator = solution_generator_2026(spends).expect("solution_generator_2026");
+        let refs: &[&[u8]] = &[];
+
+        let classic = get_coinspends_for_trusted_block(
+            &TEST_CONSTANTS,
+            &classic_generator,
+            refs,
+            ConsensusFlags::empty(),
+        )
+        .expect("get_coinspends_for_trusted_block classic");
+        let interned = get_coinspends_for_trusted_block(
+            &TEST_CONSTANTS,
+            &interned_generator,
+            refs,
+            ConsensusFlags::INTERNED_SPEND_LIST,
+        )
+        .expect("get_coinspends_for_trusted_block interned");
+        assert_eq!(classic, interned);
+        assert_eq!(interned.len(), 1);
+
+        let classic_with_conds = get_coinspends_with_conditions_for_trusted_block(
+            &TEST_CONSTANTS,
+            &classic_generator,
+            refs,
+            ConsensusFlags::empty(),
+        )
+        .expect("get_coinspends_with_conditions_for_trusted_block classic");
+        let interned_with_conds = get_coinspends_with_conditions_for_trusted_block(
+            &TEST_CONSTANTS,
+            &interned_generator,
+            refs,
+            ConsensusFlags::INTERNED_SPEND_LIST,
+        )
+        .expect("get_coinspends_with_conditions_for_trusted_block interned");
+        assert_eq!(classic_with_conds, interned_with_conds);
+        assert_eq!(interned_with_conds.len(), 1);
     }
 }

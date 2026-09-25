@@ -15,7 +15,7 @@ use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, deserialize_2026};
 
 /// Deserialize a generator on the consensus path: the blob must be a
 /// magic-prefixed serde_2026 encoding, with no fallback to classic/backrefs
-/// parsing — with `INTERNED_GENERATOR` active, serde_2026 is the only legal
+/// parsing — with `INTERNED_SPEND_LIST` active, serde_2026 is the only legal
 /// generator encoding. `max_blob_size` bounds the wire size accepted (derive
 /// it via [`max_canonical_blob_size`]); it doubles as the per-atom cap, since
 /// atoms appear as literals in the canonical serialization, so an atom of
