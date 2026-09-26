@@ -10,7 +10,7 @@ use std::fs;
 use std::path::Path;
 
 /// For a single spend bundle: upper bound >= finalize cost, and finalize cost matches
-/// `run_block_generator2(..., INTERNED_GENERATOR)` (block header cost).
+/// `run_block_generator2(..., INTERNED_SPEND_LIST)` (block header cost).
 fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
     let mut a = Allocator::new();
     let conds = run_spendbundle(
@@ -46,7 +46,7 @@ fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
-        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
         &TEST_CONSTANTS,
@@ -55,7 +55,7 @@ fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
 
     assert_eq!(
         conds.cost, exact_total,
-        "finalize() cost must match consensus INTERNED_GENERATOR path"
+        "finalize() cost must match consensus INTERNED_SPEND_LIST path"
     );
 }
 
@@ -90,16 +90,16 @@ fn test_basic_functionality() {
 
     assert_eq!(
         builder.cost(),
-        WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte + 20
+        WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte
     );
 
     let (generator, sig, cost) = builder.finalize().expect("finalize");
 
     assert!(!generator.is_empty());
     assert_eq!(sig, Signature::default());
-    // Empty builder: block_cost=20 + generator cost of (q . ((nil))) wrapper
-    // = 11 vbytes * cost_per_byte + 20
-    assert_eq!(cost, 11 * TEST_CONSTANTS.cost_per_byte + 20);
+    // Empty builder: block_cost=0 + generator cost of ((nil)) wrapper
+    // = 5 vbytes * cost_per_byte
+    assert_eq!(cost, 5 * TEST_CONSTANTS.cost_per_byte);
 }
 
 fn make_test_coin_spend(parent: [u8; 32], amount: u64) -> chia_protocol::CoinSpend {
@@ -137,7 +137,7 @@ fn clvm_execution_cost(bundle: &SpendBundle) -> u64 {
             * TEST_CONSTANTS.cost_per_byte
 }
 
-/// finalize() must agree with run_block_generator2(..., INTERNED_GENERATOR).
+/// finalize() must agree with run_block_generator2(..., INTERNED_SPEND_LIST).
 #[test]
 fn test_finalize_cost_matches_consensus() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
@@ -165,7 +165,7 @@ fn test_finalize_cost_matches_consensus() {
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
-        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
         &TEST_CONSTANTS,
@@ -174,7 +174,7 @@ fn test_finalize_cost_matches_consensus() {
 
     assert_eq!(
         conds.cost, finalize_cost,
-        "finalize() cost must match consensus INTERNED_GENERATOR path"
+        "finalize() cost must match consensus INTERNED_SPEND_LIST path"
     );
 }
 
@@ -197,7 +197,7 @@ fn test_single_spend_bundle() {
     assert!(!generator.is_empty(), "generator should not be empty");
     assert_eq!(sig, Signature::default());
     assert!(
-        cost > 11 * TEST_CONSTANTS.cost_per_byte + 20,
+        cost > WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte,
         "cost should increase from base"
     );
 }
@@ -257,7 +257,7 @@ fn test_block_full_overflow() {
 fn test_num_skipped() {
     let cost_per_byte = TEST_CONSTANTS.cost_per_byte;
     // Room for MIN_COST_THRESHOLD, but individual bundles can still be rejected.
-    let max = MIN_COST_THRESHOLD + WRAPPER_VBYTES * cost_per_byte + 20 + 1_000_000;
+    let max = MIN_COST_THRESHOLD + WRAPPER_VBYTES * cost_per_byte + 1_000_000;
 
     let mut builder = InternedBlockBuilder::new_with(cost_per_byte, max);
 
@@ -265,7 +265,7 @@ fn test_num_skipped() {
     let bundle = SpendBundle::new(vec![coin_spend], Signature::default());
 
     // Declared CLVM cost alone exceeds max (rejected before parsing spends).
-    let declared_cost = max - WRAPPER_VBYTES * cost_per_byte - 20 + 1;
+    let declared_cost = max - WRAPPER_VBYTES * cost_per_byte + 1;
 
     for _ in 0..MAX_SKIPPED_ITEMS {
         let (added, result) = builder
@@ -402,7 +402,7 @@ fn normalized_spends(
 }
 
 /// Agreement test: the interned builder's serde_2026 output, run under the
-/// INTERNED_GENERATOR consensus path, yields the same spends/conditions as
+/// INTERNED_SPEND_LIST consensus path, yields the same spends/conditions as
 /// an independently-built classic generator for the same bundles, run under
 /// classic rules. serde_2026 has no canonical encoding, so this is not a
 /// round trip.
@@ -424,11 +424,11 @@ fn test_serde_2026_builder_matches_classic() {
     let (spends_2026, run_cost_2026) = normalized_spends(
         &generator_2026,
         &sig_2026,
-        ConsensusFlags::INTERNED_GENERATOR,
+        ConsensusFlags::INTERNED_SPEND_LIST,
     );
     assert_eq!(
         run_cost_2026, cost_2026,
-        "finalize() cost must match the INTERNED_GENERATOR consensus path"
+        "finalize() cost must match the INTERNED_SPEND_LIST consensus path"
     );
 
     // classic reference generator, run under classic (pre-HF2) rules
@@ -439,15 +439,30 @@ fn test_serde_2026_builder_matches_classic() {
 }
 
 /// tree_hash_2026 semantics: hashing the serde_2026 generator agrees with the
-/// tree hash of the classic serialization of the same tree.
+/// tree hash of the classic serialization of the same (unquoted, spend-list
+/// format) tree. This uses `build_generator(..., quote: false)` directly
+/// rather than `build_classic_reference()`, since the latter produces the
+/// quoted, pre-`INTERNED_SPEND_LIST` mempool format, which is a different
+/// tree from what the builder emits.
 #[test]
 fn test_serde_2026_tree_hash_2026_agrees() {
     use crate::serde_2026::node_from_bytes_2026_trusted;
+    use crate::solution_generator::build_generator;
     use clvm_utils::{TreeCache, tree_hash_cached, tree_hash_from_bytes};
+    use clvmr::serde::node_to_bytes_backrefs;
 
     let bundles = serde_2026_test_bundles();
     let (generator_2026, _, _) = build_block(&bundles);
-    let (generator_classic, _) = build_classic_reference(&bundles);
+
+    let mut classic_a = Allocator::new();
+    let spends = bundles.iter().flat_map(|b| {
+        b.coin_spends
+            .iter()
+            .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice()))
+    });
+    let classic_root = build_generator(&mut classic_a, spends, false).expect("build_generator");
+    let generator_classic =
+        node_to_bytes_backrefs(&classic_a, classic_root).expect("node_to_bytes_backrefs");
 
     // same parse and hash as the wheel's tree_hash_2026()
     let mut a = Allocator::new();

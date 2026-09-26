@@ -36,22 +36,25 @@ where
     let mut removals = Vec::<(Bytes32, Coin)>::new();
 
     let mut cost_left = constants.max_block_cost_clvm;
-
-    // Only the generator blob itself is format-switched here; refs/args
-    // downstream (via setup_generator_args) stay classic regardless.
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        node_from_bytes_2026_trusted(&mut a, program)?
-    } else {
-        node_from_bytes_backrefs(&mut a, program)?
-    };
-
-    let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
-    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
-
-    subtract_cost(&mut cost_left, clvm_cost)?;
-    let all_spends = first(&a, all_spends)?;
+    let all_spends = if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
+        // the generator field is a serialized spend list, not a program:
+        // there's nothing to run, it's already the shape run_program() below
+        // would otherwise produce.
+        if block_refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
+        let program = node_from_bytes_2026_trusted(&mut a, program)?;
+        first(&a, program)?
+    } else {
+        let program = node_from_bytes_backrefs(&mut a, program)?;
+        let args = setup_generator_args(&mut a, block_refs, flags)?;
+        let Reduction(clvm_cost, all_spends) =
+            run_program(&mut a, &dialect, program, args, cost_left)?;
+        subtract_cost(&mut cost_left, clvm_cost)?;
+        first(&a, all_spends)?
+    };
 
     let mut cache = TreeCache::default();
     // at this point all_spends is a list of:
@@ -264,6 +267,48 @@ mod test {
         for r in &removals {
             assert!(expect_removals.contains(&r.1));
         }
+    }
+
+    /// additions_and_removals() with INTERNED_SPEND_LIST must not try to
+    /// quote-check or execute the generator field (it's a spend list, not a
+    /// program): it should read the same additions/removals out of an
+    /// unquoted solution_generator_2026() blob as out of the equivalent
+    /// classic (quoted) generator.
+    #[test]
+    fn test_additions_and_removals_interned_spend_list() {
+        use crate::solution_generator::solution_generator_2026;
+        use clvm_utils::tree_hash_atom;
+
+        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
+        let empty_solution: &[u8] = &[0x80];
+        let coin = Coin::new([0u8; 32].into(), puzzle_hash.into(), 0);
+        let spends = [(coin, [1u8].as_slice(), empty_solution)];
+
+        let classic_generator =
+            crate::solution_generator::solution_generator(spends).expect("solution_generator");
+        let interned_generator = solution_generator_2026(spends).expect("solution_generator_2026");
+
+        let block_refs = Vec::<Vec<u8>>::new();
+
+        let (classic_additions, classic_removals) = additions_and_removals(
+            &classic_generator,
+            &block_refs,
+            ConsensusFlags::empty(),
+            &TEST_CONSTANTS,
+        )
+        .expect("additions_and_removals() classic");
+
+        let (interned_additions, interned_removals) = additions_and_removals(
+            &interned_generator,
+            &block_refs,
+            ConsensusFlags::INTERNED_SPEND_LIST,
+            &TEST_CONSTANTS,
+        )
+        .expect("additions_and_removals() interned");
+
+        assert_eq!(classic_additions, interned_additions);
+        assert_eq!(classic_removals, interned_removals);
+        assert_eq!(interned_removals.len(), 1);
     }
 
     fn make_create_coin_generator(hint_size: usize) -> Vec<u8> {

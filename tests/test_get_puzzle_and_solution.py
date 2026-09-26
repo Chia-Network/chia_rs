@@ -9,7 +9,7 @@ from chia_rs import (
     Coin,
     G2Element,
     DONT_VALIDATE_SIGNATURE,
-    INTERNED_GENERATOR,
+    INTERNED_SPEND_LIST,
 )
 from run_gen import DEFAULT_CONSTANTS
 from chia_rs.sized_bytes import bytes32
@@ -115,7 +115,7 @@ def test_get_puzzle_and_solution_for_coin(input_file: str) -> None:
 
 
 def test_get_puzzle_and_solution_for_coin2_serde_2026() -> None:
-    # get_puzzle_and_solution_for_coin2() dispatches on INTERNED_GENERATOR,
+    # get_puzzle_and_solution_for_coin2() dispatches on INTERNED_SPEND_LIST,
     # so a serde_2026 generator must find the same puzzle/solution as the
     # equivalent classic one.
     identity_puzzle = bytes([1])
@@ -134,7 +134,7 @@ def test_get_puzzle_and_solution_for_coin2_serde_2026() -> None:
         classic_generator, [], MAX_COST, coin, 0
     )
     puzzle_2026, sol_2026 = get_puzzle_and_solution_for_coin2(
-        interned_generator, [], MAX_COST, coin, INTERNED_GENERATOR
+        interned_generator, [], MAX_COST, coin, INTERNED_SPEND_LIST
     )
 
     assert bytes(puzzle) == bytes(puzzle_2026) == identity_puzzle

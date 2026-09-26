@@ -22,8 +22,8 @@ const MAX_SKIPPED_ITEMS: u32 = 6;
 /// determine how close to the block size limit we're willing to go.
 const MIN_COST_THRESHOLD: u64 = 6_000_000;
 
-/// Interned vbyte weight of the `(q . ((spend_list)))` wrapper.
-const WRAPPER_VBYTES: u64 = 11;
+/// Interned vbyte weight of the `((spend_list))` wrapper.
+const WRAPPER_VBYTES: u64 = 5;
 
 /// The cost of a cons cell in the generator tree
 const COST_CONS: u64 = 3;
@@ -52,7 +52,7 @@ pub enum BuildBlockResult {
 /// finalize() always emits the generator in serde_2026 format (interned
 /// serialization, magic-prefixed). There is no classic-emission mode: this
 /// builder's cost accounting charges by interned vbytes, which is only
-/// correct once INTERNED_GENERATOR is active, and serde_2026 acceptance
+/// correct once INTERNED_SPEND_LIST is active, and serde_2026 acceptance
 /// activates at that same height (single activation) — so there is no valid
 /// height at which this builder's output could be classic-serialized.
 #[cfg_attr(feature = "py-bindings", pyclass)]
@@ -93,7 +93,7 @@ impl InternedBlockBuilder {
             allocator: a,
             signature: Signature::default(),
             spend_list,
-            block_cost: 20,
+            block_cost: 0,
             byte_cost: 0,
             num_skipped: 0,
             cost_per_byte,
@@ -102,9 +102,9 @@ impl InternedBlockBuilder {
     }
 
     pub fn new(constants: &ConsensusConstants) -> Self {
-        // the generator we produce is just a quoted list. Nothing fancy.
+        // the generator we produce is just a spend list. Nothing fancy.
         // Its format is as follows:
-        // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
+        // ( ( ( parent-id puzzle-reveal amount solution ) ... ) )
 
         Self::new_with(constants.cost_per_byte, constants.max_block_cost_clvm)
     }
@@ -223,10 +223,9 @@ impl InternedBlockBuilder {
 
     // returns generator, sig, cost
     pub fn finalize(&mut self) -> Result<(Vec<u8>, Signature, u64)> {
-        let inner = self
+        let root = self
             .allocator
             .new_pair(self.spend_list, self.allocator.nil())?;
-        let root = self.allocator.new_pair(self.allocator.one(), inner)?;
         let serialized = serialize_2026(&self.allocator, root, SERDE_2026_COMPRESSION_LEVEL)?;
 
         let interned = intern_tree(&self.allocator, root)?;
@@ -476,7 +475,7 @@ mod tests {
                     generator.as_slice(),
                     [],
                     TEST_CONSTANTS.max_block_cost_clvm,
-                    MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+                    MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
                     &signature,
                     None,
                     &TEST_CONSTANTS,
