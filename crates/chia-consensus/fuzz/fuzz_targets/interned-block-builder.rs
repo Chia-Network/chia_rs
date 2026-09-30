@@ -101,7 +101,7 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
-        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
         &TEST_CONSTANTS,
@@ -109,7 +109,7 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
 
     // Independently build a classic-serialization reference generator for
     // the same spends (cf. additional_tests.rs::build_classic_reference) and
-    // run it under classic (non-INTERNED_GENERATOR) rules. The two encodings
+    // run it under classic (non-INTERNED_SPEND_LIST) rules. The two encodings
     // charge different base costs, so the reference runs uncapped: it is a
     // semantic reference, not a budget check (the interned run above already
     // covers the real cap). Cost isn't compared, but the two runs must agree
@@ -136,7 +136,7 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         (Ok((interned_a, conds)), Ok((classic_a, classic_conds))) => {
             assert_eq!(
                 conds.cost, cost,
-                "finalize() cost must match consensus INTERNED_GENERATOR path"
+                "finalize() cost must match consensus INTERNED_SPEND_LIST path"
             );
             assert_eq!(
                 normalized_spends(&interned_a, conds),
@@ -162,13 +162,13 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     }
 
     // Round-trip: generator bytes must decode back to the same spends (cf. generator.rs).
-    // finalize() emits serde_2026, so INTERNED_GENERATOR is needed to parse it.
+    // finalize() emits serde_2026, so INTERNED_SPEND_LIST is needed to parse it.
     let gen_prog = Program::new(generator.into());
     let Ok(mut result) = get_coinspends_for_trusted_block(
         &TEST_CONSTANTS,
         &gen_prog,
         vec![&[]],
-        ConsensusFlags::INTERNED_GENERATOR,
+        ConsensusFlags::INTERNED_SPEND_LIST,
     ) else {
         return Corpus::Reject;
     };

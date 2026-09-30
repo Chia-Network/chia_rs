@@ -174,7 +174,7 @@ fn extract_n<const N: usize>(
 // this is required after the SIMPLE_GENERATOR fork is active
 #[inline]
 pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<(), ValidationErr> {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
         // nothing to check at the byte level: serde_2026 (the only legal
         // encoding, enforced by node_from_bytes_2026 at parse time) can't be
         // examined for the quote shape; quote enforcement happens
@@ -191,11 +191,11 @@ pub fn check_generator_quote(program: &[u8], flags: ConsensusFlags) -> Result<()
 // this function is mostly the same as above but is a double check in case of
 // discrepancies in serialized vs deserialized forms
 //
-// INTERNED_GENERATOR always implies the quote requirement too: serde_2026
+// INTERNED_SPEND_LIST always implies the quote requirement too: serde_2026
 // generators can't be quote-checked at the byte level (see
 // check_generator_quote() above), so this is their only enforcement point. In
 // practice SIMPLE_GENERATOR (soft_fork9) is always active by the time
-// INTERNED_GENERATOR (hard_fork2) is, but callers can construct flags
+// INTERNED_SPEND_LIST (hard_fork2) is, but callers can construct flags
 // directly (tests, wheel bindings), so don't rely on that coupling here.
 #[inline]
 pub fn check_generator_node(
@@ -203,7 +203,7 @@ pub fn check_generator_node(
     program: NodePtr,
     flags: ConsensusFlags,
 ) -> Result<(), ValidationErr> {
-    if !flags.intersects(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR) {
+    if !flags.intersects(ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST) {
         return Ok(());
     }
     // this expects an atom with a single byte value of 1 as the first value in the list
@@ -236,7 +236,7 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_SPEND_LIST);
 
     if !interned_generator {
         check_generator_quote(program, flags)?;
@@ -272,7 +272,7 @@ where
     let (spend_list_wrapper, top_level_cost) = if interned_generator {
         // the generator field is the serialized spend list wrapper, in the
         // shape run_program() would produce for the classic path.
-        // INTERNED_GENERATOR disables generator references.
+        // INTERNED_SPEND_LIST disables generator references.
         if block_refs.into_iter().next().is_some() {
             return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
         }
@@ -366,7 +366,7 @@ where
 
 // Returns the spend list wrapper of a trusted block generator: the spend
 // list in an outer list whose rest is reserved for extension data. With
-// INTERNED_GENERATOR, the generator is a serde_2026 blob holding the spend
+// INTERNED_SPEND_LIST, the generator is a serde_2026 blob holding the spend
 // list wrapper directly; generator references are disabled and rejected.
 // Otherwise the classic quoted generator is checked and executed. The CLVM
 // cost is discarded; only consensus paths account for it.
@@ -383,10 +383,10 @@ pub(crate) fn spend_list_wrapper_for_trusted_block<
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
         // the generator field is the serialized spend list wrapper, in the
         // shape run_program() would produce for the classic path.
-        // INTERNED_GENERATOR disables generator references.
+        // INTERNED_SPEND_LIST disables generator references.
         if refs.into_iter().next().is_some() {
             return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
         }
@@ -742,10 +742,10 @@ mod tests {
 
     #[test]
     fn test_check_generator_quote_interned_defers_to_parse_and_node_checks() {
-        // with INTERNED_GENERATOR set, there is nothing to check at the byte
+        // with INTERNED_SPEND_LIST set, there is nothing to check at the byte
         // level: encoding is enforced by node_from_bytes_2026 at parse time
         // and the quote shape by check_generator_node() after decode
-        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST;
         assert!(check_generator_quote(&SERDE_2026_MAGIC_PREFIX, flags).is_ok());
         assert!(check_generator_quote(&[0xff, 0x01, 0x80], flags).is_ok());
         assert!(check_generator_quote(&[0x80], flags).is_ok());
@@ -753,7 +753,7 @@ mod tests {
 
     #[test]
     fn test_serde_2026_blob_rejected_without_interned_flag() {
-        // Without INTERNED_GENERATOR, a serde_2026-prefixed blob must fail the
+        // Without INTERNED_SPEND_LIST, a serde_2026-prefixed blob must fail the
         // same way as on deployed nodes: the magic prefix starts with 0xfd,
         // which is an invalid header byte in classic CLVM serialization, so
         // node_from_bytes_backrefs() fails and maps to GeneratorRuntimeError.
@@ -776,7 +776,7 @@ mod tests {
             ErrorCode::GeneratorRuntimeError,
         );
 
-        // SIMPLE_GENERATOR active but INTERNED_GENERATOR not yet: the blob
+        // SIMPLE_GENERATOR active but INTERNED_SPEND_LIST not yet: the blob
         // fails the quote check first (it doesn't start with [0xff, 0x01]),
         // exactly as on deployed nodes.
         let result = run_block_generator2(
@@ -798,8 +798,8 @@ mod tests {
     fn test_check_generator_node_enforced_with_interned_flag() {
         // The node-level check is the quote enforcement point for serde_2026
         // blobs (whose byte encoding can't be checked for the quote shape),
-        // so it must NOT be bypassed when INTERNED_GENERATOR is set.
-        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_GENERATOR;
+        // so it must NOT be bypassed when INTERNED_SPEND_LIST is set.
+        let flags = ConsensusFlags::SIMPLE_GENERATOR | ConsensusFlags::INTERNED_SPEND_LIST;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
@@ -817,10 +817,10 @@ mod tests {
     #[test]
     fn test_check_generator_node_enforced_with_interned_flag_alone() {
         // Quote enforcement must not depend on SIMPLE_GENERATOR also being
-        // set: on deployed nodes it always is by the time INTERNED_GENERATOR
+        // set: on deployed nodes it always is by the time INTERNED_SPEND_LIST
         // is (hard_fork2_height >= soft_fork9_height), but callers can pass
         // flags directly (tests, wheel bindings) without that coupling.
-        let flags = ConsensusFlags::INTERNED_GENERATOR;
+        let flags = ConsensusFlags::INTERNED_SPEND_LIST;
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         assert_eq!(
@@ -842,7 +842,7 @@ mod tests {
 
         let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
             | ConsensusFlags::SIMPLE_GENERATOR
-            | ConsensusFlags::INTERNED_GENERATOR;
+            | ConsensusFlags::INTERNED_SPEND_LIST;
         let blocks: &[&[u8]] = &[];
 
         // a quoted spend list in serde_2026 encoding is accepted
@@ -893,7 +893,7 @@ mod tests {
         use crate::solution_generator::solution_generator_2026;
 
         let base_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
-        let interned_flags = base_flags | ConsensusFlags::INTERNED_GENERATOR;
+        let interned_flags = base_flags | ConsensusFlags::INTERNED_SPEND_LIST;
         let blocks: &[&[u8]] = &[];
 
         let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
@@ -939,7 +939,7 @@ mod tests {
         use crate::solution_generator::solution_generator_2026;
 
         let base_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
-        let interned_flags = base_flags | ConsensusFlags::INTERNED_GENERATOR;
+        let interned_flags = base_flags | ConsensusFlags::INTERNED_SPEND_LIST;
         let blocks: &[&[u8]] = &[];
 
         // a spend whose identity puzzle emits CREATE_COIN with a hint, so the
@@ -989,7 +989,7 @@ mod tests {
 
         let interned_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
             | ConsensusFlags::SIMPLE_GENERATOR
-            | ConsensusFlags::INTERNED_GENERATOR;
+            | ConsensusFlags::INTERNED_SPEND_LIST;
         let refs: &[&[u8]] = &[&[1]];
 
         let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
@@ -1001,11 +1001,11 @@ mod tests {
         )];
         let program = solution_generator_2026(spends).expect("solution_generator_2026");
 
-        // INTERNED_GENERATOR disables generator references, with or without
+        // INTERNED_SPEND_LIST disables generator references, with or without
         // SIMPLE_GENERATOR
         for flags in [
             interned_flags,
-            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::INTERNED_GENERATOR,
+            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::INTERNED_SPEND_LIST,
         ] {
             let result = run_block_generator2(
                 &program,
@@ -1048,7 +1048,7 @@ mod tests {
 
     #[test]
     fn test_old_serialization_rejected_with_interned_flag() {
-        // with INTERNED_GENERATOR active, an otherwise-valid generator in the
+        // with INTERNED_SPEND_LIST active, an otherwise-valid generator in the
         // old (classic/backrefs) serialization is a consensus failure
         let program = make_generator(1);
         assert!(program.starts_with(&[0xff, 0x01]));
@@ -1064,9 +1064,9 @@ mod tests {
             None,
             &TEST_CONSTANTS,
         );
-        assert!(result.is_ok(), "sanity: valid without INTERNED_GENERATOR");
+        assert!(result.is_ok(), "sanity: valid without INTERNED_SPEND_LIST");
 
-        let flags = flags | ConsensusFlags::INTERNED_GENERATOR;
+        let flags = flags | ConsensusFlags::INTERNED_SPEND_LIST;
         let result = run_block_generator2(
             &program,
             blocks,

@@ -52,7 +52,7 @@ pub enum BuildBlockResult {
 /// finalize() always emits the generator in serde_2026 format (interned
 /// serialization, magic-prefixed). There is no classic-emission mode: this
 /// builder's cost accounting charges by interned vbytes, which is only
-/// correct once INTERNED_GENERATOR is active, and serde_2026 acceptance
+/// correct once INTERNED_SPEND_LIST is active, and serde_2026 acceptance
 /// activates at that same height (single activation) — so there is no valid
 /// height at which this builder's output could be classic-serialized.
 #[cfg_attr(feature = "py-bindings", pyclass)]
@@ -477,7 +477,7 @@ mod tests {
                     generator.as_slice(),
                     [],
                     TEST_CONSTANTS.max_block_cost_clvm,
-                    MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+                    MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
                     &signature,
                     None,
                     &TEST_CONSTANTS,

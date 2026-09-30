@@ -273,7 +273,7 @@ fn run_generator_and_find_coin(
     flags: ConsensusFlags,
 ) -> PyResult<(Program, Program)> {
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
-    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_SPEND_LIST);
 
     let (puzzle, solution) = py
         .detach(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
@@ -325,13 +325,13 @@ pub fn get_puzzle_and_solution_for_coin2(
     let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
     let generator_bytes = generator_as_slice(&generator)?;
-    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_SPEND_LIST);
     let generator = if interned_generator {
         node_from_bytes_2026_trusted(&mut allocator, generator_bytes).map_err(map_pyerr)?
     } else {
         node_from_bytes_backrefs(&mut allocator, generator_bytes).map_err(map_pyerr)?
     };
-    // INTERNED_GENERATOR disables generator references.
+    // INTERNED_SPEND_LIST disables generator references.
     if interned_generator && !refs.is_empty() {
         return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs).into());
     }
@@ -948,8 +948,8 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("SIMPLE_GENERATOR", ConsensusFlags::SIMPLE_GENERATOR.bits())?;
     m.add("LIMIT_SPENDS", ConsensusFlags::LIMIT_SPENDS.bits())?;
     m.add(
-        "INTERNED_GENERATOR",
-        ConsensusFlags::INTERNED_GENERATOR.bits(),
+        "INTERNED_SPEND_LIST",
+        ConsensusFlags::INTERNED_SPEND_LIST.bits(),
     )?;
     m.add(
         "SERDE_2026_MAGIC_PREFIX",
