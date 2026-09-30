@@ -7,7 +7,7 @@ use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::generator_cost::interned_vbytes;
 use crate::puzzle_fingerprint::compute_puzzle_fingerprint;
 use crate::run_block_generator::subtract_cost;
-use crate::solution_generator::{build_generator, calculate_generator_length};
+use crate::solution_generator::{build_spend_list_wrapper, calculate_generator_length};
 use crate::spend_visitor::SpendVisitor;
 use crate::spendbundle_validation::get_flags_for_height_and_constants;
 use crate::validation_error::ErrorCode;
@@ -56,7 +56,7 @@ fn calculate_base_cost(
 ) -> Result<u64, ValidationErr> {
     if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
         let mut gen_allocator = Allocator::new();
-        let generator = build_generator(
+        let spend_list_wrapper = build_spend_list_wrapper(
             &mut gen_allocator,
             spend_bundle
                 .coin_spends
@@ -64,7 +64,7 @@ fn calculate_base_cost(
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
         )
         .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)
+        let interned = intern_tree_limited(&gen_allocator, spend_list_wrapper, u32::MAX as usize)
             .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         Ok(interned_vbytes(&interned) * constants.cost_per_byte)
     } else {

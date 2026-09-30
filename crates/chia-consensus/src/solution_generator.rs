@@ -8,15 +8,17 @@ use clvmr::serde::{
 };
 
 /// the tuple has the Coin, puzzle-reveal and solution
-pub(crate) fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
+///
+/// Builds the spend list wrapper: the spend list as the first (and only) item
+/// of an outer list whose rest is reserved for extension data. This is the
+/// post-hard-fork spend-list format, which is parsed directly rather than
+/// executed:
+/// ( ( ( parent-id puzzle-reveal amount solution ) ... ) )
+pub(crate) fn build_spend_list_wrapper<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
 where
     BufRef: AsRef<[u8]>,
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
-    // the generator we produce here is just a quoted list. Nothing fancy.
-    // Its format is as follows:
-    // (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
-
     let mut spend_list = a.nil();
     for s in spends {
         let item = a.nil();
@@ -36,11 +38,24 @@ where
         spend_list = a.new_pair(item, spend_list)?;
     }
 
-    // the list of spends is the first (and only) item in an outer list
-    spend_list = a.new_pair(spend_list, a.nil())?;
+    // the wrapper enables soft-fork expansion: a future fork can add a
+    // second element (extension data) without breaking old parsers, which
+    // read the first element and ignore the rest.
+    Ok(a.new_pair(spend_list, a.nil())?)
+}
 
-    let quote = a.new_pair(a.one(), spend_list)?;
-    Ok(quote)
+/// the tuple has the Coin, puzzle-reveal and solution
+///
+/// Quotes the spend list wrapper, producing a runnable generator program (the
+/// pre-hard-fork format):
+/// (q . ( ( ( parent-id puzzle-reveal amount solution ) ... ) ) )
+pub(crate) fn build_generator<BufRef, I>(a: &mut Allocator, spends: I) -> Result<NodePtr>
+where
+    BufRef: AsRef<[u8]>,
+    I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
+{
+    let spend_list_wrapper = build_spend_list_wrapper(a, spends)?;
+    Ok(a.new_pair(a.one(), spend_list_wrapper)?)
 }
 
 /// this function returns the number of bytes the specified
@@ -115,8 +130,12 @@ where
     I: IntoIterator<Item = (Coin, BufRef, BufRef)>,
 {
     let mut a = Allocator::new();
-    let generator = build_generator(&mut a, spends)?;
-    Ok(serialize_2026(&a, generator, SERDE_2026_COMPRESSION_LEVEL)?)
+    let spend_list_wrapper = build_spend_list_wrapper(&mut a, spends)?;
+    Ok(serialize_2026(
+        &a,
+        spend_list_wrapper,
+        SERDE_2026_COMPRESSION_LEVEL,
+    )?)
 }
 
 #[cfg(test)]
@@ -480,11 +499,18 @@ mod tests {
         assert!(result.starts_with(&SERDE_2026_MAGIC_PREFIX));
 
         // Round-trip through the explicit serde_2026 parser and confirm the
-        // tree is identical to the one behind the classic encoding.
+        // tree is identical to the unquoted spend-list tree (no `(q . ...)`
+        // wrapper): solution_generator_2026 is the post-hard-fork format,
+        // unlike solution_generator()/solution_generator_backrefs(), which
+        // stay quoted for pre-hard-fork compatibility.
         let mut a = Allocator::new();
         let node =
             node_from_bytes_2026_trusted(&mut a, &result).expect("node_from_bytes_2026_trusted");
-        let classic = solution_generator(spends).expect("solution_generator");
+
+        let mut classic_a = Allocator::new();
+        let unquoted =
+            build_spend_list_wrapper(&mut classic_a, spends).expect("build_spend_list_wrapper");
+        let classic = node_to_bytes(&classic_a, unquoted).expect("node_to_bytes");
         assert_eq!(node_to_bytes(&a, node).expect("node_to_bytes"), classic);
     }
 
