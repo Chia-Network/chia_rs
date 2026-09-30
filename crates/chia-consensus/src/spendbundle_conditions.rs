@@ -62,6 +62,7 @@ fn calculate_base_cost(
                 .coin_spends
                 .iter()
                 .map(|cs| (cs.coin, cs.puzzle_reveal.as_slice(), cs.solution.as_slice())),
+            false,
         )
         .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
         let interned = intern_tree_limited(&gen_allocator, generator, u32::MAX as usize)

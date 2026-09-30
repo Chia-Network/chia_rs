@@ -90,16 +90,16 @@ fn test_basic_functionality() {
 
     assert_eq!(
         builder.cost(),
-        WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte + 20
+        WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte
     );
 
     let (generator, sig, cost) = builder.finalize().expect("finalize");
 
     assert!(!generator.is_empty());
     assert_eq!(sig, Signature::default());
-    // Empty builder: block_cost=20 + generator cost of (q . ((nil))) wrapper
-    // = 11 vbytes * cost_per_byte + 20
-    assert_eq!(cost, 11 * TEST_CONSTANTS.cost_per_byte + 20);
+    // Empty builder: block_cost=0 + generator cost of ((nil)) wrapper
+    // = 5 vbytes * cost_per_byte
+    assert_eq!(cost, 5 * TEST_CONSTANTS.cost_per_byte);
 }
 
 fn make_test_coin_spend(parent: [u8; 32], amount: u64) -> chia_protocol::CoinSpend {
@@ -439,15 +439,28 @@ fn test_serde_2026_builder_matches_classic() {
 }
 
 /// tree_hash_2026 semantics: hashing the serde_2026 generator agrees with the
-/// tree hash of the classic serialization of the same tree.
+/// tree hash of the classic serialization of the same spend list. The classic
+/// reference is quoted (`(q . ...)`), so we strip the quote wrapper before
+/// hashing to compare the same tree.
 #[test]
 fn test_serde_2026_tree_hash_2026_agrees() {
     use crate::serde_2026::node_from_bytes_2026_trusted;
-    use clvm_utils::{TreeCache, tree_hash_cached, tree_hash_from_bytes};
+    use clvm_utils::{TreeCache, tree_hash_cached};
+    use clvmr::serde::node_from_bytes;
+    use clvmr::SExp;
 
     let bundles = serde_2026_test_bundles();
     let (generator_2026, _, _) = build_block(&bundles);
     let (generator_classic, _) = build_classic_reference(&bundles);
+
+    // parse the quoted classic generator and extract the spend list
+    let mut classic_a = Allocator::new();
+    let quoted_root = node_from_bytes(&mut classic_a, &generator_classic)
+        .expect("node_from_bytes");
+    let spend_list = match classic_a.sexp(quoted_root) {
+        SExp::Pair(_, rest) => rest,
+        SExp::Atom => panic!("expected pair"),
+    };
 
     // same parse and hash as the wheel's tree_hash_2026()
     let mut a = Allocator::new();
@@ -455,6 +468,6 @@ fn test_serde_2026_tree_hash_2026_agrees() {
         .expect("node_from_bytes_2026_trusted");
     let hash_2026 = tree_hash_cached(&a, node, &mut TreeCache::default());
 
-    let hash_classic = tree_hash_from_bytes(&generator_classic).expect("tree_hash_from_bytes");
+    let hash_classic = tree_hash_cached(&classic_a, spend_list, &mut TreeCache::default());
     assert_eq!(hash_2026, hash_classic);
 }

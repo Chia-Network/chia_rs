@@ -234,9 +234,13 @@ pub fn run_block_generator2<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>
 where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
-    check_generator_quote(program, flags)?;
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
 
-    let (mut a, base_cost, program) = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if !interned_generator {
+        check_generator_quote(program, flags)?;
+    }
+
+    let (mut a, base_cost, program) = if interned_generator {
         let mut decode_allocator = Allocator::new();
         let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
         let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
@@ -258,19 +262,29 @@ where
     let mut cost_left = max_cost;
     subtract_cost(&mut cost_left, base_cost)?;
 
-    check_generator_node(&a, program, flags)?;
+    if !interned_generator {
+        check_generator_node(&a, program, flags)?;
+    }
 
-    let args = setup_generator_args(&mut a, block_refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
-
-    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
-
-    subtract_cost(&mut cost_left, clvm_cost)?;
+    let (all_spends, top_level_cost) = if interned_generator {
+        // the generator field is a serialized spend list, already in the
+        // shape run_program() would produce for the classic path.
+        if block_refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
+        (first(&a, program)?, 0)
+    } else {
+        let args = setup_generator_args(&mut a, block_refs, flags)?;
+        let dialect = ChiaDialect::new(flags.to_clvm_flags());
+        let Reduction(clvm_cost, generator_output) =
+            run_program(&mut a, &dialect, program, args, cost_left)?;
+        subtract_cost(&mut cost_left, clvm_cost)?;
+        (first(&a, generator_output)?, clvm_cost)
+    };
 
     let mut ret = SpendBundleConditions::default();
-
-    let all_spends = first(&a, all_spends)?;
-    ret.execution_cost += clvm_cost;
+    ret.execution_cost += top_level_cost;
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
@@ -359,27 +373,44 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator, flags)?;
     let mut output = Vec::<CoinSpend>::new();
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
 
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if !interned_generator {
+        check_generator_quote(generator, flags)?;
+    }
+
+    let program = if interned_generator {
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
         node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
         node_from_bytes_backrefs(&mut a, generator)?
     };
-    check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
-    let Reduction(_clvm_cost, res) = run_program(
-        &mut a,
-        &dialect,
-        program,
-        args,
-        constants.max_block_cost_clvm,
-    )?;
+    if !interned_generator {
+        check_generator_node(&a, program, flags)?;
+    }
+
+    let res = if interned_generator {
+        // the generator field is a serialized spend list, already in the
+        // shape run_program() would produce for the classic path.
+        if refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
+        program
+    } else {
+        let args = setup_generator_args(&mut a, refs, flags)?;
+        let dialect = ChiaDialect::new(flags.to_clvm_flags());
+        let Reduction(_clvm_cost, res) = run_program(
+            &mut a,
+            &dialect,
+            program,
+            args,
+            constants.max_block_cost_clvm,
+        )?;
+        res
+    };
 
     let (first, _rest) = a
         .next(res)
@@ -464,28 +495,45 @@ where
     <I as IntoIterator>::IntoIter: DoubleEndedIterator,
 {
     let mut a = make_allocator(flags);
-    check_generator_quote(generator, flags)?;
     let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
+    let dialect = ChiaDialect::new(flags.to_clvm_flags());
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
 
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if !interned_generator {
+        check_generator_quote(generator, flags)?;
+    }
+
+    let program = if interned_generator {
         let max_blob_size =
             max_canonical_blob_size(constants.max_block_cost_clvm, constants.cost_per_byte);
         node_from_bytes_2026(&mut a, generator, max_blob_size)?
     } else {
         node_from_bytes_backrefs(&mut a, generator)?
     };
-    check_generator_node(&a, program, flags)?;
-    let args = setup_generator_args(&mut a, refs, flags)?;
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
-    let Reduction(_clvm_cost, res) = run_program(
-        &mut a,
-        &dialect,
-        program,
-        args,
-        constants.max_block_cost_clvm,
-    )
-    .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
+    if !interned_generator {
+        check_generator_node(&a, program, flags)?;
+    }
+
+    let res = if interned_generator {
+        // the generator field is a serialized spend list, already in the
+        // shape run_program() would produce for the classic path.
+        if refs.into_iter().next().is_some() {
+            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
+        }
+        program
+    } else {
+        let args = setup_generator_args(&mut a, refs, flags)?;
+        let Reduction(_clvm_cost, res) = run_program(
+            &mut a,
+            &dialect,
+            program,
+            args,
+            constants.max_block_cost_clvm,
+        )
+        .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
+        res
+    };
 
     let (first, _rest) = a
         .next(res)
@@ -842,8 +890,8 @@ mod tests {
         .expect("run_block_generator2");
         assert_eq!(conds.spends.len(), 1);
 
-        // a non-quoted serde_2026 generator is rejected by the node-level
-        // quote check
+        // a non-quoted serde_2026 blob that isn't a valid spend list is
+        // rejected when parsing the spend list
         let mut a = Allocator::new();
         let atom = a.new_atom(&[42]).unwrap();
         let blob = serialize_2026(&a, atom, 0).expect("serialize_2026");
@@ -859,7 +907,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err().error_code(),
-            ErrorCode::ComplexGeneratorReceived,
+            ErrorCode::InvalidCondition,
         );
     }
 
