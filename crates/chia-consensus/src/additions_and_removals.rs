@@ -37,7 +37,7 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_SPEND_LIST);
 
     // Only the generator blob itself is format-switched here; refs/args
     // downstream (via setup_generator_args) stay classic regardless.

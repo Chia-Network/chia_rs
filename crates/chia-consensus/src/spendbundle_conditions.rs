@@ -46,7 +46,7 @@ pub fn get_conditions_from_spendbundle(
 }
 
 /// Computes the base cost of a spend bundle's generator before any puzzles run.
-/// For INTERNED_GENERATOR, builds the generator tree, interns it, and charges
+/// For INTERNED_SPEND_LIST, builds the generator tree, interns it, and charges
 /// based on the interned structure. Otherwise charges cost_per_byte on the raw
 /// generator length (excluding the quote wrapper).
 fn calculate_base_cost(
@@ -54,7 +54,7 @@ fn calculate_base_cost(
     flags: ConsensusFlags,
     constants: &ConsensusConstants,
 ) -> Result<u64, ValidationErr> {
-    if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
         let mut gen_allocator = Allocator::new();
         let generator = build_generator(
             &mut gen_allocator,

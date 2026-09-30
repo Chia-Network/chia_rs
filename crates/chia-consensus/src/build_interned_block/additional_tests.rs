@@ -10,7 +10,7 @@ use std::fs;
 use std::path::Path;
 
 /// For a single spend bundle: upper bound >= finalize cost, and finalize cost matches
-/// `run_block_generator2(..., INTERNED_GENERATOR)` (block header cost).
+/// `run_block_generator2(..., INTERNED_SPEND_LIST)` (block header cost).
 fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
     let mut a = Allocator::new();
     let conds = run_spendbundle(
@@ -46,7 +46,7 @@ fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
-        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
         &TEST_CONSTANTS,
@@ -55,7 +55,7 @@ fn assert_generator_cost_accuracy(bundle: &SpendBundle) {
 
     assert_eq!(
         conds.cost, exact_total,
-        "finalize() cost must match consensus INTERNED_GENERATOR path"
+        "finalize() cost must match consensus INTERNED_SPEND_LIST path"
     );
 }
 
@@ -137,7 +137,7 @@ fn clvm_execution_cost(bundle: &SpendBundle) -> u64 {
             * TEST_CONSTANTS.cost_per_byte
 }
 
-/// finalize() must agree with run_block_generator2(..., INTERNED_GENERATOR).
+/// finalize() must agree with run_block_generator2(..., INTERNED_SPEND_LIST).
 #[test]
 fn test_finalize_cost_matches_consensus() {
     let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
@@ -165,7 +165,7 @@ fn test_finalize_cost_matches_consensus() {
         generator.as_slice(),
         [],
         TEST_CONSTANTS.max_block_cost_clvm,
-        MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
         &TEST_CONSTANTS,
@@ -174,7 +174,7 @@ fn test_finalize_cost_matches_consensus() {
 
     assert_eq!(
         conds.cost, finalize_cost,
-        "finalize() cost must match consensus INTERNED_GENERATOR path"
+        "finalize() cost must match consensus INTERNED_SPEND_LIST path"
     );
 }
 
@@ -402,7 +402,7 @@ fn normalized_spends(
 }
 
 /// Agreement test: the interned builder's serde_2026 output, run under the
-/// INTERNED_GENERATOR consensus path, yields the same spends/conditions as
+/// INTERNED_SPEND_LIST consensus path, yields the same spends/conditions as
 /// an independently-built classic generator for the same bundles, run under
 /// classic rules. serde_2026 has no canonical encoding, so this is not a
 /// round trip.
@@ -424,11 +424,11 @@ fn test_serde_2026_builder_matches_classic() {
     let (spends_2026, run_cost_2026) = normalized_spends(
         &generator_2026,
         &sig_2026,
-        ConsensusFlags::INTERNED_GENERATOR,
+        ConsensusFlags::INTERNED_SPEND_LIST,
     );
     assert_eq!(
         run_cost_2026, cost_2026,
-        "finalize() cost must match the INTERNED_GENERATOR consensus path"
+        "finalize() cost must match the INTERNED_SPEND_LIST consensus path"
     );
 
     // classic reference generator, run under classic (pre-HF2) rules
