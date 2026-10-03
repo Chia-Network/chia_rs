@@ -1,12 +1,11 @@
 use crate::condition_sanitizers::parse_amount;
-use crate::run_block_generator::setup_generator_args;
+use crate::run_block_generator::spend_list_wrapper_for_trusted_block;
 use crate::run_block_generator::subtract_cost;
 use chia_protocol::Coin;
 
 use crate::allocator::make_allocator;
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
-use crate::serde_2026::node_from_bytes_2026_trusted;
 use crate::validation_error::{ErrorCode, ValidationErr, atom, first, next, rest};
 use chia_protocol::{Bytes, Bytes32};
 use clvm_traits::FromClvm;
@@ -15,8 +14,6 @@ use clvmr::allocator::{NodePtr, SExp};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
-use clvmr::serde::node_from_bytes_backrefs;
-
 /// Run a *trusted* block generator and return its additions and removals. This
 /// function does not validate the block, it is assumed to be valid.
 /// The returned vectors are additions (with hints) and removals (with
@@ -37,22 +34,11 @@ where
 
     let mut cost_left = constants.max_block_cost_clvm;
 
-    // Only the generator blob itself is format-switched here; refs/args
-    // downstream (via setup_generator_args) stay classic regardless.
-    let program = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
-        node_from_bytes_2026_trusted(&mut a, program)?
-    } else {
-        node_from_bytes_backrefs(&mut a, program)?
-    };
-
-    let args = setup_generator_args(&mut a, block_refs, flags)?;
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
 
-    let Reduction(clvm_cost, all_spends) = run_program(&mut a, &dialect, program, args, cost_left)?;
-
-    subtract_cost(&mut cost_left, clvm_cost)?;
-    let all_spends = first(&a, all_spends)?;
-
+    let spend_list_wrapper =
+        spend_list_wrapper_for_trusted_block(&mut a, program, block_refs, flags, cost_left)?;
+    let all_spends = first(&a, spend_list_wrapper)?;
     let mut cache = TreeCache::default();
     // at this point all_spends is a list of:
     // (parent-coin-id puzzle-reveal amount solution . extra)
