@@ -27,11 +27,11 @@ CONTRACT_PH = bytes32.fromhex("01" * 32)
 @pytest.mark.parametrize(
     "strength, pool_pk, contract_ph, plot_index, meta_group, expected_proofs",
     [
-        (2, POOL_PK, None, uint16(0), uint8(0), 217),
-        (2, POOL_PK, None, uint16(0), uint8(1), 185),
-        (2, None, CONTRACT_PH, uint16(0), uint8(0), 186),
-        (3, POOL_PK, None, uint16(0), uint8(0), 207),
-        (3, None, CONTRACT_PH, uint16(0), uint8(0), 191),
+        (2, POOL_PK, None, uint16(0), uint8(0), 214),
+        (2, POOL_PK, None, uint16(0), uint8(1), 247),
+        (2, None, CONTRACT_PH, uint16(0), uint8(0), 169),
+        (3, POOL_PK, None, uint16(0), uint8(0), 216),
+        (3, None, CONTRACT_PH, uint16(0), uint8(0), 207),
     ],
     ids=["0", "1", "2", "3", "4"],
 )
@@ -70,6 +70,7 @@ def test_plot_roundtrip(
     assert prover.plot_id_for_index(plot_index) == plot_id
     assert prover.get_meta_group() == meta_group
     assert prover.get_group_size() == 1
+    assert prover.get_memo() == memo
 
     # Test serialization/deserialization
     serialized = prover.to_bytes()
@@ -81,6 +82,7 @@ def test_plot_roundtrip(
     assert prover2.plot_id_for_index(plot_index) == plot_id
     assert prover2.get_meta_group() == meta_group
     assert prover2.get_group_size() == 1
+    assert prover2.get_memo() == memo
 
     num_challenges = 0
     num_proofs = 0
