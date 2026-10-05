@@ -8,22 +8,37 @@ use chia_bls::GTElement;
 use chia_bls::{aggregate_verify_gt, hash_to_g2};
 use chia_protocol::SpendBundle;
 use chia_sha2::Sha256;
+use std::time::{Duration, Instant};
 
 // type definition makes clippy happy
 pub type ValidationPair = ([u8; 32], GTElement);
 
-// currently in mempool_manager.py
-// called in threads from pre_validate_spend_bundle()
-// pybinding returns (error, cached_results, new_cache_entries, duration)
+/// Validate CLVM and the aggregate signature for a mempool spend bundle.
+///
+/// `timeout` is a wall-clock limit for CLVM execution across all spends in the
+/// bundle (shared deadline). See [`run_spendbundle`].
 pub fn validate_clvm_and_signature(
     spend_bundle: &SpendBundle,
     max_cost: u64,
     constants: &ConsensusConstants,
     flags: ConsensusFlags,
+    timeout: Duration,
 ) -> Result<(OwnedSpendBundleConditions, Vec<ValidationPair>), ValidationErr> {
+    let start = Instant::now();
     let mut a = make_allocator(ConsensusFlags::LIMIT_HEAP);
-    let (sbc, pkm_pairs) = run_spendbundle(&mut a, spend_bundle, max_cost, flags, constants)?;
+    let (sbc, pkm_pairs) = run_spendbundle(
+        &mut a,
+        spend_bundle,
+        max_cost,
+        flags,
+        constants,
+        Some(timeout),
+    )?;
     let conditions = OwnedSpendBundleConditions::from(&a, sbc);
+
+    if start.elapsed() >= timeout {
+        return Err(ValidationErr::Err(ErrorCode::Timeout));
+    }
 
     // Collect all pairs in a single vector to avoid multiple iterations
     let mut pairs = Vec::new();
@@ -88,7 +103,8 @@ pub fn get_flags_for_height_and_constants(
             | ConsensusFlags::COST_CONDITIONS
             | ConsensusFlags::ENABLE_SECP_OPS
             | ConsensusFlags::NEW_COST_MODEL
-            | ConsensusFlags::RELAXED_BLS;
+            | ConsensusFlags::RELAXED_BLS
+            | ConsensusFlags::INTERNED_GENERATOR;
     } else if prev_tx_height >= constants.soft_fork8_height {
         // once the hard fork activates, we no longer disable the operators
         flags |= ConsensusFlags::DISABLE_OP;
@@ -265,8 +281,9 @@ mod tests {
             .union(ConsensusFlags::LIMIT_SPENDS)
             .union(ConsensusFlags::LIMITS)
     )]
-    // hard fork 2 window: keccak/secp/cost flags + generator flags,
-    // but NOT DISABLE_OP and NOT LIMITS (mutually exclusive with hard fork 2)
+    // hard fork 2 window: keccak/secp/cost flags + generator flags +
+    // INTERNED_GENERATOR, but NOT DISABLE_OP and NOT LIMITS (mutually
+    // exclusive with hard fork 2)
     #[case(
         300,
         ConsensusFlags::ENABLE_KECCAK_OPS_OUTSIDE_GUARD
@@ -277,6 +294,7 @@ mod tests {
             .union(ConsensusFlags::SIMPLE_GENERATOR)
             .union(ConsensusFlags::CANONICAL_INTS)
             .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::INTERNED_GENERATOR)
     )]
     #[case(
         u32::MAX,
@@ -288,6 +306,7 @@ mod tests {
             .union(ConsensusFlags::SIMPLE_GENERATOR)
             .union(ConsensusFlags::CANONICAL_INTS)
             .union(ConsensusFlags::LIMIT_SPENDS)
+            .union(ConsensusFlags::INTERNED_GENERATOR)
     )]
     fn test_get_flags_at_forks(#[case] prev_tx_height: u32, #[case] expected: ConsensusFlags) {
         assert_eq!(
@@ -309,6 +328,11 @@ mod tests {
             ..FORK_CONSTANTS.hard_fork2_height)
             .contains(&prev_tx_height);
         assert_eq!(has_disable_op, expected_disable_op);
+
+        // INTERNED_GENERATOR turns on at (and stays on from) hard fork 2.
+        let has_interned_generator = expected.contains(ConsensusFlags::INTERNED_GENERATOR);
+        let expected_interned_generator = prev_tx_height >= FORK_CONSTANTS.hard_fork2_height;
+        assert_eq!(has_interned_generator, expected_interned_generator);
     }
 
     #[test]
@@ -341,6 +365,7 @@ ff01\
                 TEST_CONSTANTS.max_block_cost_clvm,
                 &TEST_CONSTANTS,
                 MEMPOOL_MODE,
+                Duration::MAX,
             )
             .unwrap_err()
             .error_code(),
@@ -368,6 +393,7 @@ ff01\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             MEMPOOL_MODE,
+            Duration::MAX,
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -392,6 +418,7 @@ ff843B9ACA00\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             MEMPOOL_MODE | ConsensusFlags::COMPUTE_FINGERPRINT,
+            Duration::MAX,
         )
         .expect("SpendBundle should be valid for this test");
 
@@ -416,12 +443,22 @@ ff843B9ACA00\
         };
         let expected_cost = 5_527_116_044;
         let max_cost = expected_cost;
-        let (conds, _) =
-            validate_clvm_and_signature(&spend_bundle, max_cost, &TEST_CONSTANTS, MEMPOOL_MODE)
-                .expect("validate_clvm_and_signature failed");
+        let (conds, _) = validate_clvm_and_signature(
+            &spend_bundle,
+            max_cost,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE,
+            Duration::MAX,
+        )
+        .expect("validate_clvm_and_signature failed");
         assert_eq!(conds.cost, expected_cost);
-        let result =
-            validate_clvm_and_signature(&spend_bundle, max_cost - 1, &TEST_CONSTANTS, MEMPOOL_MODE);
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            max_cost - 1,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE,
+            Duration::MAX,
+        );
         assert!(matches!(
             result,
             Err(ValidationErr::Err(ErrorCode::CostExceeded))
@@ -458,6 +495,7 @@ ff843B9ACA00\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             MEMPOOL_MODE,
+            Duration::MAX,
         )
         .expect("SpendBundle should be valid for this test");
     }
@@ -506,10 +544,80 @@ ff843B9ACA00\
             TEST_CONSTANTS.max_block_cost_clvm,
             &TEST_CONSTANTS,
             MEMPOOL_MODE,
+            Duration::MAX,
         );
         assert!(matches!(
             result,
             Err(ValidationErr::Err(ErrorCode::BadAggregateSignature))
         ));
+    }
+
+    // Same ~25M-cost program used by clvmr's run_program_with_timeout tests.
+    const EXPENSIVE_PUZZLE: &[u8] = &hex!(
+        "ff02ffff01ff02ff02ffff04ff02ffff04ff05ffff04ff0bff8080808080ffff04ffff01ff02ffff03ffff09ff0bff8080ffff01ff0101ffff01ff10ff05ffff02ff02ffff04ff02ffff04ff05ffff04ffff11ff0bffff010180ff80808080808080ff0180ff018080"
+    );
+    const EXPENSIVE_SOLUTION: &[u8] = &hex!("ff8213a9ff82271080");
+
+    #[test]
+    fn test_validate_timeout() {
+        use clvm_utils::tree_hash;
+        use clvmr::allocator::Allocator;
+        use clvmr::serde::node_from_bytes;
+
+        let mut a = Allocator::new();
+        let puz = node_from_bytes(&mut a, EXPENSIVE_PUZZLE).expect("puzzle");
+        let ph = tree_hash(&a, puz).to_bytes();
+        let test_coin = Coin::new(
+            hex!("4444444444444444444444444444444444444444444444444444444444444444").into(),
+            ph.into(),
+            1_000_000_000,
+        );
+        let spend = CoinSpend::new(
+            test_coin,
+            Program::new(EXPENSIVE_PUZZLE.into()),
+            EXPENSIVE_SOLUTION.into(),
+        );
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+
+        // A near-zero timeout aborts the expensive puzzle during CLVM execution.
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE,
+            Duration::from_nanos(1),
+        );
+        assert_eq!(result, Err(ValidationErr::Err(ErrorCode::Timeout)));
+    }
+
+    #[test]
+    fn test_validate_non_canonical_clvm() {
+        // atom 1 with a non-canonical length prefix (0xc0 0x01 0x01 instead of 0x01)
+        let puzzle = hex!("c00101");
+        let spend = mk_spend(&puzzle, &hex!("80"));
+        let spend_bundle = SpendBundle {
+            coin_spends: vec![spend],
+            aggregated_signature: Signature::default(),
+        };
+        let result = validate_clvm_and_signature(
+            &spend_bundle,
+            TEST_CONSTANTS.max_block_cost_clvm,
+            &TEST_CONSTANTS,
+            MEMPOOL_MODE,
+            Duration::MAX,
+        );
+        assert_eq!(
+            result,
+            Err(ValidationErr::Err(
+                ErrorCode::InvalidTransactionsGeneratorEncoding
+            ))
+        );
+        assert_eq!(
+            u32::from(ErrorCode::InvalidTransactionsGeneratorEncoding),
+            148
+        );
     }
 }

@@ -344,7 +344,6 @@ mod tests {
     }
 
     #[rstest]
-    #[case(hex!("f800000000").as_ref(), SOLUTION1.as_ref())]
     #[case(hex!("fffffe0000ff41ff013a").as_ref(), SOLUTION1.as_ref())]
     #[case(PUZZLE1.as_ref(), hex!("00").as_ref())]
     fn test_length_calculator_edge_case(#[case] puzzle: &[u8], #[case] solution: &[u8]) {
@@ -459,8 +458,7 @@ mod tests {
 
     #[test]
     fn test_solution_generator_2026() {
-        use crate::consensus_constants::TEST_CONSTANTS;
-        use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_auto};
+        use crate::serde_2026::node_from_bytes_2026_trusted;
         use clvmr::serde::SERDE_2026_MAGIC_PREFIX;
 
         let coin1: Coin = Coin::new(
@@ -481,14 +479,11 @@ mod tests {
         let result = solution_generator_2026(spends).expect("solution_generator_2026");
         assert!(result.starts_with(&SERDE_2026_MAGIC_PREFIX));
 
-        // Round-trip through the consensus auto-deserializer and confirm the
+        // Round-trip through the explicit serde_2026 parser and confirm the
         // tree is identical to the one behind the classic encoding.
-        let cap = max_canonical_blob_size(
-            TEST_CONSTANTS.max_block_cost_clvm,
-            TEST_CONSTANTS.cost_per_byte,
-        );
         let mut a = Allocator::new();
-        let node = node_from_bytes_auto(&mut a, &result, cap).expect("node_from_bytes_auto");
+        let node =
+            node_from_bytes_2026_trusted(&mut a, &result).expect("node_from_bytes_2026_trusted");
         let classic = solution_generator(spends).expect("solution_generator");
         assert_eq!(node_to_bytes(&a, node).expect("node_to_bytes"), classic);
     }

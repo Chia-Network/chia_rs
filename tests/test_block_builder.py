@@ -26,7 +26,7 @@ def test_block_builder() -> None:
         with open(join("test-bundles", name), "rb") as f:
             sb = SpendBundle.from_bytes(f.read())
             conds, bls_cache, duration = validate_clvm_and_signature(
-                sb, 11000000000, DEFAULT_CONSTANTS, 5000000
+                sb, 11000000000, DEFAULT_CONSTANTS, 5000000, 60.0
             )
             cost = uint64(conds.execution_cost + conds.condition_cost)
 

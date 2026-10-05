@@ -240,6 +240,7 @@ def test_validate_clvm_and_sig() -> None:
         DEFAULT_CONSTANTS.MAX_BLOCK_COST_CLVM,
         DEFAULT_CONSTANTS,
         ENABLE_KECCAK_OPS_OUTSIDE_GUARD | COST_CONDITIONS,
+        60.0,
     )
 
     assert sbc is not None
