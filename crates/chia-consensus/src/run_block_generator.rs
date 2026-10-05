@@ -269,21 +269,22 @@ where
     }
 
     let dialect = ChiaDialect::new(flags.to_clvm_flags());
-    let (all_spends, top_level_cost) = if interned_generator {
+    let (spend_list_wrapper, top_level_cost) = if interned_generator {
         // the generator field is the serialized spend list wrapper, in the
         // shape run_program() would produce for the classic path.
         // INTERNED_GENERATOR disables generator references.
         if block_refs.into_iter().next().is_some() {
             return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
         }
-        (first(&a, program)?, 0)
+        (program, 0)
     } else {
         let args = setup_generator_args(&mut a, block_refs, flags)?;
         let Reduction(clvm_cost, spend_list_wrapper) =
             run_program(&mut a, &dialect, program, args, cost_left)?;
         subtract_cost(&mut cost_left, clvm_cost)?;
-        (first(&a, spend_list_wrapper)?, clvm_cost)
+        (spend_list_wrapper, clvm_cost)
     };
+    let all_spends = first(&a, spend_list_wrapper)?;
 
     let mut ret = SpendBundleConditions::default();
     ret.execution_cost += top_level_cost;
