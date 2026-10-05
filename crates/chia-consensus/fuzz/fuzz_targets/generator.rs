@@ -3,7 +3,7 @@ use chia_bls::Signature;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::{
     build_compressed_block::BlockBuilder, consensus_constants::TEST_CONSTANTS,
-    run_block_generator::get_coinspends_for_trusted_block,
+    trusted_generator::get_coinspends_for_trusted_block,
 };
 use chia_protocol::{CoinSpend, Program, SpendBundle};
 use clvmr::{

@@ -13,15 +13,15 @@ use chia_consensus::merkle_set::compute_merkle_set_root as compute_merkle_root_i
 use chia_consensus::merkle_tree::{MerkleSet, validate_merkle_proof};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::setup_generator_args;
-use chia_consensus::run_block_generator::{
-    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
-};
 use chia_consensus::solution_generator::solution_generator as native_solution_generator;
 use chia_consensus::solution_generator::solution_generator_2026 as native_solution_generator_2026;
 use chia_consensus::solution_generator::solution_generator_backrefs as native_solution_generator_backrefs;
 use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
+};
+use chia_consensus::trusted_generator::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
 };
 use chia_protocol::{
     BlockRecord, Bytes32, ChallengeBlockInfo, ChallengeChainSubSlot, ClassgroupElement, Coin,

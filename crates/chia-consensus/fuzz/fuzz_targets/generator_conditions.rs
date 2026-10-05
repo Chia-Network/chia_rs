@@ -2,7 +2,7 @@
 use chia_bls::Signature;
 use chia_consensus::{
     build_compressed_block::BlockBuilder, consensus_constants::TEST_CONSTANTS,
-    flags::ConsensusFlags, run_block_generator::get_coinspends_with_conditions_for_trusted_block,
+    flags::ConsensusFlags, trusted_generator::get_coinspends_with_conditions_for_trusted_block,
 };
 use chia_protocol::{Bytes, Coin, CoinSpend, Program, SpendBundle};
 use chia_traits::Streamable;

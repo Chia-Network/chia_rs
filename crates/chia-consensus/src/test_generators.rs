@@ -1,12 +1,12 @@
 use super::conditions::{NewCoin, SpendBundleConditions, SpendConditions};
-use super::run_block_generator::{
-    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
-    run_block_generator, run_block_generator2,
-};
+use super::run_block_generator::{run_block_generator, run_block_generator2};
 use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::run_block_generator::check_generator_node;
+use crate::trusted_generator::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+};
 use crate::validation_error::ErrorCode;
 use chia_bls::Signature;
 use chia_protocol::Program;
