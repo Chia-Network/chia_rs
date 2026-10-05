@@ -934,6 +934,55 @@ mod tests {
     }
 
     #[test]
+    fn test_additions_and_removals_interned_parity() {
+        use crate::additions_and_removals::additions_and_removals;
+        use crate::solution_generator::solution_generator_2026;
+
+        let base_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
+        let interned_flags = base_flags | ConsensusFlags::INTERNED_GENERATOR;
+        let blocks: &[&[u8]] = &[];
+
+        // a spend whose identity puzzle emits CREATE_COIN with a hint, so the
+        // additions path (not just removals) is exercised
+        let puzzle_hash = Bytes32::from(tree_hash_atom(&[1]).to_bytes());
+        let mut a = Allocator::new();
+        let hint = a.new_atom(b"hint").unwrap();
+        // the memos list's first element must itself be a list wrapping the
+        // hint atom — (51 ph amount ((hint))) — a bare atom memo is ignored
+        let cond = (CREATE_COIN, (puzzle_hash, (100u64, ((hint, 0), 0))))
+            .to_clvm(&mut a)
+            .unwrap();
+        let conds = a.new_pair(cond, a.nil()).unwrap();
+        let solution_bytes = node_to_bytes(&a, conds).unwrap();
+
+        let coin = Coin::new([0u8; 32].into(), puzzle_hash, 100);
+        let spends = [(coin, IDENTITY_PUZZLE, solution_bytes.as_slice())];
+        let classic = solution_generator(spends).expect("solution_generator");
+        let interned = solution_generator_2026(spends).expect("solution_generator_2026");
+
+        let expected = additions_and_removals(&classic, blocks, base_flags, &TEST_CONSTANTS)
+            .expect("classic additions_and_removals");
+        let actual = additions_and_removals(&interned, blocks, interned_flags, &TEST_CONSTANTS)
+            .expect("interned additions_and_removals");
+        assert_eq!(expected, actual);
+
+        // the parity assert above is only meaningful if this case actually
+        // produced an addition carrying the hint
+        let (additions, removals) = &actual;
+        assert_eq!(removals.len(), 1);
+        assert_eq!(removals[0].0, coin.coin_id());
+        assert_eq!(additions.len(), 1);
+        let (addition, addition_hint) = &additions[0];
+        assert_eq!(addition.parent_coin_info, coin.coin_id());
+        assert_eq!(addition.puzzle_hash, puzzle_hash);
+        assert_eq!(addition.amount, 100);
+        assert_eq!(
+            addition_hint.as_ref().map(AsRef::as_ref),
+            Some(&b"hint"[..])
+        );
+    }
+
+    #[test]
     fn test_interned_spend_list_rejects_block_refs() {
         use crate::additions_and_removals::additions_and_removals;
         use crate::solution_generator::solution_generator_2026;
