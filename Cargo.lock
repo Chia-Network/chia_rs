@@ -476,7 +476,7 @@ dependencies = [
 [[package]]
 name = "chia-pos2"
 version = "0.6.0"
-source = "git+https://github.com/Chia-Network/pos2-chip.git?rev=1dab6be2a4861be1809438781f195949286ac453#1dab6be2a4861be1809438781f195949286ac453"
+source = "git+https://github.com/Chia-Network/pos2-chip.git?rev=b1386ee2b71409a3cff32a610c500325a11942c8#b1386ee2b71409a3cff32a610c500325a11942c8"
 dependencies = [
  "cc",
  "serde",
