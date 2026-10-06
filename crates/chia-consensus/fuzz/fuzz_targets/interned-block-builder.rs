@@ -7,7 +7,7 @@ use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::owned_conditions::{OwnedSpendBundleConditions, OwnedSpendConditions};
 use chia_consensus::run_block_generator::run_block_generator2;
 use chia_consensus::solution_generator::solution_generator_backrefs;
-use chia_consensus::trusted_generator::get_coinspends_for_trusted_block;
+use chia_consensus::trusted_block::get_coinspends_for_trusted_block;
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use chia_protocol::{Bytes, CoinSpend, Program, SpendBundle};
 use clvmr::cost::Cost;

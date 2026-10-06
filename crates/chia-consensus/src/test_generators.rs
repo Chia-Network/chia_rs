@@ -4,7 +4,7 @@ use crate::allocator::make_allocator;
 use crate::consensus_constants::TEST_CONSTANTS;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
 use crate::run_block_generator::check_generator_node;
-use crate::trusted_generator::{
+use crate::trusted_block::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
 };
 use crate::validation_error::ErrorCode;

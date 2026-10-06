@@ -2,7 +2,7 @@ use chia_bls::Signature;
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::ConsensusFlags;
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_consensus::trusted_generator::additions_and_removals;
+use chia_consensus::trusted_block::additions_and_removals;
 use clvmr::Allocator;
 use clvmr::serde::{node_from_bytes, node_to_bytes_backrefs};
 use criterion::{Criterion, black_box, criterion_group, criterion_main};

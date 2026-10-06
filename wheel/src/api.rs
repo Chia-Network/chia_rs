@@ -20,7 +20,7 @@ use chia_consensus::spendbundle_conditions::get_conditions_from_spendbundle;
 use chia_consensus::spendbundle_validation::{
     get_flags_for_height_and_constants, validate_clvm_and_signature,
 };
-use chia_consensus::trusted_generator::{
+use chia_consensus::trusted_block::{
     get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
 };
 use chia_protocol::{

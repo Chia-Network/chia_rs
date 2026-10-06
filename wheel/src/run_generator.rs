@@ -5,7 +5,7 @@ use chia_consensus::generator_cost::interned_vbytes;
 use chia_consensus::owned_conditions::OwnedSpendBundleConditions;
 use chia_consensus::run_block_generator::run_block_generator as native_run_block_generator;
 use chia_consensus::run_block_generator::run_block_generator2 as native_run_block_generator2;
-use chia_consensus::trusted_generator::additions_and_removals as native_additions_and_removals;
+use chia_consensus::trusted_block::additions_and_removals as native_additions_and_removals;
 use chia_protocol::{Bytes, Bytes32, Coin};
 
 use clvmr::allocator::Allocator;

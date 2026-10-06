@@ -28,7 +28,7 @@ pub mod solution_generator;
 pub mod spend_visitor;
 pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
-pub mod trusted_generator;
+pub mod trusted_block;
 pub mod validation_error;
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use chia_consensus::conditions::{NewCoin, SpendBundleConditions, SpendConditions
 use chia_consensus::consensus_constants::TEST_CONSTANTS;
 use chia_consensus::flags::{ConsensusFlags, MEMPOOL_MODE};
 use chia_consensus::run_block_generator::{run_block_generator, run_block_generator2};
-use chia_consensus::trusted_generator::get_coinspends_for_trusted_block;
+use chia_consensus::trusted_block::get_coinspends_for_trusted_block;
 use chia_protocol::Program;
 use chia_tools::iterate_blocks;
 use clvmr::Allocator;
