@@ -76,7 +76,7 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
-use chia_consensus::validation_error::ValidationErr;
+use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
 use clvmr::cost::Cost;
@@ -259,9 +259,10 @@ fn generator_as_slice(buf: &PyBuffer<u8>) -> PyResult<&[u8]> {
     Ok(unsafe { std::slice::from_raw_parts(buf.buf_ptr().cast(), buf.len_bytes()) })
 }
 
-/// Shared tail of `get_puzzle_and_solution_for_coin2`: run the
-/// (already-parsed) generator against `args`, find `find_coin`'s puzzle
-/// reveal and solution in the output, and serialize both.
+/// Shared tail of `get_puzzle_and_solution_for_coin2`: produce the spend list
+/// wrapper (running the classic generator against `args`, or taking the
+/// already-parsed serde_2026 blob directly), find `find_coin`'s puzzle
+/// reveal and solution in it, and serialize both.
 fn run_generator_and_find_coin(
     py: Python<'_>,
     allocator: &mut clvmr::Allocator,
@@ -272,11 +273,19 @@ fn run_generator_and_find_coin(
     flags: ConsensusFlags,
 ) -> PyResult<(Program, Program)> {
     let dialect = &ChiaDialect::new(flags.to_clvm_flags());
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
 
     let (puzzle, solution) = py
         .detach(|| -> Result<(Vec<u8>, Vec<u8>), EvalErr> {
-            let Reduction(_cost, result) =
-                run_program(allocator, dialect, generator, args, max_cost)?;
+            let result = if interned_generator {
+                // the generator field is the serialized spend list wrapper, in
+                // the shape run_program() would produce for the classic path.
+                generator
+            } else {
+                let Reduction(_cost, result) =
+                    run_program(allocator, dialect, generator, args, max_cost)?;
+                result
+            };
             let (puzzle, solution) = match parse_puzzle_solution(allocator, result, find_coin) {
                 Err(ValidationErr::Err(_)) => Err(EvalErr::InvalidOpArg(
                     NodePtr::NIL,
@@ -316,11 +325,16 @@ pub fn get_puzzle_and_solution_for_coin2(
     let refs: Vec<&[u8]> = block_ref_buffers.iter().map(py_to_slice).collect();
 
     let generator_bytes = generator_as_slice(&generator)?;
-    let generator = if flags.contains(ConsensusFlags::INTERNED_GENERATOR) {
+    let interned_generator = flags.contains(ConsensusFlags::INTERNED_GENERATOR);
+    let generator = if interned_generator {
         node_from_bytes_2026_trusted(&mut allocator, generator_bytes).map_err(map_pyerr)?
     } else {
         node_from_bytes_backrefs(&mut allocator, generator_bytes).map_err(map_pyerr)?
     };
+    // INTERNED_GENERATOR disables generator references.
+    if interned_generator && !refs.is_empty() {
+        return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs).into());
+    }
     let args = setup_generator_args(&mut allocator, refs, flags)?;
 
     run_generator_and_find_coin(
