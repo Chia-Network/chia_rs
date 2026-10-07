@@ -56,7 +56,7 @@ bitflags! {
         /// After the generator-identity hard fork, generators must be validated from
         /// the INTERNED (canonical) tree so atom/pair limits and cost apply to the same
         /// structure independent of serialization.
-        const INTERNED_GENERATOR = 0x0800_0000;
+        const INTERNED_SPEND_LIST = 0x0800_0000;
     }
 }
 
