@@ -141,7 +141,7 @@ def rust_type_to_python(t: str) -> str:
         inner = ", ".join(map(lambda se: rust_type_to_python(se), inner_list))
         return f"tuple[{inner}]"
 
-    m = re.fullmatch("\\[(.+); [0-9]+\\]", t)
+    m = re.fullmatch(r"\[(.+); (?:[0-9]+|[A-Za-z_][A-Za-z0-9_]*)\]", t)
     if m is not None:
         return f"list[{rust_type_to_python(m.group(1))}]"
 
@@ -540,14 +540,9 @@ class PlotParam:
     meta_group: uint8
 
 @final
-class PlotQualityChain:
-    chain: PartialProof
-    plot_index: uint16
-
-@final
 class Prover:
     def __new__(cls, plot_path: str) -> Self: ...
-    def get_qualities_for_challenge(self, challenge: bytes32) -> list[PlotQualityChain]: ...
+    def get_qualities_for_challenge(self, challenge: bytes32) -> list[PartialProof]: ...
     def size(self) -> int: ...
     def plot_group_id(self) -> bytes32: ...
     def plot_id_for_index(self, plot_index: uint16) -> bytes32: ...

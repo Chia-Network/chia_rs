@@ -7,6 +7,7 @@ from pathlib import Path
 
 from chia_rs import (
     G1Element,
+    PartialProof,
     Prover,
     compute_plot_group_id_v2,
     compute_plot_id_v2,
@@ -16,12 +17,28 @@ from chia_rs import (
     validate_proof_v2,
 )
 from chia_rs.sized_bytes import bytes32
-from chia_rs.sized_ints import uint8, uint16
+from chia_rs.sized_ints import uint8, uint16, uint64
 
 # Either pool_pk or contract_ph must be set
 PLOT_PK = G1Element.generator().derive_unhardened(1)
 POOL_PK = G1Element.generator().derive_unhardened(2)
 CONTRACT_PH = bytes32.fromhex("01" * 32)
+
+
+@pytest.mark.parametrize("plot_index", [0, 1, 1000, 65535])
+def test_partial_proof_index_roundtrip(plot_index: int) -> None:
+    partial = PartialProof([uint64(256)] * 16, uint16(plot_index))
+    assert len(bytes(partial)) == 130
+    assert PartialProof.from_bytes(bytes(partial)) == partial
+    assert PartialProof.from_json_dict(partial.to_json_dict()) == partial
+    assert partial.plot_index == plot_index
+    assert partial.get_string(uint8(2)).hex() == (
+        "5d63c294322cfc29b4b0e42b585dd75a8c3813f7ece0f1c127cacd0d0f832219"
+    )
+    other = partial.replace(plot_index=uint16(plot_index ^ 1))
+    assert other != partial
+    assert bytes(other) != bytes(partial)
+    assert other.get_string(uint8(2)) == partial.get_string(uint8(2))
 
 
 @pytest.mark.parametrize(
@@ -91,19 +108,18 @@ def test_plot_roundtrip(
         challenge = bytes32.random(rng)
         num_challenges += 1
 
-        quality_chains = prover.get_qualities_for_challenge(challenge)
-        if quality_chains == []:
+        partial_proofs = prover.get_qualities_for_challenge(challenge)
+        if partial_proofs == []:
             continue
-        for quality_chain in quality_chains:
-            assert quality_chain.plot_index == plot_index
-            pp = quality_chain.chain
-            quality_plot_id = prover.plot_id_for_index(quality_chain.plot_index)
+        for pp in partial_proofs:
+            assert pp.plot_index == plot_index
+            quality_plot_id = prover.plot_id_for_index(pp.plot_index)
             full_proof = solve_proof(pp, quality_plot_id, strength, k)
             assert len(full_proof) * 8 / 128 == k
             num_proofs += 1
             quality = validate_proof_v2(
                 plot_group_id,
-                quality_chain.plot_index,
+                pp.plot_index,
                 k,
                 strength,
                 meta_group,

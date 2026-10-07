@@ -11,9 +11,11 @@ const NUM_CHAIN_LINKS: usize = 16;
 pub struct PartialProof {
     #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     fragments: [u64; NUM_CHAIN_LINKS],
+    plot_index: u16,
 }
 
 impl PartialProof {
+    /// Hashes the strength and fragments. The plot index is not part of this hash.
     pub fn get_string(&self, strength: u8) -> Bytes32 {
         let mut sha256 = Sha256::new();
         sha256.update(serialize_quality(&self.fragments, strength));

@@ -715,12 +715,6 @@ pub fn create_v2_single_plot_group(
     )?)
 }
 
-#[pyclass(get_all)]
-pub struct PlotQualityChain {
-    pub chain: PartialProof,
-    pub plot_index: u16,
-}
-
 #[pyclass]
 pub struct Prover(chia_pos2::Prover);
 
@@ -731,17 +725,12 @@ impl Prover {
         Ok(Self(chia_pos2::Prover::new(Path::new(plot_path))?))
     }
 
-    pub fn get_qualities_for_challenge(
-        &self,
-        challenge: Bytes32,
-    ) -> PyResult<Vec<PlotQualityChain>> {
+    pub fn get_qualities_for_challenge(&self, challenge: Bytes32) -> PyResult<Vec<PartialProof>> {
         let qualities = self.0.get_qualities_for_challenge(&challenge.to_bytes())?;
         Ok(qualities
             .into_iter()
-            .map(|q| PlotQualityChain {
-                chain: PartialProof {
-                    fragments: q.chain.chain_links,
-                },
+            .map(|q| PartialProof {
+                fragments: q.chain.chain_links,
                 plot_index: q.plot_index,
             })
             .collect())
@@ -893,7 +882,6 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(quality_string_from_proof, m)?)?;
     m.add_class::<Prover>()?;
     m.add_class::<PartialProof>()?;
-    m.add_class::<PlotQualityChain>()?;
 
     // check time lock
     m.add_function(wrap_pyfunction!(py_check_time_locks, m)?)?;
