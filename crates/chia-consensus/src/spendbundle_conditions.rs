@@ -850,12 +850,13 @@ mod tests {
 
         assert_eq!(mempool_conds.cost, block_conds.cost);
 
-        // the exact cost is accepted, one less is rejected, on both paths
+        // max_cost == cost passes and max_cost == cost - 1 fails, on both paths,
+        // so the cost each path enforces is exactly `cost`
         let cost = mempool_conds.cost;
         run_spendbundle(&mut a, &bundle, cost, flags, &TEST_CONSTANTS, None)
-            .expect("run_spendbundle at exact cost");
+            .expect("run_spendbundle with max_cost == cost");
         let err = run_spendbundle(&mut a, &bundle, cost - 1, flags, &TEST_CONSTANTS, None)
-            .expect_err("run_spendbundle below cost");
+            .expect_err("run_spendbundle with max_cost == cost - 1");
         assert_eq!(err.error_code(), ErrorCode::CostExceeded);
 
         run_block_generator2::<&[u8], _>(
@@ -867,7 +868,7 @@ mod tests {
             None,
             &TEST_CONSTANTS,
         )
-        .expect("run_block_generator2 at exact cost");
+        .expect("run_block_generator2 with max_cost == cost");
         let err = run_block_generator2::<&[u8], _>(
             &generator,
             [],
@@ -877,7 +878,7 @@ mod tests {
             None,
             &TEST_CONSTANTS,
         )
-        .expect_err("run_block_generator2 below cost");
+        .expect_err("run_block_generator2 with max_cost == cost - 1");
         assert_eq!(err.error_code(), ErrorCode::CostExceeded);
     }
 }
