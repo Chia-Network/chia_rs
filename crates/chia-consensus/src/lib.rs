@@ -31,5 +31,10 @@ pub mod spendbundle_validation;
 pub mod trusted_block;
 pub mod validation_error;
 
+/// Re-exports `trusted_block::additions_and_removals` at its previous path.
+pub mod additions_and_removals {
+    pub use crate::trusted_block::additions_and_removals;
+}
+
 #[cfg(test)]
 pub(crate) mod test_generators;

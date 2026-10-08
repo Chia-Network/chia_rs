@@ -20,6 +20,11 @@ use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
 
+// Re-exports the trusted-block readers at their previous paths.
+pub use crate::trusted_block::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+};
+
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
         Err(ValidationErr::Err(ErrorCode::CostExceeded))
