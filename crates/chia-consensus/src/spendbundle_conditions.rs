@@ -823,7 +823,7 @@ mod tests {
             })
             .collect();
         let bundle = SpendBundle::new(coin_spends, Signature::default());
-        let flags = MEMPOOL_MODE | ConsensusFlags::INTERNED_GENERATOR;
+        let flags = MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST;
 
         let mut a = make_allocator(MEMPOOL_MODE);
         let (mempool_conds, _) =
