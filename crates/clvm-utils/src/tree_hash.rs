@@ -578,7 +578,7 @@ fn test_tree_hash_cached(
     use std::fs::read_to_string;
 
     let filename = format!("../../generator-tests/{name}.txt");
-    println!("file: {filename}",);
+    println!("file: {filename}");
     let test_file = read_to_string(filename).expect("test file not found");
     let generator = test_file.lines().next().expect("invalid test file");
     let generator = hex::decode(generator).expect("invalid hex encoded generator");
