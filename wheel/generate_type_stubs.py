@@ -141,7 +141,7 @@ def rust_type_to_python(t: str) -> str:
         inner = ", ".join(map(lambda se: rust_type_to_python(se), inner_list))
         return f"tuple[{inner}]"
 
-    m = re.fullmatch("\\[(.+); [0-9]+\\]", t)
+    m = re.fullmatch(r"\[(.+); .+\]", t)
     if m is not None:
         return f"list[{rust_type_to_python(m.group(1))}]"
 
