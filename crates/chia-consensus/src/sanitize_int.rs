@@ -74,9 +74,9 @@ fn test_sanitize_uint() {
     let e = ErrorCode::InvalidCoinAmount;
     let no_leading_zero = a.new_substr(atom, 0, 8).unwrap();
     // this is a negative number, not allowed
-    assert!(
-        sanitize_uint(&a, no_leading_zero, 8, ValidationErr::Err(e))
-            == Ok(SanitizedUint::NegativeOverflow)
+    assert_eq!(
+        sanitize_uint(&a, no_leading_zero, 8, ValidationErr::Err(e)),
+        Ok(SanitizedUint::NegativeOverflow)
     );
 
     let just_zeros = a.new_substr(atom, 10, 70).unwrap();
