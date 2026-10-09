@@ -135,3 +135,61 @@ def test_plot_roundtrip(
     print(f"proofs: {num_proofs}")
     assert num_challenges == 200
     assert num_proofs == expected_proofs, "unexpected proof count over 200 challenges"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "pool-2-0-0",
+        "pool-2-0-1",
+        "pool-2-1-0",
+        "pool-2-1000-7",
+        "contract-2-0-0",
+        "pool-3-0-0",
+        "contract-3-0-0",
+    ],
+)
+def test_validate_proof_v2_wrong_plot_index(name: str) -> None:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "crates/chia-protocol/quality-string-tests"
+        / f"{name}.txt"
+    )
+    values = [line.split("#", 1)[0].strip() for line in path.read_text().splitlines()]
+    (
+        challenge_hex,
+        strength_text,
+        index_text,
+        meta_group_text,
+        pool_hex,
+        proof_hex,
+        quality_hex,
+    ) = (value for value in values if value)
+    strength = uint8(int(strength_text))
+    plot_index = uint16(int(index_text))
+    meta_group = uint8(int(meta_group_text))
+    pool_pk = (
+        G1Element.from_bytes(bytes.fromhex(pool_hex)) if len(pool_hex) == 96 else None
+    )
+    contract_ph = bytes32.fromhex(pool_hex) if pool_pk is None else None
+    plot_group_id = compute_plot_group_id_v2(strength, PLOT_PK, pool_pk, contract_ph)
+    challenge = bytes32.fromhex(challenge_hex)
+    proof = bytes.fromhex(proof_hex)
+
+    assert validate_proof_v2(
+        plot_group_id, plot_index, 22, strength, meta_group, challenge, proof
+    ) == bytes32.fromhex(quality_hex)
+
+    # Keep the valid proof and its parameters, but claim a different plot index.
+    assert (
+        validate_proof_v2(
+            plot_group_id,
+            uint16(plot_index ^ 1),
+            22,
+            strength,
+            meta_group,
+            challenge,
+            proof,
+        )
+        is None
+    )
