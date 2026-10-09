@@ -15,7 +15,7 @@ fuzz_target!(|data: &[u8]| {
     let mut spends = Vec::<CoinSpend>::new();
     let mut data = Cursor::new(data);
     let mut a = Allocator::new();
-    let mut blockbuilder = BlockBuilder::new().expect("default");
+    let mut blockbuilder = BlockBuilder::new(&TEST_CONSTANTS).expect("default");
 
     let Ok(num_of_conds) = u32::parse::<false>(&mut data) else {
         return;
@@ -104,10 +104,10 @@ fuzz_target!(|data: &[u8]| {
     };
 
     blockbuilder
-        .add_spend_bundles([spend_bundle], 0, &TEST_CONSTANTS)
+        .add_spend_bundles([spend_bundle], 0)
         .expect("add spend");
 
-    let Ok((generator, _sig, _cost)) = blockbuilder.finalize(&TEST_CONSTANTS) else {
+    let Ok((generator, _sig, _cost)) = blockbuilder.finalize() else {
         return;
     };
 

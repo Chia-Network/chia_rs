@@ -57,6 +57,10 @@ pub struct BlockBuilder {
 
     // the serializer for the generator CLVM
     ser: Serializer,
+
+    // from consensus constants, set at construction
+    cost_per_byte: u64,
+    max_block_cost: u64,
 }
 
 fn result(num_skipped: u32) -> BuildBlockResult {
@@ -68,7 +72,11 @@ fn result(num_skipped: u32) -> BuildBlockResult {
 }
 
 impl BlockBuilder {
-    pub fn new() -> Result<Self> {
+    pub fn new(constants: &ConsensusConstants) -> Result<Self> {
+        Self::new_with(constants.cost_per_byte, constants.max_block_cost_clvm)
+    }
+
+    fn new_with(cost_per_byte: u64, max_block_cost: u64) -> Result<Self> {
         let mut a = Allocator::new();
 
         // the sentinel just needs to be a unique NodePtr. Since atoms may be
@@ -96,6 +104,8 @@ impl BlockBuilder {
             byte_cost: 0,
             num_skipped: 0,
             ser,
+            cost_per_byte,
+            max_block_cost,
         })
     }
 
@@ -111,7 +121,6 @@ impl BlockBuilder {
         &mut self,
         bundles: T,
         cost: u64,
-        constants: &ConsensusConstants,
     ) -> Result<(bool, BuildBlockResult)>
     where
         T: IntoIterator<Item = S>,
@@ -119,12 +128,12 @@ impl BlockBuilder {
     {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
-        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm {
+        if self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > self.max_block_cost {
             self.num_skipped += 1;
             return Ok((false, BuildBlockResult::Done));
         }
 
-        if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+        if self.byte_cost + self.block_cost + cost > self.max_block_cost {
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -156,8 +165,8 @@ impl BlockBuilder {
         let (done, state) = self.ser.add(a, spend_list)?;
 
         // closing the lists at the end needs 2 extra bytes
-        self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
-        if self.byte_cost + self.block_cost + cost > constants.max_block_cost_clvm {
+        self.byte_cost = (self.ser.size() + 2) * self.cost_per_byte;
+        if self.byte_cost + self.block_cost + cost > self.max_block_cost {
             // Undo the last add() call.
             // It might be tempting to reset the allocator as well, however,
             // the incremental serializer will have already cached the tree we
@@ -165,7 +174,7 @@ impl BlockBuilder {
             // serializer state. It's more expensive to reset this cache, so we
             // leave the Allocator untouched instead.
             self.ser.restore(state);
-            self.byte_cost = (self.ser.size() + 2) * constants.cost_per_byte;
+            self.byte_cost = (self.ser.size() + 2) * self.cost_per_byte;
             self.num_skipped += 1;
             return Ok((false, result(self.num_skipped)));
         }
@@ -175,7 +184,7 @@ impl BlockBuilder {
         // if we're very close to a full block, we're done. It's very unlikely
         // any transaction will be smallar than MIN_COST_THRESHOLD
         let result = if done
-            || self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > constants.max_block_cost_clvm
+            || self.byte_cost + self.block_cost + MIN_COST_THRESHOLD > self.max_block_cost
         {
             BuildBlockResult::Done
         } else {
@@ -189,14 +198,14 @@ impl BlockBuilder {
     }
 
     // returns generator, sig, cost
-    pub fn finalize(mut self, constants: &ConsensusConstants) -> Result<(Vec<u8>, Signature, u64)> {
+    pub fn finalize(mut self) -> Result<(Vec<u8>, Signature, u64)> {
         let (done, _) = self.ser.add(&self.allocator, self.allocator.nil())?;
         assert!(done);
 
         // add the size cost before returning it
-        self.block_cost += self.ser.size() * constants.cost_per_byte;
+        self.block_cost += self.ser.size() * self.cost_per_byte;
 
-        assert!(self.block_cost <= constants.max_block_cost_clvm);
+        assert!(self.block_cost <= self.max_block_cost);
         Ok((self.ser.into_inner(), self.signature, self.block_cost))
     }
 }
@@ -205,8 +214,8 @@ impl BlockBuilder {
 #[pymethods]
 impl BlockBuilder {
     #[new]
-    pub fn py_new() -> PyResult<Self> {
-        Ok(Self::new()?)
+    pub fn py_new(constants: &ConsensusConstants) -> PyResult<Self> {
+        Ok(Self::new(constants)?)
     }
 
     /// the first bool indicates whether the bundles was added.
@@ -216,7 +225,6 @@ impl BlockBuilder {
         &mut self,
         bundles: &Bound<'_, PyList>,
         cost: u64,
-        constants: &ConsensusConstants,
     ) -> PyResult<(bool, bool)> {
         let (added, result) = self.add_spend_bundles(
             bundles.iter().map(|item| {
@@ -231,7 +239,6 @@ impl BlockBuilder {
                     .clone()
             }),
             cost,
-            constants,
         )?;
         let done = matches!(result, BuildBlockResult::Done);
         Ok((added, done))
@@ -244,13 +251,10 @@ impl BlockBuilder {
 
     /// generate the block generator
     #[pyo3(name = "finalize")]
-    pub fn py_finalize(
-        &mut self,
-        constants: &ConsensusConstants,
-    ) -> PyResult<(Vec<u8>, Signature, u64)> {
-        let mut temp = BlockBuilder::new()?;
+    pub fn py_finalize(&mut self) -> PyResult<(Vec<u8>, Signature, u64)> {
+        let mut temp = BlockBuilder::new_with(self.cost_per_byte, self.max_block_cost)?;
         std::mem::swap(self, &mut temp);
-        let (generator, sig, cost) = temp.finalize(constants)?;
+        let (generator, sig, cost) = temp.finalize()?;
         Ok((generator, sig, cost))
     }
 }
@@ -272,6 +276,56 @@ mod tests {
     use std::collections::HashSet;
     use std::fs;
     use std::time::Instant;
+
+    // Builds a block from the test bundles in a fixed order, with a fixed
+    // per-bundle cost, and checks the result against known output. This pins
+    // the exact generator bytes, signature and cost the BlockBuilder produces.
+    #[test]
+    fn test_build_block_golden() {
+        let mut files: Vec<_> = fs::read_dir("../../test-bundles")
+            .expect("listing test-bundles directory")
+            .map(|entry| entry.expect("list dir").path())
+            .filter(|file| {
+                file.extension().map(|s| s.to_str()) == Some(Some("bundle"))
+                    && file.file_stem().map(std::ffi::OsStr::len) == Some(64_usize)
+            })
+            .collect();
+        files.sort();
+
+        let mut builder = BlockBuilder::new(&TEST_CONSTANTS).expect("BlockBuilder");
+        let mut num_added = 0;
+        let mut num_skipped = 0;
+        for file in &files {
+            let buf = fs::read(file).expect("read bundle file");
+            let bundle = SpendBundle::from_bytes(buf.as_slice()).expect("parsing SpendBundle");
+            let (added, result) = builder
+                .add_spend_bundles([&bundle], 150_000_000)
+                .expect("add_spend_bundles");
+            if added {
+                num_added += 1;
+            } else {
+                num_skipped += 1;
+            }
+            if result == BuildBlockResult::Done {
+                break;
+            }
+        }
+        let (generator, signature, cost) = builder.finalize().expect("finalize()");
+
+        let mut sig_and_gen = generator.clone();
+        sig_and_gen.extend_from_slice(&signature.to_bytes());
+        let mut digest = chia_sha2::Sha256::new();
+        digest.update(&sig_and_gen);
+        let digest = hex::encode(digest.finalize());
+        assert_eq!(num_added, 40);
+        assert_eq!(num_skipped, 7);
+        assert_eq!(generator.len(), 406_712);
+        assert_eq!(cost, 10_880_544_020);
+        assert_eq!(
+            digest,
+            "85bba9ff6f2b6c47e22ef9f9fc80268d4d81946c8e63ffed90e5a9feb4e97964"
+        );
+    }
 
     #[ignore = "expensive test, only run in release mode (--include-ignored)"]
     #[test]
@@ -391,7 +445,7 @@ mod tests {
                 bundles.shuffle(&mut rng);
 
                 let start = Instant::now();
-                let mut builder = BlockBuilder::new().expect("BlockBuilder");
+                let mut builder = BlockBuilder::new(&TEST_CONSTANTS).expect("BlockBuilder");
                 let mut skipped = 0;
                 let mut num_tx = 0;
                 let mut max_call_time = 0.0f32;
@@ -400,7 +454,7 @@ mod tests {
                     let (bundle, cost, conds) = entry.as_ref();
                     let start_call = Instant::now();
                     let (added, result) = builder
-                        .add_spend_bundles([bundle], *cost, &TEST_CONSTANTS)
+                        .add_spend_bundles([bundle], *cost)
                         .expect("add_spend_bundle");
 
                     max_call_time = f32::max(max_call_time, start_call.elapsed().as_secs_f32());
@@ -415,7 +469,7 @@ mod tests {
                     }
                 }
                 let (generator, signature, cost) =
-                    builder.finalize(&TEST_CONSTANTS).expect("finalize()");
+                    builder.finalize().expect("finalize()");
 
                 println!(
                     "idx: {seed:3} built block in {:>5.2} seconds, cost: {cost:11} skipped: {skipped:2} longest-call: {max_call_time:>5.2}s TX: {num_tx}",
