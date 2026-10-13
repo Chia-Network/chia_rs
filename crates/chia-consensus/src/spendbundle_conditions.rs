@@ -1,6 +1,6 @@
 use crate::conditions::{
-    ELIGIBLE_FOR_DEDUP, MAX_SPENDS_PER_BLOCK, MempoolVisitor, ParseState, SpendBundleConditions,
-    process_single_spend, validate_conditions,
+    ELIGIBLE_FOR_DEDUP, ELIGIBLE_FOR_FF, MAX_SPENDS_PER_BLOCK, MempoolVisitor, ParseState,
+    SpendBundleConditions, process_single_spend, validate_conditions,
 };
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::{ConsensusFlags, MEMPOOL_MODE};
@@ -154,6 +154,12 @@ pub fn run_spendbundle(
             constants,
         )?;
 
+        if spend.flags & ELIGIBLE_FOR_FF != 0
+            && !crate::fast_forward::supports_fast_forward(a, puz, sol)
+        {
+            spend.flags &= !ELIGIBLE_FOR_FF;
+        }
+
         if (spend.flags & ELIGIBLE_FOR_DEDUP) != 0
             && flags.contains(ConsensusFlags::COMPUTE_FINGERPRINT)
         {
@@ -255,10 +261,13 @@ mod tests {
             .zip(ps_conds.spends.iter())
             .enumerate()
         {
+            // The two entry points have different information for FF checks.
             assert_eq!(
-                s1.flags, s2.flags,
+                s1.flags & !ELIGIBLE_FOR_FF,
+                s2.flags & !ELIGIBLE_FOR_FF,
                 "spend {i} flags differ: run_spendbundle={:#x}, parse_spends={:#x}",
-                s1.flags, s2.flags
+                s1.flags,
+                s2.flags
             );
         }
     }
@@ -362,6 +371,98 @@ mod tests {
         result
     }
 
+    #[rstest]
+    #[case("amount")]
+    #[case("parent_amount")]
+    #[case("extra_solution_field")]
+    #[case("extra_lineage_field")]
+    #[case("solution_tail")]
+    #[case("lineage_tail")]
+    fn test_noncanonical_singleton_clears_ff(#[case] mutation: &str) {
+        use clvm_traits::FromClvm;
+        use clvmr::allocator::NodePtr;
+        use clvmr::serde::node_to_bytes;
+
+        let mut spend = CoinSpend::from_bytes(&read("../../ff-tests/e3c0.spend").unwrap()).unwrap();
+        let mut a = Allocator::new();
+        let sol = node_from_bytes(&mut a, spend.solution.as_slice()).unwrap();
+        let mut solution = <[NodePtr; 3]>::from_clvm(&a, sol).unwrap().to_vec();
+        let mut proof = <[NodePtr; 3]>::from_clvm(&a, solution[0]).unwrap().to_vec();
+        match mutation {
+            "amount" | "parent_amount" => {
+                let target = if mutation == "amount" {
+                    &mut solution[1]
+                } else {
+                    &mut proof[2]
+                };
+                let mut bytes = vec![0];
+                bytes.extend_from_slice(a.atom(*target).as_ref());
+                *target = a.new_atom(&bytes).unwrap();
+            }
+            "extra_solution_field" => solution.push(a.nil()),
+            "extra_lineage_field" => proof.push(a.nil()),
+            "solution_tail" | "lineage_tail" => (),
+            _ => unreachable!(),
+        }
+        let mut proof_node = if mutation == "lineage_tail" {
+            a.one()
+        } else {
+            a.nil()
+        };
+        for field in proof.into_iter().rev() {
+            proof_node = a.new_pair(field, proof_node).unwrap();
+        }
+        solution[0] = proof_node;
+        let mut sol = if mutation == "solution_tail" {
+            a.one()
+        } else {
+            a.nil()
+        };
+        for field in solution.into_iter().rev() {
+            sol = a.new_pair(field, sol).unwrap();
+        }
+        spend.solution = node_to_bytes(&a, sol).unwrap().into();
+        if mutation == "amount" || mutation == "parent_amount" {
+            let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()).unwrap();
+            assert!(!crate::fast_forward::supports_fast_forward(&a, puzzle, sol));
+            if mutation == "parent_amount" {
+                // Keep the fixture's parent ID consistent with its solution.
+                let Reduction(_, conditions) = run_program(
+                    &mut a,
+                    &ChiaDialect::new(ConsensusFlags::empty().to_clvm_flags()),
+                    puzzle,
+                    sol,
+                    11_000_000_000,
+                )
+                .unwrap();
+                let conditions = Vec::<NodePtr>::from_clvm(&a, conditions).unwrap();
+                let [_opcode, parent_coin_info] =
+                    <[NodePtr; 2]>::from_clvm(&a, conditions[1]).unwrap();
+                spend.coin.parent_coin_info = a.atom(parent_coin_info).as_ref().try_into().unwrap();
+            }
+        }
+        let bundle = SpendBundle::new(vec![spend], Signature::default());
+        let result = run_spendbundle(
+            &mut a,
+            &bundle,
+            11_000_000_000,
+            MEMPOOL_MODE | ConsensusFlags::DONT_VALIDATE_SIGNATURE,
+            &TEST_CONSTANTS,
+            None,
+        );
+        if mutation == "amount" {
+            // This case is rejected by condition validation.
+            assert_eq!(
+                result.unwrap_err(),
+                ValidationErr::Err(ErrorCode::AssertMyAmountFailed)
+            );
+            return;
+        }
+        let (conditions, _) = result.expect("noncanonical singleton still executes successfully");
+        assert_eq!(conditions.spends[0].flags & ELIGIBLE_FOR_FF, 0);
+        assert_ne!(conditions.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
+    }
+
     fn condition_node(
         a: &mut Allocator,
         opcode: crate::opcodes::ConditionOpcode,
@@ -428,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn test_post_process_single_ff_eligible_spend() {
+    fn test_identity_spend_is_not_ff_eligible() {
         let spend_a = make_coin_spend([1u8; 32], 123, &[]);
 
         let bundle = SpendBundle::new(vec![spend_a], Signature::default());
@@ -445,7 +546,7 @@ mod tests {
         .expect("run_spendbundle");
 
         assert_eq!(conds.spends.len(), 1);
-        assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
+        assert_eq!(conds.spends[0].flags & ELIGIBLE_FOR_FF, 0);
         assert_ne!(conds.spends[0].flags & ELIGIBLE_FOR_DEDUP, 0);
 
         assert_run_spendbundle_matches_parse_spends(&bundle);

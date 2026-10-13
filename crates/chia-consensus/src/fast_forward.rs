@@ -51,6 +51,46 @@ fn curry_and_treehash(inner_puzzle_hash: &Bytes32, singleton_struct: &SingletonS
     .into()
 }
 
+/// Check that the singleton uses the encoding supported by fast-forwarding.
+/// This only reads the allocator; it does not allocate atoms or pairs.
+pub fn supports_fast_forward(a: &Allocator, puzzle: NodePtr, solution: NodePtr) -> bool {
+    let Ok(singleton) = CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(a, puzzle)
+    else {
+        return false;
+    };
+    let Ok(parsed) = SingletonSolution::<NodePtr>::from_clvm(a, solution) else {
+        return false;
+    };
+    let Proof::Lineage(lineage) = parsed.lineage_proof else {
+        return false;
+    };
+    if singleton.args.singleton_struct.mod_hash.as_ref() != SINGLETON_TOP_LAYER_V1_1_HASH
+        || tree_hash(a, singleton.program) != SINGLETON_TOP_LAYER_V1_1_HASH.into()
+        || tree_hash(a, puzzle)
+            != curry_and_treehash(
+                &lineage.parent_inner_puzzle_hash,
+                &singleton.args.singleton_struct,
+            )
+            .into()
+    {
+        return false;
+    }
+
+    // Require canonical amounts and exact solution and proof shapes.
+    let Ok([lineage_proof, amount, _inner_solution]) = <[NodePtr; 3]>::from_clvm(a, solution)
+    else {
+        return false;
+    };
+    let Ok([_parent_parent_coin, _parent_inner_ph, parent_amount]) =
+        <[NodePtr; 3]>::from_clvm(a, lineage_proof)
+    else {
+        return false;
+    };
+    a.atom(amount).as_ref() == clvm_traits::encode_number(&parsed.amount.to_be_bytes(), false)
+        && a.atom(parent_amount).as_ref()
+            == clvm_traits::encode_number(&lineage.parent_amount.to_be_bytes(), false)
+}
+
 /// given a puzzle, solution and new coin of a singleton
 /// this function validates the lineage proof and returns a new
 /// solution spending a new coin ID.
@@ -183,6 +223,49 @@ mod tests {
     use rstest::rstest;
     use std::fs;
     use std::sync::Arc;
+
+    #[rstest]
+    fn test_canonical_singleton_roundtrip(
+        #[values(1, 127, 129, 255, 32767, 32769, u64::MAX)] amount: u64,
+    ) {
+        let spend = CoinSpend::from_bytes(&fs::read("../../ff-tests/e3c0.spend").unwrap()).unwrap();
+        let mut a = Allocator::new();
+        let puzzle = node_from_bytes(&mut a, spend.puzzle_reveal.as_slice()).unwrap();
+        let solution = node_from_bytes(&mut a, spend.solution.as_slice()).unwrap();
+        let mut parsed = SingletonSolution::<NodePtr>::from_clvm(&a, solution).unwrap();
+        parsed.amount = amount;
+        let Proof::Lineage(lineage) = &mut parsed.lineage_proof else {
+            panic!("lineage proof");
+        };
+        lineage.parent_amount = amount;
+        // Preserve the opaque inner solution.
+        parsed.inner_solution = a.new_atom(&[0, 0, 1]).unwrap();
+        let solution = parsed.to_clvm(&mut a).unwrap();
+        for (puzzle, solution, expected) in [
+            (puzzle, solution, true),
+            (puzzle, a.nil(), false),
+            (a.nil(), solution, false),
+        ] {
+            let atoms_before = a.atom_count();
+            let pairs_before = a.pair_count();
+            assert_eq!(supports_fast_forward(&a, puzzle, solution), expected);
+            assert_eq!(a.atom_count(), atoms_before);
+            assert_eq!(a.pair_count(), pairs_before);
+        }
+        let decoded = SingletonSolution::<NodePtr>::from_clvm(&a, solution).unwrap();
+        let regenerated = decoded.to_clvm(&mut a).unwrap();
+        assert_eq!(
+            node_to_bytes(&a, solution).unwrap(),
+            node_to_bytes(&a, regenerated).unwrap()
+        );
+        let decoded =
+            CurriedProgram::<NodePtr, SingletonArgs<NodePtr>>::from_clvm(&a, puzzle).unwrap();
+        let regenerated = decoded.to_clvm(&mut a).unwrap();
+        assert_eq!(
+            node_to_bytes(&a, puzzle).unwrap(),
+            node_to_bytes(&a, regenerated).unwrap()
+        );
+    }
 
     pub fn run_puzzle(
         a: &mut Allocator,
