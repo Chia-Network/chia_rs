@@ -14,7 +14,7 @@ use libfuzzer_sys::{Corpus, fuzz_target};
 
 fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     let mut a = Allocator::new();
-    let mut blockbuilder = BlockBuilder::new().expect("default");
+    let mut blockbuilder = BlockBuilder::new(&TEST_CONSTANTS).expect("default");
 
     if spends.is_empty() {
         return Corpus::Reject;
@@ -24,9 +24,9 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         aggregated_signature: Signature::default(),
     };
     blockbuilder
-        .add_spend_bundles([spend_bundle], 0, &TEST_CONSTANTS)
+        .add_spend_bundles([spend_bundle], 0)
         .expect("add spend");
-    let Ok((generator, _sig, _cost)) = blockbuilder.finalize(&TEST_CONSTANTS) else {
+    let Ok((generator, _sig, _cost)) = blockbuilder.finalize() else {
         return Corpus::Reject;
     };
     let gen_prog = &Program::new(generator.into());

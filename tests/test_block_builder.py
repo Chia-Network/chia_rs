@@ -46,22 +46,20 @@ def test_block_builder() -> None:
         random.shuffle(all_bundles)
 
         start = time.monotonic()
-        builder = BlockBuilder()
+        builder = BlockBuilder(DEFAULT_CONSTANTS)
         skipped = 0
         for sbs in (
             all_bundles[i : i + batch_size]
             for i in range(0, len(all_bundles), batch_size)
         ):
             cost = uint64(sum([i[1] for i in sbs]))
-            added, done = builder.add_spend_bundles(
-                [i[0] for i in sbs], cost, DEFAULT_CONSTANTS
-            )
+            added, done = builder.add_spend_bundles([i[0] for i in sbs], cost)
             if not added:
                 skipped += 1
             if done:
                 break
 
-        generator, signature, generator_cost = builder.finalize(DEFAULT_CONSTANTS)
+        generator, signature, generator_cost = builder.finalize()
 
         end = time.monotonic()
         gen_time = end - start
