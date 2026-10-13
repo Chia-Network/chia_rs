@@ -49,7 +49,9 @@ jobs:
           python -m pip install --upgrade pip
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: stable
 
       - uses: chia-network/actions/create-venv@main
         id: create-venv
@@ -136,7 +138,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@1.92.0
+        uses: ./.github/actions/rust-toolchain
 
       - uses: chia-network/actions/create-venv@main
         id: create-venv
@@ -180,7 +182,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up rust
-        uses: dtolnay/rust-toolchain@1.92.0
+        uses: ./.github/actions/rust-toolchain
 
       - name: cargo bench
         run: |
