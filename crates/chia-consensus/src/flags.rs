@@ -53,9 +53,10 @@ bitflags! {
         /// Limit the number of spends per block.
         const LIMIT_SPENDS = 0x200_0000;
 
-        /// After the generator-identity hard fork, generators must be validated from
-        /// the INTERNED (canonical) tree so atom/pair limits and cost apply to the same
-        /// structure independent of serialization.
+        /// After the generator-identity hard fork, the generator field carries a
+        /// serialized spend-list wrapper (serde_2026), which is parsed directly. It is
+        /// validated from the INTERNED (canonical) tree so atom/pair limits and cost
+        /// apply to the same structure independent of serialization.
         const INTERNED_SPEND_LIST = 0x0800_0000;
     }
 }

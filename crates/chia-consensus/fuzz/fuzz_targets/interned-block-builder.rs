@@ -164,14 +164,13 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
     // Round-trip: generator bytes must decode back to the same spends (cf. generator.rs).
     // finalize() emits serde_2026, so INTERNED_SPEND_LIST is needed to parse it.
     let gen_prog = Program::new(generator.into());
-    let Ok(mut result) = get_coinspends_for_trusted_block(
+    let mut result = get_coinspends_for_trusted_block::<&[u8], _>(
         &TEST_CONSTANTS,
         &gen_prog,
-        vec![&[]],
+        vec![],
         ConsensusFlags::INTERNED_SPEND_LIST,
-    ) else {
-        return Corpus::Reject;
-    };
+    )
+    .expect("finalize() output must decode back to its spends");
 
     assert_eq!(spends.len(), result.len());
     result.reverse();
