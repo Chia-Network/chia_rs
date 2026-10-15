@@ -25,14 +25,14 @@ jobs:
         python:
           - major-dot-minor: "3.9"
             stubtest-args: --allowlist wheel/stubtest.allowlist.disjoint-base
-          - major-dot-minor: "3.10"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.11"
             stubtest-args: --allowlist wheel/stubtest.allowlist.3-11 --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.12"
             stubtest-args: --allowlist wheel/stubtest.allowlist.3-12
           - major-dot-minor: "3.13"
             stubtest-args: --allowlist wheel/stubtest.allowlist.3-13
+          - major-dot-minor: "3.14"
+            stubtest-args: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -123,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
