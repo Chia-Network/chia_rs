@@ -23,8 +23,6 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python:
-          - major-dot-minor: "3.9"
-            stubtest-args: --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.11"
             stubtest-args: --allowlist wheel/stubtest.allowlist.3-11 --allowlist wheel/stubtest.allowlist.disjoint-base
           - major-dot-minor: "3.12"
@@ -85,19 +83,15 @@ jobs:
         shell: bash
         run: |
           FAILURE=0
-          EXTRA_ARGS=()
-          if [[ "${{ matrix.python.major-dot-minor }}" == "3.9" ]]; then
-            EXTRA_ARGS=(--allowlist wheel/stubtest.allowlist.3-9)
-          fi
           echo "::group::concise"
-          if ! stubtest ${{ matrix.python.stubtest-args }} "${EXTRA_ARGS[@]}" --allowlist wheel/stubtest.allowlist --concise chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist --concise chia_rs
           then
             FAILURE=1
           fi
           echo "::endgroup::"
 
           echo "::group::complete"
-          if ! stubtest ${{ matrix.python.stubtest-args }} "${EXTRA_ARGS[@]}" --allowlist wheel/stubtest.allowlist chia_rs
+          if ! stubtest ${{ matrix.python.stubtest-args }} --allowlist wheel/stubtest.allowlist chia_rs
           then
             FAILURE=1
           fi
@@ -106,7 +100,6 @@ jobs:
           exit ${FAILURE}
 
       - name: python black
-        if: matrix.python.major-dot-minor != 3.9
         run: |
           black --check tests
           black --check wheel/generate_type_stubs.py
