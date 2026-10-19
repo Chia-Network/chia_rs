@@ -1,6 +1,7 @@
 from chia_rs import (
     CoinSpend,
     Coin,
+    Program,
     supports_fast_forward,
     fast_forward_singleton,
 )
@@ -12,6 +13,21 @@ def test_supports_fast_forward(file: str) -> None:
     with open(f"ff-tests/{file}.spend", "rb") as f:
         spend = CoinSpend.from_bytes(f.read())
     assert supports_fast_forward(spend)
+
+
+@pytest.mark.parametrize("file", ["bb13", "e3c0"])
+@pytest.mark.parametrize("tail", ["ff8080", "01"])
+def test_supports_fast_forward_requires_exact_solution(file: str, tail: str) -> None:
+    with open(f"ff-tests/{file}.spend", "rb") as f:
+        spend = CoinSpend.from_bytes(f.read())
+    solution = bytes(spend.solution)
+    assert solution[-1] == 0x80
+    modified = CoinSpend(
+        spend.coin,
+        spend.puzzle_reveal,
+        Program.from_bytes(solution[:-1] + bytes.fromhex(tail)),
+    )
+    assert not supports_fast_forward(modified)
 
 
 @pytest.mark.parametrize("file", ["bb13", "e3c0"])

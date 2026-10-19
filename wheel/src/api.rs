@@ -502,6 +502,10 @@ fn supports_fast_forward(spend: &CoinSpend) -> bool {
         return false;
     };
 
+    if !chia_consensus::fast_forward::supports_fast_forward(&a, puzzle, solution) {
+        return false;
+    }
+
     native_ff(
         &mut a,
         puzzle,
