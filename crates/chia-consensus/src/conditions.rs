@@ -3116,9 +3116,9 @@ fn test_create_coin_with_hint() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3142,9 +3142,9 @@ fn test_create_coin_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3163,9 +3163,9 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3244,9 +3244,9 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == MSG1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), MSG1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -4760,7 +4760,7 @@ fn test_assert_ephemeral_no_ff() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H1);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
-    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
+    assert_eq!((spend.flags & ELIGIBLE_FOR_FF), 0);
 
     let spend = &conds.spends[1];
     assert_eq!(
@@ -4770,7 +4770,7 @@ fn test_assert_ephemeral_no_ff() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.agg_sig_me.len(), 0);
     assert_eq!(spend.flags, ELIGIBLE_FOR_DEDUP); // not ELIGIBLE_FOR_FF
-    assert!((spend.flags & ELIGIBLE_FOR_FF) == 0);
+    assert_eq!((spend.flags & ELIGIBLE_FOR_FF), 0);
 }
 
 #[test]
@@ -5181,7 +5181,7 @@ fn test_eligible_for_ff_assert_parent() {
 
     let (_a, cond) =
         cond_test_flag(test, ConsensusFlags::DONT_VALIDATE_SIGNATURE).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0);
 }
 
@@ -5201,8 +5201,8 @@ fn test_eligible_for_ff_even_amount() {
        ))";
 
     let (_a, cond) = cond_test(test).expect("cond_test");
-    assert!(cond.spends.len() == 1);
-    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+    assert_eq!(cond.spends.len(), 1);
+    assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF), 0);
 }
 
 #[test]
@@ -5221,8 +5221,8 @@ fn test_eligible_for_ff_different_amount() {
        ))";
 
     let (_a, cond) = cond_test(test).expect("cond_test");
-    assert!(cond.spends.len() == 1);
-    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+    assert_eq!(cond.spends.len(), 1);
+    assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF), 0);
 }
 
 #[cfg(test)]
@@ -5245,12 +5245,12 @@ fn test_eligible_for_ff_output_coin(#[case] amount: u64, #[case] ph: &str, #[cas
     );
 
     let (_a, cond) = cond_test(test).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
     let flags = cond.spends[0].flags;
     if eligible {
         assert!((flags & ELIGIBLE_FOR_FF) != 0);
     } else {
-        assert!((flags & ELIGIBLE_FOR_FF) == 0);
+        assert_eq!((flags & ELIGIBLE_FOR_FF), 0);
     }
 }
 
@@ -5277,8 +5277,8 @@ fn test_eligible_for_ff_invalid_assert_parent(
     );
 
     let (_a, cond) = cond_test(test).expect("cond_test");
-    assert!(cond.spends.len() == 1);
-    assert!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0);
+    assert_eq!(cond.spends.len(), 1);
+    assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF), 0);
 }
 
 #[cfg(test)]
@@ -5321,7 +5321,7 @@ fn test_eligible_for_ff_timelocks(
 
     let (_a, cond) =
         cond_test_flag(test, ConsensusFlags::DONT_VALIDATE_SIGNATURE).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
     assert!(if eligible {
         (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0
     } else {
@@ -5357,12 +5357,12 @@ fn test_eligible_for_ff_invalid_agg_sig_me(
 
     let (_a, cond) =
         cond_test_sig(test, &signature, None, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
     let flags = cond.spends[0].flags;
     if eligible {
         assert!((flags & ELIGIBLE_FOR_FF) != 0);
     } else {
-        assert!((flags & ELIGIBLE_FOR_FF) == 0);
+        assert_eq!((flags & ELIGIBLE_FOR_FF), 0);
     }
 }
 
@@ -6178,7 +6178,7 @@ fn test_message_eligible_for_ff() {
         );
 
         let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
-        assert!(cond.spends.len() == 2);
+        assert_eq!(cond.spends.len(), 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
             (mode & 0b10_0000) == 0
@@ -6202,7 +6202,7 @@ fn test_message_eligible_for_ff() {
         );
 
         let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
-        assert!(cond.spends.len() == 2);
+        assert_eq!(cond.spends.len(), 2);
         assert_eq!(
             (cond.spends[0].flags & ELIGIBLE_FOR_FF) != 0,
             (mode & 0b100) == 0
@@ -6233,7 +6233,7 @@ fn test_assert_concurrent_spend_ff(#[values(true, false)] is_dedup_id: bool) {
     );
 
     let (_a, cond) = cond_test_flag(&test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 2);
+    assert_eq!(cond.spends.len(), 2);
 
     // If the spend is referenced by ASSERT_CONCURRENT_SPEND, it's not eligible for FF
     assert_eq!((cond.spends[0].flags & ELIGIBLE_FOR_FF) == 0, is_dedup_id);
@@ -6251,7 +6251,7 @@ fn test_dedup_excess_amount() {
        ))";
 
     let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
 
     // Not eligible for dedup because the output is less than the input
     // This would essentially result in double spends of the value across deduped transactions
@@ -6267,7 +6267,7 @@ fn test_dedup_same_amount() {
        ))";
 
     let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 1);
+    assert_eq!(cond.spends.len(), 1);
 
     // Eligible for dedup because the output is equal to the input
     assert!((cond.spends[0].flags & ELIGIBLE_FOR_DEDUP) != 0);
@@ -6284,7 +6284,7 @@ fn test_dedup_absorb_amount() {
        ))";
 
     let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 2);
+    assert_eq!(cond.spends.len(), 2);
 
     // Eligible for dedup because the output is greater than the input
     // It's fine to pay for this multiple times from different spends, since the excess goes to the farmer
@@ -6305,7 +6305,7 @@ fn test_dedup_reserve_and_pay_fee() {
        ))";
 
     let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 2);
+    assert_eq!(cond.spends.len(), 2);
 
     // Not eligible for dedup because the output is less than the input
     // This would mean the fee for the transaction is misleading due to deduplication
@@ -6327,7 +6327,7 @@ fn test_dedup_reserve_fee_without_paying() {
        ))";
 
     let (_a, cond) = cond_test_flag(test, ConsensusFlags::empty()).expect("cond_test");
-    assert!(cond.spends.len() == 2);
+    assert_eq!(cond.spends.len(), 2);
 
     // Eligible for dedup because the output is equal to the input
     // And a dedup spend can still reserve a fee as long as it doesn't pay it
