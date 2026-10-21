@@ -114,7 +114,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -199,7 +199,7 @@ jobs:
           rm -rf "${TMP_DEST}"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
@@ -221,7 +221,7 @@ jobs:
       # (pattern: packages-*) would ingest it.
       - name: Upload debug symbols artifact (Windows)
         if: matrix.os.matrix == 'windows' && github.event_name == 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debug-symbols-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./debug-symbols/
@@ -254,7 +254,7 @@ jobs:
       # The per-matrix .zip archives already have unique names, so flatten them
       # all into one directory with merge-multiple.
       - name: Download debug symbols
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           pattern: debug-symbols-*
@@ -282,7 +282,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -317,7 +317,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -340,7 +340,7 @@ jobs:
           rm -rf "$dirname"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-sdist-${{ matrix.os.name }}-${{ matrix.python.major-dot-minor }}-${{ matrix.arch.name }}
           path: ./target/wheels/
@@ -349,7 +349,7 @@ jobs:
     runs-on: ubuntu-latest
     name: cargo fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -367,7 +367,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.92.0
         with:
           components: clippy
@@ -381,7 +381,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: actionlint
         run: |
@@ -443,7 +443,7 @@ jobs:
             test-runner:
               matrix: pytest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
@@ -535,7 +535,7 @@ jobs:
         uses: Chia-Network/actions/clean-workspace@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -544,7 +544,7 @@ jobs:
           python-version: ${{ matrix.python.major-dot-minor }}
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           pattern: packages-*
