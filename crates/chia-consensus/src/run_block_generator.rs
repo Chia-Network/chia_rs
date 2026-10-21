@@ -1,5 +1,4 @@
 use crate::allocator::make_allocator;
-use crate::condition_sanitizers::parse_amount;
 use crate::conditions::{
     EmptyVisitor, MAX_SPENDS_PER_BLOCK, ParseState, SpendBundleConditions, parse_spends,
     process_single_spend, validate_conditions, validate_signature,
@@ -7,27 +6,24 @@ use crate::conditions::{
 use crate::consensus_constants::ConsensusConstants;
 use crate::flags::ConsensusFlags;
 use crate::generator_cost::interned_vbytes;
-use crate::opcodes::{
-    AGG_SIG_AMOUNT, AGG_SIG_ME, AGG_SIG_PARENT, AGG_SIG_PARENT_AMOUNT, AGG_SIG_PARENT_PUZZLE,
-    AGG_SIG_PUZZLE, AGG_SIG_PUZZLE_AMOUNT, AGG_SIG_UNSAFE, CREATE_COIN,
-};
-use crate::serde_2026::{
-    max_canonical_blob_size, node_from_bytes_2026, node_from_bytes_2026_trusted,
-};
+use crate::serde_2026::{max_canonical_blob_size, node_from_bytes_2026};
 use crate::validation_error::{ErrorCode, ValidationErr, first};
 use chia_bls::{BlsCache, Signature};
-use chia_protocol::{BytesImpl, Coin, CoinSpend, Program};
 use chia_puzzles::{CHIALISP_DESERIALISATION, ROM_BOOTSTRAP_GENERATOR};
 use clvm_traits::FromClvm;
 use clvm_traits::MatchByte;
 use clvm_utils::{TreeCache, tree_hash_cached};
-use clvmr::SExp;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
 use clvmr::cost::Cost;
 use clvmr::reduction::Reduction;
 use clvmr::run_program::run_program;
 use clvmr::serde::{InternedTree, intern_tree_limited, node_from_bytes, node_from_bytes_backrefs};
+
+// Re-exports the trusted-block readers at their previous paths.
+pub use crate::trusted_block::{
+    get_coinspends_for_trusted_block, get_coinspends_with_conditions_for_trusted_block,
+};
 
 pub fn subtract_cost(cost_left: &mut Cost, subtract: Cost) -> Result<(), ValidationErr> {
     if subtract > *cost_left {
@@ -147,7 +143,7 @@ where
     Ok((a, result))
 }
 
-fn extract_n<const N: usize>(
+pub(crate) fn extract_n<const N: usize>(
     a: &Allocator,
     mut n: NodePtr,
     e: ErrorCode,
@@ -364,242 +360,6 @@ where
     Ok((a, ret))
 }
 
-// Returns the spend list wrapper of a trusted block generator: the spend
-// list in an outer list whose rest is reserved for extension data. With
-// INTERNED_SPEND_LIST, the generator is a serde_2026 blob holding the spend
-// list wrapper directly; generator references are disabled and rejected.
-// Otherwise the classic quoted generator is checked and executed. The CLVM
-// cost is discarded; only consensus paths account for it.
-pub(crate) fn spend_list_wrapper_for_trusted_block<
-    GenBuf: AsRef<[u8]>,
-    I: IntoIterator<Item = GenBuf>,
->(
-    a: &mut Allocator,
-    generator: &[u8],
-    refs: I,
-    flags: ConsensusFlags,
-    max_cost: u64,
-) -> Result<NodePtr, ValidationErr>
-where
-    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
-{
-    if flags.contains(ConsensusFlags::INTERNED_SPEND_LIST) {
-        // the generator field is the serialized spend list wrapper, in the
-        // shape run_program() would produce for the classic path.
-        // INTERNED_SPEND_LIST disables generator references.
-        if refs.into_iter().next().is_some() {
-            return Err(ValidationErr::Err(ErrorCode::TooManyGeneratorRefs));
-        }
-        Ok(node_from_bytes_2026_trusted(a, generator)?)
-    } else {
-        check_generator_quote(generator, flags)?;
-        let program = node_from_bytes_backrefs(a, generator)?;
-        check_generator_node(a, program, flags)?;
-        let args = setup_generator_args(a, refs, flags)?;
-        let dialect = ChiaDialect::new(flags.to_clvm_flags());
-        let Reduction(_clvm_cost, spend_list_wrapper) =
-            run_program(a, &dialect, program, args, max_cost)
-                .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        Ok(spend_list_wrapper)
-    }
-}
-
-// this function is less capable of handling problematic generators as they are
-// returning serialized puzzles, which may not be possible. They will simply ignore many of the bad cases.
-pub fn get_coinspends_for_trusted_block<GenBuf: AsRef<[u8]>, I: IntoIterator<Item = GenBuf>>(
-    constants: &ConsensusConstants,
-    generator: &[u8],
-    refs: I,
-    flags: ConsensusFlags,
-) -> Result<Vec<CoinSpend>, ValidationErr>
-where
-    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
-{
-    let mut a = make_allocator(flags);
-    let mut output = Vec::<CoinSpend>::new();
-    let spend_list_wrapper = spend_list_wrapper_for_trusted_block(
-        &mut a,
-        generator,
-        refs,
-        flags,
-        constants.max_block_cost_clvm,
-    )?;
-    let all_spends = first(&a, spend_list_wrapper)?;
-    let mut cache = TreeCache::default();
-    let mut iter = all_spends;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let Ok([_, puzzle, _]) = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition) else {
-            continue;
-        };
-        cache.visit_tree(&a, puzzle);
-    }
-    iter = all_spends;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
-            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
-        else {
-            continue; // if we fail at this step then maybe the generator was malicious - try other spends
-        };
-        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
-        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr::Err(ErrorCode::InvalidParentId))?;
-        let coin = Coin::new(
-            parent_id,
-            puzhash.into(),
-            parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
-        );
-        // This may fail for malicious generators, where the puzzle reveal or
-        // solution reuses CLVM subtrees such that a plain serialization becomes
-        // very large. from_clvm() fails if the resulting buffer is greater than
-        // 2 MB
-        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
-        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
-        let coinspend = CoinSpend::new(coin, puzzle_program, solution_program);
-        output.push(coinspend);
-    }
-    Ok(output)
-}
-
-/// Maximum number of conditions per spend before we start dropping conditions
-/// to keep JSON and other serialized output bounded. Only AGG_SIG_* and
-/// CREATE_COIN conditions are added after this limit is reached.
-const MAX_CONDITIONS_PER_SPEND: usize = 1024;
-
-/// Returns true for condition opcodes that are safe to include even after
-/// exceeding the soft limit. These conditions have cost associated with them, so
-/// are already restricted.
-fn is_high_priority_condition(op: u32) -> bool {
-    u16::try_from(op).is_ok()
-        && matches!(
-            op as u16,
-            AGG_SIG_PARENT
-                | AGG_SIG_PUZZLE
-                | AGG_SIG_AMOUNT
-                | AGG_SIG_PUZZLE_AMOUNT
-                | AGG_SIG_PARENT_AMOUNT
-                | AGG_SIG_PARENT_PUZZLE
-                | AGG_SIG_UNSAFE
-                | AGG_SIG_ME
-                | CREATE_COIN
-        )
-}
-
-// this function returns a list of tuples (coinspend, conditions)
-// conditions are formatted as a vec of tuples of (condition_opcode, args)
-// this function is less capable of handling problematic generators as they are
-// returning serialized puzzles, which may not be possible. They will simply
-// ignore many of the bad cases.
-#[allow(clippy::type_complexity)]
-pub fn get_coinspends_with_conditions_for_trusted_block<
-    GenBuf: AsRef<[u8]>,
-    I: IntoIterator<Item = GenBuf>,
->(
-    constants: &ConsensusConstants,
-    generator: &[u8],
-    refs: I,
-    flags: ConsensusFlags,
-) -> Result<Vec<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>, ValidationErr>
-where
-    <I as IntoIterator>::IntoIter: DoubleEndedIterator,
-{
-    let mut a = make_allocator(flags);
-    let mut output = Vec::<(CoinSpend, Vec<(u32, Vec<Vec<u8>>)>)>::new();
-    let dialect = ChiaDialect::new(flags.to_clvm_flags());
-    let spend_list_wrapper = spend_list_wrapper_for_trusted_block(
-        &mut a,
-        generator,
-        refs,
-        flags,
-        constants.max_block_cost_clvm,
-    )?;
-    let all_spends = first(&a, spend_list_wrapper)?;
-    let mut cache = TreeCache::default();
-    let mut iter = all_spends;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let [_, puzzle, _] = extract_n::<3>(&a, spend, ErrorCode::InvalidCondition)?;
-        cache.visit_tree(&a, puzzle);
-    }
-    iter = all_spends;
-    while let Some((spend, rest)) = a.next(iter) {
-        iter = rest;
-        let mut cond_output = Vec::<(u32, Vec<Vec<u8>>)>::new();
-        let Ok([parent_id, puzzle, amount, solution, _spend_level_extra]) =
-            extract_n::<5>(&a, spend, ErrorCode::InvalidCondition)
-        else {
-            continue; // if we fail at this step then maybe the generator was malicious - try other spends
-        };
-        let puzhash = tree_hash_cached(&a, puzzle, &mut cache);
-        let parent_id = BytesImpl::<32>::from_clvm(&a, parent_id)
-            .map_err(|_| ValidationErr::Err(ErrorCode::InvalidParentId))?;
-        let coin = Coin::new(
-            parent_id,
-            puzhash.into(),
-            parse_amount(&a, amount, ErrorCode::InvalidCoinAmount)?,
-        );
-        let puzzle_program = Program::from_clvm(&a, puzzle).unwrap_or_default();
-        let solution_program = Program::from_clvm(&a, solution).unwrap_or_default();
-
-        let Reduction(_clvm_cost, res) = run_program(
-            &mut a,
-            &dialect,
-            puzzle,
-            solution,
-            constants.max_block_cost_clvm,
-        )
-        .map_err(|_| ValidationErr::Err(ErrorCode::GeneratorRuntimeError))?;
-        // conditions_list is the full returned output of puzzle ran with solution
-        // ((51 0xcafef00d 100) (51 0x1234 200) ...)
-
-        // condition is each grouped list
-        // (51 0xcafef00d 100)
-        let mut iter_two = res;
-        'outer: while let Some((condition, rest_two)) = a.next(iter_two) {
-            iter_two = rest_two;
-            let mut iter_three = condition;
-            let Some((condition_values, rest_three)) = a.next(iter_three) else {
-                continue;
-            };
-            iter_three = rest_three;
-            let Some(opcode) = a.small_number(condition_values) else {
-                continue;
-            };
-            let mut bytes_vec = Vec::<Vec<u8>>::new();
-            'inner: while let Some((condition_values, rest_three)) = a.next(iter_three) {
-                iter_three = rest_three;
-                if bytes_vec.len() < 6 {
-                    if let SExp::Atom = a.sexp(condition_values) {
-                        // a reasonable max length of an atom is 1,024 bytes
-                        if a.atom_len(condition_values) >= 1024 {
-                            // skip this condition
-                            continue 'outer;
-                        }
-                        let bytes = a.atom(condition_values).to_vec();
-                        bytes_vec.push(bytes);
-                    }
-                } else {
-                    break 'inner; // we only care about the first 5 condition arguments
-                }
-            }
-
-            // When over the per-spend limit, drop low-priority conditions first (REMARK,
-            // announcements, SOFTFORK, SEND_MESSAGE, RECEIVE_MESSAGE) to keep output bounded.
-            if cond_output.len() >= MAX_CONDITIONS_PER_SPEND && !is_high_priority_condition(opcode)
-            {
-                continue 'outer;
-            }
-            cond_output.push((opcode, bytes_vec));
-        }
-        output.push((
-            CoinSpend::new(coin, puzzle_program, solution_program),
-            cond_output,
-        ));
-    }
-    Ok(output)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -607,7 +367,7 @@ mod tests {
     use crate::consensus_constants::TEST_CONSTANTS;
     use crate::opcodes::{CREATE_COIN, CREATE_COIN_COST, NEW_CREATE_COIN_COST, SPEND_COST};
     use crate::solution_generator::solution_generator;
-    use chia_protocol::Bytes32;
+    use chia_protocol::{Bytes32, Coin};
     use clvm_traits::ToClvm;
     use clvm_utils::tree_hash_atom;
     use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, node_to_bytes};
@@ -886,164 +646,6 @@ mod tests {
             result.unwrap_err().error_code(),
             ErrorCode::InvalidCondition,
         );
-    }
-
-    #[test]
-    fn test_trusted_block_interned_spend_list_parity() {
-        use crate::solution_generator::solution_generator_2026;
-
-        let base_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
-        let interned_flags = base_flags | ConsensusFlags::INTERNED_SPEND_LIST;
-        let blocks: &[&[u8]] = &[];
-
-        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
-        let empty_solution: &[u8] = &[0x80];
-        let spends = [(
-            Coin::new([0u8; 32].into(), puzzle_hash.into(), 0),
-            IDENTITY_PUZZLE,
-            empty_solution,
-        )];
-        let classic = solution_generator(spends).expect("solution_generator");
-        let interned = solution_generator_2026(spends).expect("solution_generator_2026");
-
-        let expected =
-            get_coinspends_for_trusted_block(&TEST_CONSTANTS, &classic, blocks, base_flags)
-                .expect("classic get_coinspends_for_trusted_block");
-        let actual =
-            get_coinspends_for_trusted_block(&TEST_CONSTANTS, &interned, blocks, interned_flags)
-                .expect("interned get_coinspends_for_trusted_block");
-        assert_eq!(actual.len(), 1);
-        assert_eq!(expected, actual);
-
-        let expected = get_coinspends_with_conditions_for_trusted_block(
-            &TEST_CONSTANTS,
-            &classic,
-            blocks,
-            base_flags,
-        )
-        .expect("classic get_coinspends_with_conditions_for_trusted_block");
-        let actual = get_coinspends_with_conditions_for_trusted_block(
-            &TEST_CONSTANTS,
-            &interned,
-            blocks,
-            interned_flags,
-        )
-        .expect("interned get_coinspends_with_conditions_for_trusted_block");
-        assert_eq!(actual.len(), 1);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_additions_and_removals_interned_parity() {
-        use crate::additions_and_removals::additions_and_removals;
-        use crate::solution_generator::solution_generator_2026;
-
-        let base_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::SIMPLE_GENERATOR;
-        let interned_flags = base_flags | ConsensusFlags::INTERNED_SPEND_LIST;
-        let blocks: &[&[u8]] = &[];
-
-        // a spend whose identity puzzle emits CREATE_COIN with a hint, so the
-        // additions path (not just removals) is exercised
-        let puzzle_hash = Bytes32::from(tree_hash_atom(&[1]).to_bytes());
-        let mut a = Allocator::new();
-        let hint = a.new_atom(b"hint").unwrap();
-        // the memos list's first element must itself be a list wrapping the
-        // hint atom — (51 ph amount ((hint))) — a bare atom memo is ignored
-        let cond = (CREATE_COIN, (puzzle_hash, (100u64, ((hint, 0), 0))))
-            .to_clvm(&mut a)
-            .unwrap();
-        let conds = a.new_pair(cond, a.nil()).unwrap();
-        let solution_bytes = node_to_bytes(&a, conds).unwrap();
-
-        let coin = Coin::new([0u8; 32].into(), puzzle_hash, 100);
-        let spends = [(coin, IDENTITY_PUZZLE, solution_bytes.as_slice())];
-        let classic = solution_generator(spends).expect("solution_generator");
-        let interned = solution_generator_2026(spends).expect("solution_generator_2026");
-
-        let expected = additions_and_removals(&classic, blocks, base_flags, &TEST_CONSTANTS)
-            .expect("classic additions_and_removals");
-        let actual = additions_and_removals(&interned, blocks, interned_flags, &TEST_CONSTANTS)
-            .expect("interned additions_and_removals");
-        assert_eq!(expected, actual);
-
-        // the parity assert above is only meaningful if this case actually
-        // produced an addition carrying the hint
-        let (additions, removals) = &actual;
-        assert_eq!(removals.len(), 1);
-        assert_eq!(removals[0].0, coin.coin_id());
-        assert_eq!(additions.len(), 1);
-        let (addition, addition_hint) = &additions[0];
-        assert_eq!(addition.parent_coin_info, coin.coin_id());
-        assert_eq!(addition.puzzle_hash, puzzle_hash);
-        assert_eq!(addition.amount, 100);
-        assert_eq!(
-            addition_hint.as_ref().map(AsRef::as_ref),
-            Some(&b"hint"[..])
-        );
-    }
-
-    #[test]
-    fn test_interned_spend_list_rejects_block_refs() {
-        use crate::additions_and_removals::additions_and_removals;
-        use crate::solution_generator::solution_generator_2026;
-
-        let interned_flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE
-            | ConsensusFlags::SIMPLE_GENERATOR
-            | ConsensusFlags::INTERNED_SPEND_LIST;
-        let refs: &[&[u8]] = &[&[1]];
-
-        let puzzle_hash = tree_hash_atom(&[1]).to_bytes();
-        let empty_solution: &[u8] = &[0x80];
-        let spends = [(
-            Coin::new([0u8; 32].into(), puzzle_hash.into(), 0),
-            IDENTITY_PUZZLE,
-            empty_solution,
-        )];
-        let program = solution_generator_2026(spends).expect("solution_generator_2026");
-
-        // INTERNED_SPEND_LIST disables generator references, with or without
-        // SIMPLE_GENERATOR
-        for flags in [
-            interned_flags,
-            ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::INTERNED_SPEND_LIST,
-        ] {
-            let result = run_block_generator2(
-                &program,
-                refs,
-                u64::MAX,
-                flags,
-                &Signature::default(),
-                None,
-                &TEST_CONSTANTS,
-            );
-            assert_eq!(
-                result.unwrap_err().error_code(),
-                ErrorCode::TooManyGeneratorRefs
-            );
-
-            let result = get_coinspends_for_trusted_block(&TEST_CONSTANTS, &program, refs, flags);
-            assert_eq!(
-                result.unwrap_err().error_code(),
-                ErrorCode::TooManyGeneratorRefs
-            );
-
-            let result = get_coinspends_with_conditions_for_trusted_block(
-                &TEST_CONSTANTS,
-                &program,
-                refs,
-                flags,
-            );
-            assert_eq!(
-                result.unwrap_err().error_code(),
-                ErrorCode::TooManyGeneratorRefs
-            );
-
-            let result = additions_and_removals(&program, refs, flags, &TEST_CONSTANTS);
-            assert_eq!(
-                result.unwrap_err().error_code(),
-                ErrorCode::TooManyGeneratorRefs
-            );
-        }
     }
 
     #[test]
