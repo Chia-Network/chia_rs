@@ -70,6 +70,7 @@ pub struct RequestBlocks {
 pub struct RespondBlocks {
     start_height: u32,
     end_height: u32,
+    #[chia(max_length = 64)]
     blocks: Vec<FullBlock>,
 }
 

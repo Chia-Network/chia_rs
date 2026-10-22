@@ -6,8 +6,8 @@ use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::token::Pub;
 use syn::{
-    Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, Index, Lit, Type, Visibility,
-    parse_macro_input,
+    Attribute, Data, DeriveInput, Expr, Fields, FieldsNamed, FieldsUnnamed, GenericArgument, Index,
+    Lit, PathArguments, Type, Visibility, parse_macro_input,
 };
 
 #[proc_macro_attribute]
@@ -152,7 +152,71 @@ pub fn streamable(attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
-#[proc_macro_derive(Streamable)]
+fn get_max_length(attrs: &[Attribute]) -> Option<usize> {
+    for attr in attrs {
+        if attr.path().is_ident("chia") {
+            let mut max_length = None;
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("max_length") {
+                    let value = meta.value()?;
+                    let lit: syn::LitInt = value.parse()?;
+                    max_length = Some(
+                        lit.base10_parse::<usize>()
+                            .expect("max_length must be a valid usize"),
+                    );
+                    Ok(())
+                } else {
+                    Err(meta.error("unsupported chia attribute"))
+                }
+            })
+            .expect("failed to parse chia attribute");
+            return max_length;
+        }
+    }
+    None
+}
+
+fn extract_inner_type<'a>(ty: &'a Type, name: &str) -> Option<&'a Type> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != name {
+        return None;
+    }
+    let PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+    match args.args.first() {
+        Some(GenericArgument::Type(inner)) => Some(inner),
+        _ => None,
+    }
+}
+
+fn generate_bounded_parse(ty: &Type, max_len: usize, crate_name: &TokenStream2) -> TokenStream2 {
+    if let Some(inner_type) = extract_inner_type(ty, "Vec") {
+        quote! {
+            #crate_name::parse_vec_with_max_length::<#inner_type, TRUSTED>(input, #max_len)?
+        }
+    } else if let Some(inner_option_type) = extract_inner_type(ty, "Option") {
+        let vec_inner_type = extract_inner_type(inner_option_type, "Vec")
+            .expect("max_length attribute is only supported on Vec<T> or Option<Vec<T>> fields");
+        quote! {
+            {
+                let val = #crate_name::read_bytes(input, 1)?[0];
+                match val {
+                    0 => None,
+                    1 => Some(#crate_name::parse_vec_with_max_length::<#vec_inner_type, TRUSTED>(input, #max_len)?),
+                    _ => return Err(#crate_name::chia_error::Error::InvalidOptional),
+                }
+            }
+        }
+    } else {
+        panic!("max_length attribute is only supported on Vec<T> or Option<Vec<T>> fields");
+    }
+}
+
+#[proc_macro_derive(Streamable, attributes(chia))]
 pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
 
@@ -169,6 +233,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
     let mut fnames = Vec::<Ident>::new();
     let mut findices = Vec::<Index>::new();
     let mut ftypes = Vec::<Type>::new();
+    let mut max_lengths = Vec::<Option<usize>>::new();
     match data {
         Data::Enum(e) => {
             let mut names = Vec::<Ident>::new();
@@ -216,6 +281,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
                 for (index, f) in unnamed.iter().enumerate() {
                     findices.push(Index::from(index));
                     ftypes.push(f.ty.clone());
+                    max_lengths.push(get_max_length(&f.attrs));
                 }
             }
             Fields::Unit => {}
@@ -223,10 +289,23 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
                 for f in &named {
                     fnames.push(f.ident.as_ref().unwrap().clone());
                     ftypes.push(f.ty.clone());
+                    max_lengths.push(get_max_length(&f.attrs));
                 }
             }
         },
     }
+
+    let parse_exprs: Vec<TokenStream2> = ftypes
+        .iter()
+        .zip(max_lengths.iter())
+        .map(|(ty, max_len)| {
+            if let Some(max_len) = max_len {
+                generate_bounded_parse(ty, *max_len, &crate_name)
+            } else {
+                quote!(<#ty as #crate_name::Streamable>::parse::<TRUSTED>(input)?)
+            }
+        })
+        .collect();
 
     if !fnames.is_empty() {
         let ret = quote! {
@@ -239,7 +318,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
                     Ok(())
                 }
                 fn parse<const TRUSTED: bool>(input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
-                    Ok(Self { #( #fnames: <#ftypes as #crate_name::Streamable>::parse::<TRUSTED>(input)?, )* })
+                    Ok(Self { #( #fnames: #parse_exprs, )* })
                 }
             }
         };
@@ -255,7 +334,7 @@ pub fn chia_streamable_macro(input: TokenStream) -> TokenStream {
                     Ok(())
                 }
                 fn parse<const TRUSTED: bool>(input: &mut std::io::Cursor<&[u8]>) -> #crate_name::chia_error::Result<Self> {
-                    Ok(Self( #( <#ftypes as #crate_name::Streamable>::parse::<TRUSTED>(input)?, )* ))
+                    Ok(Self( #( #parse_exprs, )* ))
                 }
             }
         };
