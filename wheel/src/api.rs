@@ -75,7 +75,9 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
+use chia_consensus::serde_2026::{
+    node_from_bytes_2026_trusted, reencode_2026 as native_reencode_2026,
+};
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -152,6 +154,40 @@ pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, 
     let mut cache = clvm_utils::TreeCache::default();
     let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+/// Re-encode a serde_2026 blob at compression `level`. The tree is unchanged,
+/// so `tree_hash_2026()` of the output equals that of the input. The blob is
+/// untrusted: `max_size` caps the accepted wire size, the way
+/// `run_block_generator2` caps it via `max_canonical_blob_size`. Without it,
+/// the blob's own length is the only bound.
+///
+/// `level=None` picks the best level available. Levels saturate to the highest
+/// one implemented; today only level 0 exists, so all levels give the same
+/// output. Once higher levels land, slow machines can pass `level=0` to get the
+/// fastest one.
+#[pyfunction]
+#[pyo3(signature = (blob, max_size=None, level=None))]
+pub fn reencode_2026(
+    py: Python<'_>,
+    blob: PyBuffer<u8>,
+    max_size: Option<usize>,
+    level: Option<i64>,
+) -> PyResult<Bound<'_, PyBytes>> {
+    let level = match level {
+        None => u32::MAX,
+        Some(l) if l < 0 => {
+            return Err(PyValueError::new_err(format!("negative level: {l}")));
+        }
+        // levels saturate, so clamping to u32::MAX doesn't change the result
+        Some(l) => u32::try_from(l).unwrap_or(u32::MAX),
+    };
+    let slice = py_to_slice(&blob);
+    let max_size = max_size.unwrap_or(slice.len());
+    let out = py
+        .detach(|| native_reencode_2026(slice, max_size, level))
+        .map_err(map_pyerr)?;
+    Ok(PyBytes::new(py, &out))
 }
 
 #[pyfunction]
@@ -1107,6 +1143,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
+    m.add_function(wrap_pyfunction!(reencode_2026, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
