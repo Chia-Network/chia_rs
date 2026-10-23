@@ -156,23 +156,37 @@ pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, 
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
 }
 
-/// Re-encode a serde_2026 blob with the best compression clvm_rs offers. The
-/// tree is unchanged, so `tree_hash_2026()` of the output equals that of the
-/// input. The blob is untrusted: `max_size` caps the accepted wire size, the
-/// way `run_block_generator2` caps it via `max_canonical_blob_size`. Without
-/// it, the blob's own length is the only bound.
+/// Re-encode a serde_2026 blob at compression `level`. The tree is unchanged,
+/// so `tree_hash_2026()` of the output equals that of the input. The blob is
+/// untrusted: `max_size` caps the accepted wire size, the way
+/// `run_block_generator2` caps it via `max_canonical_blob_size`. Without it,
+/// the blob's own length is the only bound.
+///
+/// `level=None` picks the best level available. Levels saturate to the highest
+/// one implemented; today only level 0 exists, so all levels give the same
+/// output. Once higher levels land, slow machines can pass `level=0` to get the
+/// fastest one.
 #[pyfunction]
-#[pyo3(signature = (blob, max_size=None))]
+#[pyo3(signature = (blob, max_size=None, level=None))]
 pub fn reencode_2026<'py>(
     py: Python<'py>,
     blob: &[u8],
     max_size: Option<usize>,
+    level: Option<i64>,
 ) -> PyResult<Bound<'py, PyBytes>> {
+    let level = match level {
+        None => u32::MAX,
+        Some(l) if l < 0 => {
+            return Err(PyValueError::new_err(format!("negative level: {l}")));
+        }
+        // levels saturate, so clamping to u32::MAX doesn't change the result
+        Some(l) => u32::try_from(l).unwrap_or(u32::MAX),
+    };
     let max_size = max_size.unwrap_or(blob.len());
     // `&[u8]` only accepts `bytes`, which is immutable, so the blob can't
     // change while the GIL is released.
     let out = py
-        .detach(|| native_reencode_2026(blob, max_size))
+        .detach(|| native_reencode_2026(blob, max_size, level))
         .map_err(map_pyerr)?;
     Ok(PyBytes::new(py, &out))
 }
