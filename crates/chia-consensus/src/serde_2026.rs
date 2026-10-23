@@ -446,4 +446,43 @@ mod tests {
             Err(EvalErr::SerializationError)
         ));
     }
+
+    /// `(A . (S . S))` with `S = (1 . 1)` and `A` a chain of `chain_len`
+    /// pairs `(() . (() . ... (() . ())))`, hand-encoded the way the
+    /// unmerged level 1 ("compact", clvm_rs 9471104^) does: cons the root
+    /// right-first, so `S` is built first and its back-ref is pair index 0
+    /// (1-byte varint). Level 0 builds `A` first, which pushes `S` to pair
+    /// index `chain_len`, and a back-ref needs 2 bytes once that's >= 63.
+    fn right_first_blob(chain_len: u8) -> Vec<u8> {
+        let instruction_count = 5 + (chain_len as u16 + 1) + chain_len as u16 + 1;
+        assert!(instruction_count > 63 && instruction_count < 8192);
+        let mut blob = SERDE_2026_MAGIC_PREFIX.to_vec();
+        // one atom group: one atom, 0x01
+        blob.extend_from_slice(b"\x01\x01\x01");
+        blob.extend_from_slice(&(0x8000 | instruction_count).to_be_bytes());
+        // S = (1 . 1), then (S . S) via back-ref to pair 0
+        blob.extend_from_slice(b"\x02\x02\x01\x7e\x01");
+        // A
+        blob.extend(std::iter::repeat_n(0x00, chain_len as usize + 1));
+        blob.extend(std::iter::repeat_n(0x01, chain_len as usize));
+        // root = (A . (S . S)), right-first
+        blob.push(0x7f);
+        blob
+    }
+
+    #[test]
+    fn test_reencode_2026_can_grow() {
+        // 63 pairs before S is the smallest chain where level 0 loses
+        let blob = right_first_blob(63);
+        assert_eq!(blob.len(), 144);
+        let out = reencode_2026(&blob, usize::MAX).unwrap();
+        assert_eq!(tree_hash_of(&out), tree_hash_of(&blob));
+        assert_eq!(out.len(), blob.len() + 1);
+
+        // one pair fewer, and S's back-ref fits in 1 byte either way
+        let blob = right_first_blob(62);
+        let out = reencode_2026(&blob, usize::MAX).unwrap();
+        assert_eq!(tree_hash_of(&out), tree_hash_of(&blob));
+        assert_eq!(out.len(), blob.len());
+    }
 }
