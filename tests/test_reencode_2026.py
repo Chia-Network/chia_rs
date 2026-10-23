@@ -120,3 +120,37 @@ def test_max_size() -> None:
     padded = HELLO_PAIR + b"\x00" * 10
     with pytest.raises(ValueError):
         reencode_2026(padded, len(HELLO_PAIR))
+
+
+def right_first_blob(chain_len: int) -> bytes:
+    # (A . (S . S)) with S = (1 . 1) and A a chain of `chain_len` pairs
+    # (() . (() . ... (() . ()))), consing the root right-first the way the
+    # unmerged level 1 ("compact") does. S is built first, so its back-ref is
+    # pair index 0 (1 byte). Level 0 builds A first, so S lands at pair index
+    # `chain_len` and its back-ref takes 2 bytes once that's >= 63.
+    instruction_count = 5 + (chain_len + 1) + chain_len + 1
+    assert 63 < instruction_count < 8192
+    return (
+        SERDE_2026_MAGIC_PREFIX
+        + b"\x01\x01\x01"
+        + (0x8000 | instruction_count).to_bytes(2, "big")
+        + b"\x02\x02\x01\x7e\x01"
+        + b"\x00" * (chain_len + 1)
+        + b"\x01" * chain_len
+        + b"\x7f"
+    )
+
+
+def test_reencode_can_grow() -> None:
+    # here re-encoding makes the blob bigger, so the caller keeps the original
+    blob = right_first_blob(63)
+    assert len(blob) == 144
+    out = reencode_2026(blob)
+    assert tree_hash_2026(out) == tree_hash_2026(blob)
+    assert len(out) > len(blob)
+
+    # one pair fewer and the trick doesn't save anything
+    blob = right_first_blob(62)
+    out = reencode_2026(blob)
+    assert tree_hash_2026(out) == tree_hash_2026(blob)
+    assert len(out) == len(blob)
