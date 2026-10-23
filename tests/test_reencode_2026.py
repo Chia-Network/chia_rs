@@ -153,3 +153,17 @@ def test_reencode_can_grow() -> None:
     out = reencode_2026(blob)
     assert tree_hash_2026(out) == tree_hash_2026(blob)
     assert len(out) == len(blob)
+
+
+@pytest.mark.parametrize("level", [0, 1, 2**32 - 1, 2**32, 2**63 - 1])
+def test_level(level: int) -> None:
+    # only level 0 exists today, and higher levels saturate to it
+    for blob in (HELLO_PAIR + b"\x00" * 10, right_first_blob(63)):
+        assert reencode_2026(blob, level=level) == reencode_2026(blob)
+
+
+def test_negative_level() -> None:
+    with pytest.raises(ValueError):
+        reencode_2026(HELLO_PAIR, level=-1)
+    with pytest.raises(ValueError):
+        reencode_2026(HELLO_PAIR, None, -(2**63))

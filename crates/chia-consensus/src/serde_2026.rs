@@ -123,8 +123,8 @@ pub fn node_from_bytes_2026_trusted(allocator: &mut Allocator, bytes: &[u8]) -> 
     deserialize_2026(allocator, bytes, bytes.len(), false)
 }
 
-/// Re-encode an untrusted serde_2026 blob with the best compression clvmr
-/// offers, keeping the tree (and so its tree hash) exactly the same.
+/// Re-encode an untrusted serde_2026 blob at compression `level`, keeping
+/// the tree (and so its tree hash) exactly the same.
 ///
 /// The decoder accepts many encodings of one tree: overlong varints,
 /// trailing bytes, unused or duplicate atom-table entries, rebuilt pairs
@@ -132,15 +132,19 @@ pub fn node_from_bytes_2026_trusted(allocator: &mut Allocator, bytes: &[u8]) -> 
 /// is bounded the same way as on the consensus path: `max_blob_size` caps
 /// the wire size (derive it via [`max_canonical_blob_size`]).
 ///
-/// This passes `u32::MAX` rather than [`SERDE_2026_COMPRESSION_LEVEL`]:
-/// levels saturate, so this always picks the best level implemented. The
-/// output is not guaranteed to be smaller than `bytes` (a future, smarter
+/// `level` is passed straight to [`serialize_2026`]. Levels saturate to the
+/// highest one implemented, so `u32::MAX` always picks the best available.
+/// Today only level 0 exists, so every level gives the same output. Once
+/// higher (slower) levels land, slow machines can pass 0 to get the fastest
+/// one.
+///
+/// The output is not guaranteed to be smaller than `bytes` (a smarter
 /// encoder may have produced it), so a caller that wants the smallest
 /// encoding should compare lengths and keep the shorter one.
-pub fn reencode_2026(bytes: &[u8], max_blob_size: usize) -> Result<Vec<u8>> {
+pub fn reencode_2026(bytes: &[u8], max_blob_size: usize, level: u32) -> Result<Vec<u8>> {
     let mut a = Allocator::new();
     let node = node_from_bytes_2026(&mut a, bytes, max_blob_size)?;
-    serialize_2026(&a, node, u32::MAX)
+    serialize_2026(&a, node, level)
 }
 
 #[cfg(test)]
@@ -381,13 +385,16 @@ mod tests {
     #[test]
     fn test_reencode_2026_canonical_is_identity() {
         let canonical = with_prefix(HELLO_PAIR);
-        assert_eq!(reencode_2026(&canonical, usize::MAX).unwrap(), canonical);
+        assert_eq!(
+            reencode_2026(&canonical, usize::MAX, u32::MAX).unwrap(),
+            canonical
+        );
 
         for (a, node) in tight_trees() {
             let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
-            let out = reencode_2026(&blob, usize::MAX).unwrap();
+            let out = reencode_2026(&blob, usize::MAX, u32::MAX).unwrap();
             assert_eq!(out, blob);
-            assert_eq!(reencode_2026(&out, usize::MAX).unwrap(), out);
+            assert_eq!(reencode_2026(&out, usize::MAX, u32::MAX).unwrap(), out);
         }
     }
 
@@ -407,7 +414,7 @@ mod tests {
     fn test_reencode_2026_strips_padding(#[case] body: &[u8]) {
         let canonical = with_prefix(HELLO_PAIR);
         let padded = with_prefix(body);
-        let out = reencode_2026(&padded, usize::MAX).unwrap();
+        let out = reencode_2026(&padded, usize::MAX, u32::MAX).unwrap();
         assert_eq!(out, canonical);
         assert_eq!(tree_hash_of(&out), tree_hash_of(&padded));
     }
@@ -418,7 +425,7 @@ mod tests {
         // of back-referenced
         let rebuilt = with_prefix(b"\x01\x05hello\x07\x02\x02\x01\x02\x02\x01\x01");
         let canonical = with_prefix(b"\x01\x05hello\x05\x02\x02\x01\x7e\x01");
-        let out = reencode_2026(&rebuilt, usize::MAX).unwrap();
+        let out = reencode_2026(&rebuilt, usize::MAX, u32::MAX).unwrap();
         assert_eq!(out, canonical);
         assert_eq!(tree_hash_of(&out), tree_hash_of(&rebuilt));
     }
@@ -434,15 +441,15 @@ mod tests {
     // truncated atom
     #[case(b"\xfd\xff2026\x01\x05hel")]
     fn test_reencode_2026_bad_input(#[case] blob: &[u8]) {
-        assert!(reencode_2026(blob, usize::MAX).is_err());
+        assert!(reencode_2026(blob, usize::MAX, u32::MAX).is_err());
     }
 
     #[test]
     fn test_reencode_2026_max_blob_size() {
         let canonical = with_prefix(HELLO_PAIR);
-        assert!(reencode_2026(&canonical, canonical.len()).is_ok());
+        assert!(reencode_2026(&canonical, canonical.len(), u32::MAX).is_ok());
         assert!(matches!(
-            reencode_2026(&canonical, canonical.len() - 1),
+            reencode_2026(&canonical, canonical.len() - 1, u32::MAX),
             Err(EvalErr::SerializationError)
         ));
     }
@@ -475,14 +482,30 @@ mod tests {
         // 63 pairs before S is the smallest chain where level 0 loses
         let blob = right_first_blob(63);
         assert_eq!(blob.len(), 144);
-        let out = reencode_2026(&blob, usize::MAX).unwrap();
+        let out = reencode_2026(&blob, usize::MAX, u32::MAX).unwrap();
         assert_eq!(tree_hash_of(&out), tree_hash_of(&blob));
         assert_eq!(out.len(), blob.len() + 1);
 
         // one pair fewer, and S's back-ref fits in 1 byte either way
         let blob = right_first_blob(62);
-        let out = reencode_2026(&blob, usize::MAX).unwrap();
+        let out = reencode_2026(&blob, usize::MAX, u32::MAX).unwrap();
         assert_eq!(tree_hash_of(&out), tree_hash_of(&blob));
         assert_eq!(out.len(), blob.len());
+    }
+
+    #[rstest]
+    #[case(0)]
+    #[case(1)]
+    #[case(u32::MAX)]
+    fn test_reencode_2026_level(#[case] level: u32) {
+        // only level 0 exists today, and higher levels saturate to it
+        let padded = with_prefix(b"\x01\x05hello\x03\x02\x02\x01\x00\x00");
+        let blob = right_first_blob(63);
+        for input in [&padded, &blob] {
+            assert_eq!(
+                reencode_2026(input, usize::MAX, level).unwrap(),
+                reencode_2026(input, usize::MAX, u32::MAX).unwrap()
+            );
+        }
     }
 }
