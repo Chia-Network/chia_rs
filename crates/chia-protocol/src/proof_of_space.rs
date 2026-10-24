@@ -159,6 +159,7 @@ impl ProofOfSpace {
 
     /// returns the quality string of the v2 proof of space.
     /// returns None if this is a v1 proof or if the proof is invalid.
+    #[cfg(feature = "pos2")]
     pub fn quality_string(&self) -> Option<Bytes32> {
         if self.version != 1 {
             return None;
@@ -248,9 +249,12 @@ impl Streamable for ProofOfSpace {
 
             // for v2 proofs, we don't hash the full proof directly. The full
             // proof is the witness to this quality string commitment.
+            #[cfg(feature = "pos2")]
             self.quality_string()
                 .expect("internal error. Can't compute hash of invalid ProofOfSpace")
                 .update_digest(digest);
+            #[cfg(not(feature = "pos2"))]
+            panic!("hashing a v2 ProofOfSpace requires the \"pos2\" feature");
         } else {
             panic!("version field must be 0 or 1, but it's {}", self.version);
         }
@@ -458,6 +462,7 @@ mod tests {
 
     // Regression tests for quality_string(). Vectors in quality-string-tests/*.txt:
     // 7 lines (challenge hex, strength, plot_index, meta_group, pool hex, proof hex, expect_quality hex).
+    #[cfg(feature = "pos2")]
     #[rstest]
     #[case("pool-2-0-0")]
     #[case("contract-2-0-0")]
