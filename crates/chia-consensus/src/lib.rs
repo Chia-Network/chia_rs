@@ -1,7 +1,6 @@
 #![allow(clippy::large_stack_arrays)]
 #![doc = include_str!("../README.md")]
 
-pub mod additions_and_removals;
 pub mod allocator;
 pub mod build_compressed_block;
 pub mod build_interned_block;
@@ -29,7 +28,13 @@ pub mod solution_generator;
 pub mod spend_visitor;
 pub mod spendbundle_conditions;
 pub mod spendbundle_validation;
+pub mod trusted_block;
 pub mod validation_error;
+
+/// Re-exports `trusted_block::additions_and_removals` at its previous path.
+pub mod additions_and_removals {
+    pub use crate::trusted_block::additions_and_removals;
+}
 
 #[cfg(test)]
 pub(crate) mod test_generators;
