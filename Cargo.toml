@@ -91,7 +91,8 @@ default = [
     "puzzle-types",
     "sha2",
     "clvm-traits",
-    "clvm-utils"
+    "clvm-utils",
+    "pos2"
 ]
 
 bls = ["dep:chia-bls", "clvm-traits/chia-bls"]
@@ -100,6 +101,7 @@ client = ["dep:chia-client"]
 consensus = ["dep:chia-consensus"]
 datalayer = ["dep:chia-datalayer"]
 protocol = ["dep:chia-protocol"]
+pos2 = ["protocol", "chia-protocol/pos2"]
 ssl = ["dep:chia-ssl"]
 serde = ["dep:chia-serde", "chia-protocol/serde", "chia-bls/serde"]
 traits = ["dep:chia-traits"]
