@@ -156,3 +156,10 @@ path = "fuzz_targets/serde-2026-size-bound.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "serde-2026-dag-cap"
+path = "fuzz_targets/serde-2026-dag-cap.rs"
+test = false
+doc = false
+bench = false
