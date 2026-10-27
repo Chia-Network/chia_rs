@@ -244,6 +244,8 @@ where
 
     let (mut a, base_cost, program) = if interned_generator {
         let mut decode_allocator = Allocator::new();
+        // a sanity bound on the wire size, admitting every generator whose
+        // cost fits `max_cost`; the exact cost is charged after interning
         let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
         let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
