@@ -164,10 +164,62 @@ mod tests {
         a.new_pair(pair, pair).unwrap()
     }
 
-    /// The provable per-tree wire-size bound: interned_vbytes + 5 + prefix.
+    /// The provable per-tree wire-size bound, `floor(4*v/3) + 15` (valid while
+    /// `v <= 2^20 + 1`; see the derivation on [`max_canonical_blob_size`]).
     fn encoding_bound(a: &Allocator, node: NodePtr) -> usize {
         let tree = intern_tree(a, node).unwrap();
-        interned_vbytes(&tree) as usize + 5 + SERDE_2026_MAGIC_PREFIX.len()
+        let v = interned_vbytes(&tree);
+        assert!(v <= THREE_BYTE_VARINT_VBYTES, "outside the 3-byte regime");
+        (v * 4 / 3 + 15) as usize
+    }
+
+    /// Left-deep chain over nil: `c[0] = (nil . nil)`, `c[1] = (c[0] . nil)`,
+    /// `c[i] = (c[i-1] . c[i-2])`. Each pair is one cons plus one back-ref
+    /// push to the pair built two steps earlier, so once more than 8191
+    /// pairs exist every push is a 3-byte varint: the worst case for the
+    /// `4/3` factor.
+    fn chain(a: &mut Allocator, len: usize) -> NodePtr {
+        let nil = a.nil();
+        let mut prev2 = a.new_pair(nil, nil).unwrap();
+        let mut prev = a.new_pair(prev2, nil).unwrap();
+        for _ in 2..len {
+            let next = a.new_pair(prev, prev2).unwrap();
+            prev2 = prev;
+            prev = next;
+        }
+        prev
+    }
+
+    /// List of `len` distinct pairs whose children are both back-references
+    /// into `num_base` shared `(atom_i . nil)` pairs.
+    fn shared_pairs_list(a: &mut Allocator, num_base: usize, len: usize) -> NodePtr {
+        let nil = a.nil();
+        let base: Vec<NodePtr> = (0..num_base)
+            .map(|i| {
+                let atom = a.new_atom(&(i as u16).to_be_bytes()).unwrap();
+                a.new_pair(atom, nil).unwrap()
+            })
+            .collect();
+        let mut list = nil;
+        // `len` distinct (x, y) index pairs, deterministic
+        for k in 0..len {
+            let (x, y) = (k % num_base, (k / num_base + k) % num_base);
+            let item = a.new_pair(base[x], base[y]).unwrap();
+            list = a.new_pair(item, list).unwrap();
+        }
+        list
+    }
+
+    /// List of `n` distinct 1- or 2-byte atoms, each referenced twice (so
+    /// they sort by first use and the last ones get atom indices near `n`).
+    fn atom_list(a: &mut Allocator, n: usize) -> NodePtr {
+        let mut list = a.nil();
+        for i in 0..n {
+            let atom = a.new_atom(&(i as u16 + 256).to_be_bytes()).unwrap();
+            let item = a.new_pair(atom, atom).unwrap();
+            list = a.new_pair(item, list).unwrap();
+        }
+        list
     }
 
     /// Adversarial tree shapes: the configurations where the encoding
@@ -176,10 +228,44 @@ mod tests {
     fn tight_trees() -> Vec<(Allocator, NodePtr)> {
         let mut trees = Vec::new();
 
-        // Single atom at 2^20 bytes, where the encoding bound's slack
-        // reaches exactly zero (see the proof's tightness note).
+        // Largest atom inside the 3-byte regime (v = 2^20 + 1), and atoms
+        // either side of the 2-byte/3-byte length-header boundary.
+        for len in [(1 << 20) - 1, 8191, 8192] {
+            let mut a = Allocator::new();
+            let node = a.new_atom(&vec![0xa5; len]).unwrap();
+            trees.push((a, node));
+        }
+        // ...and several of them, singleton and grouped headers.
+        for (len, count) in [(8191, 2), (8192, 2), (8192, 1), (8191, 64)] {
+            let mut a = Allocator::new();
+            let mut node = a.nil();
+            for i in 0..count {
+                let mut bytes = vec![0x5a; len];
+                bytes[0] = i as u8;
+                let atom = a.new_atom(&bytes).unwrap();
+                node = a.new_pair(atom, node).unwrap();
+            }
+            trees.push((a, node));
+        }
+
+        // Worst-case chains, either side of the 2-byte/3-byte back-ref
+        // boundary (pair index 8190 vs 8191) and well past it.
+        for len in [8191, 8192, 8193, 8194, 20_000, 100_000] {
+            let mut a = Allocator::new();
+            let node = chain(&mut a, len);
+            trees.push((a, node));
+        }
+
+        // Atom-index boundary: atom index 8189 is the last 2-byte push.
+        for n in [8189, 8190, 8191, 8192, 20_000] {
+            let mut a = Allocator::new();
+            let node = atom_list(&mut a, n);
+            trees.push((a, node));
+        }
+
+        // Many distinct pairs over shared children.
         let mut a = Allocator::new();
-        let node = a.new_atom(&vec![0xa5; 1 << 20]).unwrap();
+        let node = shared_pairs_list(&mut a, 9000, 60_000);
         trees.push((a, node));
 
         // >63 distinct atom lengths: forces a 2-byte atom-group-count header.
@@ -232,18 +318,87 @@ mod tests {
     }
 
     #[test]
-    fn test_encoding_bound_tight_at_max_atom_len() {
-        // A single atom of exactly 2^20 bytes is the known worst case: the
-        // encoding uses every byte the bound allows. 2^20 is a property of
-        // the encoding's varint/header boundaries, NOT of any consensus cap
-        // (mainnet's derived cap is ~917 KB, below this), which is why it is
-        // hardcoded rather than computed via max_canonical_blob_size.
-        // If equality stops holding, the "+5" analysis has changed — revisit
-        // the proof on max_canonical_blob_size.
+    fn test_encoding_bound_tight_on_chains() {
+        // The chain reaches `floor(4*v/3) + 15 - 8264` at every length in
+        // 8193..=349_525 (past the back-ref boundary, inside the 3-byte
+        // regime; at 524_288 the instruction count needs 4 bytes and the gap
+        // is 8263), so the 4/3 factor can't be lowered and the
+        // constant is within 8264 bytes of optimal. If this gap changes,
+        // the level-0 encoder changed: revisit the derivation on
+        // max_canonical_blob_size.
+        for len in [8193, 8194, 20_000, 100_000, 300_000, 349_525] {
+            let mut a = Allocator::new();
+            let node = chain(&mut a, len);
+            let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+            assert_eq!(encoding_bound(&a, node) - blob.len(), 8264, "len {len}");
+        }
+    }
+
+    #[test]
+    fn test_encoding_bound_random_dags() {
+        // Property test: random DAGs mixing atom sizes and sharing, up to
+        // ~40k pairs so indices cross the 2-byte/3-byte boundaries.
+        use rand::rngs::SmallRng;
+        use rand::{Rng, SeedableRng};
+        let mut rng = SmallRng::seed_from_u64(0x5eed_2026);
+        for _ in 0..60 {
+            let mut a = Allocator::new();
+            let mut nodes = vec![a.nil()];
+            for i in 0..rng.random_range(1..12_000u32) {
+                let len = [1, 2, 4, 32, 64, 8192][rng.random_range(0..6)];
+                let mut bytes = vec![0u8; len];
+                bytes[..4.min(len)].copy_from_slice(&i.to_be_bytes()[..4.min(len)]);
+                nodes.push(a.new_atom(&bytes).unwrap());
+            }
+            for _ in 0..rng.random_range(1..40_000) {
+                // bias toward recent nodes (deep sharing) half the time
+                let pick = |rng: &mut SmallRng, n: usize| {
+                    if rng.random_bool(0.5) {
+                        n - 1 - rng.random_range(0..n.min(8200))
+                    } else {
+                        rng.random_range(0..n)
+                    }
+                };
+                let l = nodes[pick(&mut rng, nodes.len())];
+                let r = nodes[pick(&mut rng, nodes.len())];
+                nodes.push(a.new_pair(l, r).unwrap());
+            }
+            let root = *nodes.last().unwrap();
+            if interned_vbytes(&intern_tree(&a, root).unwrap()) > THREE_BYTE_VARINT_VBYTES {
+                continue;
+            }
+            let blob = serialize_2026(&a, root, SERDE_2026_COMPRESSION_LEVEL).unwrap();
+            assert!(blob.len() <= encoding_bound(&a, root));
+        }
+    }
+
+    #[test]
+    fn test_max_canonical_blob_size_regimes() {
+        // Exact values either side of the 3-byte regime boundary, and the
+        // cap is monotone in max_cost across it.
+        let v = THREE_BYTE_VARINT_VBYTES;
+        assert_eq!(max_canonical_blob_size(v, 1), (v * 4 / 3 + 15) as usize);
+        assert_eq!(
+            max_canonical_blob_size(v + 1, 1),
+            ((v + 1) * 4 + 18) as usize
+        );
+        assert_eq!(max_canonical_blob_size(0, 1), 15);
+        assert_eq!(max_canonical_blob_size(1 << 55, 1), usize::MAX);
+        let mut points: Vec<u64> = (0..v + 1000).step_by(997).chain(v - 3..v + 3).collect();
+        points.sort_unstable();
+        let mut last = 0;
+        for vb in points {
+            let cap = max_canonical_blob_size(vb, 1);
+            assert!(cap >= last);
+            last = cap;
+        }
+        // A 2^20-byte atom (v = 2^20 + 2) is just outside the 3-byte regime
+        // (its length varint is 4 bytes) and fits the general bound.
         let mut a = Allocator::new();
         let node = a.new_atom(&vec![0xa5; 1 << 20]).unwrap();
         let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).unwrap();
-        assert_eq!(blob.len(), encoding_bound(&a, node));
+        assert_eq!(blob.len(), (1 << 20) + 13);
+        assert!(blob.len() <= max_canonical_blob_size((1 << 20) + 2, 1));
     }
 
     #[rstest]
