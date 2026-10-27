@@ -42,11 +42,17 @@ pub fn node_from_bytes_2026(
 /// fast/left-first encoding (currently the only one implemented).
 pub const SERDE_2026_COMPRESSION_LEVEL: u32 = 0;
 
-/// Maximum serde_2026 wire size, in bytes, of any generator whose cost fits
-/// within `max_cost` at `cost_per_byte` — i.e. every generator that could
-/// possibly be valid under those constants has a canonical encoding no
-/// larger than this. A blob above this size is either over-cost or
-/// non-minimally encoded (and its sender could re-encode it smaller).
+/// Largest `max_cost / cost_per_byte` (interned vbytes) for which every
+/// varint a level-0 encoding contains fits in 3 bytes: atom lengths are at
+/// most `vbytes - 2 <= 2^20 - 1`, and every count and index is smaller.
+const THREE_BYTE_VARINT_VBYTES: u64 = (1 << 20) + 1;
+
+/// Maximum serde_2026 wire size, in bytes, of the level-0 encoding of any
+/// generator whose cost fits within `max_cost` at `cost_per_byte`. Every
+/// generator that could be valid under those constants has a level-0
+/// encoding no larger than this. A blob above this size is either over cost
+/// or encoded less compactly than level 0, and its sender could re-encode it
+/// smaller.
 ///
 /// # Why such a bound matters
 ///
@@ -57,45 +63,61 @@ pub const SERDE_2026_COMPRESSION_LEVEL: u32 = 0;
 ///
 /// # Derivation
 ///
-/// Let a tree have `atom_bytes` total atom payload, `U_a` unique atoms and
-/// `U_p` unique pairs, so its interned weight (see
+/// Let a tree have `S` total atom payload bytes, `n` unique non-nil atoms,
+/// `nu` = 1 if nil occurs (else 0) and `p` unique pairs, so its interned
+/// weight (see
 /// [`generator_cost::interned_vbytes`](crate::generator_cost::interned_vbytes))
-/// is `vbytes = atom_bytes + 2*U_a + 3*U_p`.
+/// is `v = S + 2*(n + nu) + 3*p`. The level-0 encoding is the 6-byte prefix,
+/// the atom-group count, the group headers, `S` payload bytes, the
+/// instruction count, `p` one-byte conses and exactly `p + 1` pushes.
+/// While `v <= 2^20 + 1`, every varint fits in 3 bytes and a group header
+/// costs at most 2 bytes per atom (3 for atoms of 8192+ bytes), so
+/// `wire <= S + floor(S/8192) + 2*n + 4*p + 15 <= floor(4*v/3) + 15`
+/// (`wire` is an integer, so the floor is free).
 ///
-/// **Step 1 — encoding bound:** the canonical serde_2026 *body* is at most
-/// `vbytes + 5` bytes. Sketch: the atom table costs at most 2 bytes of
-/// overhead per atom (length varint, amortized group headers) plus a group
-/// count header; the instruction stream is exactly `2*U_p + 1` instructions
-/// (each push adds one stack entry, each cons nets -1, one root remains),
-/// costing 1 byte per cons and at most 2 bytes per push, plus a count
-/// header; the headers and per-item slack together never exceed the `+5`
-/// because `U_a <= U_p + 1` forces cheap 1-byte pushes to exist whenever the
-/// headers grow. The bound is tight (slack reaches 0 at atom length 2^20)
-/// and requires atom lengths < 2^27 — enforced by the per-atom cap in
-/// [`node_from_bytes_2026`] whenever the derived blob cap is below 2^27
-/// (at mainnet constants it is ~0.9 MB). The wire blob adds the
-/// [`SERDE_2026_MAGIC_PREFIX`] on top of the body.
+/// The `4/3` is necessary: a pair is charged 3 vbytes, but it is one cons
+/// plus (on average) one push, and a push of an atom index >= 8190 or a pair
+/// index >= 8191 is a 3-byte varint. A left-deep chain
+/// `c[i] = (c[i-1] . c[i-2])` over nil reaches `floor(4*v/3) + 15 - 8264` for
+/// every length in `8193..=349_525` (the chains inside the 3-byte regime); no
+/// tree beats `floor(4*v/3) + 15 - min(p + 1, 8191)`.
 ///
-/// **Step 2 — cost bound:** consensus charges `vbytes * cost_per_byte`, and
-/// rejects anything over `max_cost`, so any potentially-valid generator has
-/// `vbytes <= max_cost / cost_per_byte`.
+/// Above `2^20 + 1` vbytes (non-mainnet constants only), every varint is at
+/// most `W` = varint width of `v` bytes, and `wire <= W*v + 3*W + 6`.
 ///
-/// Combining: `wire_size <= max_cost / cost_per_byte + 5 + prefix_len`.
+/// Consensus charges `v * cost_per_byte` and rejects anything over
+/// `max_cost`, so any potentially valid generator has
+/// `v <= max_cost / cost_per_byte`, and the bound is monotone in `v`.
 ///
-/// If `cost_per_byte` is 0, bytes are free and no size is over-cost, so the
+/// If `cost_per_byte` is 0, bytes are free and no size is over cost, so the
 /// bound degenerates to `usize::MAX` (unbounded).
 ///
 /// At mainnet constants (`max_cost` = 11e9, `cost_per_byte` = 12_000) this
-/// is 916_677 bytes, a little under 1 MiB.
+/// is 1_222_236 bytes.
 pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
     if cost_per_byte == 0 {
         // Free bytes: no blob size exhausts the budget, so the least upper
         // bound is "unbounded".
         return usize::MAX;
     }
+    let prefix = SERDE_2026_MAGIC_PREFIX.len() as u64;
+    let vbytes = max_cost / cost_per_byte;
+    if vbytes <= THREE_BYTE_VARINT_VBYTES {
+        // 9 = atom-group count + instruction count + the push beyond one
+        // per pair, each at most 3 bytes
+        return (vbytes * 4 / 3 + 9 + prefix) as usize;
+    }
+    // Varint width of `vbytes`: w bytes hold 7*w - 1 magnitude bits.
+    let Some(width) = (1..=8u64).find(|w| vbytes < 1 << (7 * w - 1)) else {
+        return usize::MAX;
+    };
     // Saturating: a clamped result is still a correct upper bound, and this
     // keeps the function total for extreme (non-mainnet) constants.
-    ((max_cost / cost_per_byte) as usize).saturating_add(5 + SERDE_2026_MAGIC_PREFIX.len())
+    (vbytes
+        .saturating_mul(width)
+        .saturating_add(3 * width + prefix))
+    .try_into()
+    .unwrap_or(usize::MAX)
 }
 
 /// Deserialize a serde_2026 blob on a *trusted* read path: no magic-prefix
@@ -304,7 +326,7 @@ mod tests {
     fn test_max_canonical_blob_size_at_real_constants() {
         // Ties the doc-comment number to the real consensus constants so
         // drift gets caught here instead of silently invalidating the bound.
-        assert_eq!(mainnet_cap(), 916_677);
+        assert_eq!(mainnet_cap(), 1_222_236);
     }
 
     #[test]
