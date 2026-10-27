@@ -8,14 +8,13 @@ use chia_consensus::serde_2026::{
 use clvm_fuzzing::make_tree;
 use clvm_utils::{TreeCache, tree_hash_cached};
 use clvmr::Allocator;
-use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, intern_tree, serialize_2026};
+use clvmr::serde::{intern_tree, serialize_2026};
 
 // Empirically checks the theorem behind `max_canonical_blob_size` (see the
 // proof on that function; this target hunts for counterexamples):
 //
 // 1. Encoding bound: for ANY CLVM tree, the canonical serde_2026 wire
-//    encoding is at most interned_vbytes(tree) + 5 bytes plus the magic
-//    prefix.
+//    encoding fits max_canonical_blob_size at the tree's own byte cost.
 // 2. Corollary, at fuzzed cost constants: if the tree is affordable under
 //    (max_cost, cost_per_byte), its blob fits in
 //    max_canonical_blob_size(max_cost, cost_per_byte).
@@ -37,7 +36,8 @@ fuzz_target!(|data: &[u8]| {
 
     let tree = intern_tree(&a, node).expect("intern_tree");
     let vbytes = interned_vbytes(&tree);
-    let bound = vbytes as usize + 5 + SERDE_2026_MAGIC_PREFIX.len();
+    // the cap at exactly this tree's byte cost (cost_per_byte = 1)
+    let bound = max_canonical_blob_size(vbytes, 1);
     assert!(
         blob.len() <= bound,
         "size bound violated: blob {} > interned_vbytes-derived bound {}",
