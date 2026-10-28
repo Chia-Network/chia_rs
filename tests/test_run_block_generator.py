@@ -2,6 +2,7 @@ import pytest
 
 from chia_rs import (
     generator_interned_vbytes_trusted,
+    max_canonical_blob_size,
     SERDE_2026_MAGIC_PREFIX,
     run_block_generator,
     run_block_generator2,
@@ -175,3 +176,8 @@ def test_generator_interned_vbytes_dedup_pair() -> None:
 def test_generator_interned_vbytes_bad_input() -> None:
     with pytest.raises(ValueError):
         generator_interned_vbytes_trusted(b"\xff\xff")
+
+
+def test_max_canonical_blob_size() -> None:
+    # mainnet MAX_BLOCK_COST_CLVM / COST_PER_BYTE
+    assert max_canonical_blob_size(11_000_000_000, 12000) == 1_222_236
