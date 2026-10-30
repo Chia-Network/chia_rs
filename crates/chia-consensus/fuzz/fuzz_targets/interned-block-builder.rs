@@ -97,10 +97,12 @@ fuzz_target!(|spends: Vec<CoinSpend>| -> Corpus {
         "cost() upper bound {upper_bound} must be >= finalize() cost {cost}"
     );
 
+    // consensus validates a block at its declared cost (which also sets the
+    // size cap), so run at `cost` rather than the max block cost
     let interned_result = run_block_generator2::<&[u8], _>(
         generator.as_slice(),
         [],
-        TEST_CONSTANTS.max_block_cost_clvm,
+        cost,
         MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
         &signature,
         None,
