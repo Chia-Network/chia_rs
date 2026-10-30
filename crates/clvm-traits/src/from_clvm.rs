@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::{num::NonZero, rc::Rc, sync::Arc};
 
 use num_bigint::BigInt;
 
@@ -28,6 +28,13 @@ macro_rules! clvm_primitive {
                 };
 
                 Ok(<$primitive>::from_be_bytes(bytes))
+            }
+        }
+
+        impl<N, D: ClvmDecoder<Node = N>> FromClvm<D> for NonZero<$primitive> {
+            fn from_clvm(decoder: &D, node: N) -> Result<Self, FromClvmError> {
+                NonZero::new(<$primitive>::from_clvm(decoder, node)?)
+                    .ok_or_else(|| FromClvmError::Custom("expected non-zero integer".to_string()))
             }
         }
     };
@@ -318,6 +325,71 @@ mod tests {
         assert_eq!(decode(a, "81e5"), Ok(-27i32));
         assert_eq!(decode(a, "80"), Ok(-0));
         assert_eq!(decode(a, "8180"), Ok(-128i8));
+    }
+
+    #[test]
+    fn test_non_zero() {
+        use clvmr::serde::node_to_bytes;
+
+        use crate::ToClvm;
+
+        let zero_error = FromClvmError::Custom("expected non-zero integer".to_string());
+
+        macro_rules! check {
+            ($primitive:ty, $($value:expr),+ $(,)?) => {{
+                let a = &mut Allocator::new();
+
+                // Zero is rejected, both as nil and as a non-canonical `0x00` atom.
+                assert_eq!(decode::<NonZero<$primitive>>(a, "80"), Err(zero_error.clone()));
+                assert_eq!(decode::<NonZero<$primitive>>(a, "00"), Err(zero_error.clone()));
+
+                for value in [$($value),+] {
+                    let value: $primitive = value;
+                    let non_zero = NonZero::new(value).unwrap();
+
+                    // Encoding is byte-identical to the underlying integer.
+                    let plain = value.to_clvm(a).unwrap();
+                    let wrapped = non_zero.to_clvm(a).unwrap();
+                    assert_eq!(
+                        node_to_bytes(a, plain).unwrap(),
+                        node_to_bytes(a, wrapped).unwrap()
+                    );
+
+                    // Round trip.
+                    assert_eq!(NonZero::<$primitive>::from_clvm(a, wrapped), Ok(non_zero));
+                }
+            }};
+        }
+
+        check!(u8, 1, 2, 0x7f, 0x80, <u8>::MAX);
+        check!(u16, 1, 0x80, <u16>::MAX);
+        check!(u32, 1, 0x80, <u32>::MAX);
+        check!(u64, 1, 0x80, <u64>::MAX);
+        check!(u128, 1, 0x80, <u128>::MAX);
+        check!(usize, 1, 0x80, <usize>::MAX);
+        check!(i8, 1, -1, <i8>::MIN, <i8>::MAX);
+        check!(i16, 1, -1, <i16>::MIN, <i16>::MAX);
+        check!(i32, 1, -1, <i32>::MIN, <i32>::MAX);
+        check!(i64, 1, -1, <i64>::MIN, <i64>::MAX);
+        check!(i128, 1, -1, <i128>::MIN, <i128>::MAX);
+        check!(isize, 1, -1, <isize>::MIN, <isize>::MAX);
+
+        // Values that don't fit the underlying type still fail the same way.
+        let a = &mut Allocator::new();
+        assert_eq!(
+            decode::<NonZero<u8>>(a, "820100"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 1,
+                found: 2
+            })
+        );
+        assert_eq!(
+            decode::<NonZero<u64>>(a, "81ff"),
+            Err(FromClvmError::WrongAtomLength {
+                expected: 8,
+                found: 1
+            })
+        );
     }
 
     #[test]
