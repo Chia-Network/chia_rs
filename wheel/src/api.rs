@@ -75,7 +75,10 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
+use chia_consensus::serde_2026::{
+    max_canonical_blob_size as native_max_canonical_blob_size, node_from_bytes_2026,
+    node_from_bytes_2026_trusted,
+};
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -136,22 +139,31 @@ pub fn tree_hash(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyAny
 }
 
 #[pyfunction]
-pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, PyAny>> {
-    let slice = py_to_slice(&blob);
-    let mut a = clvmr::Allocator::new();
+pub fn tree_hash_2026<'py>(py: Python<'py>, blob: &[u8]) -> PyResult<Bound<'py, PyAny>> {
     // Unconditional serde_2026 parse, no magic-prefix sniffing: the caller
     // (chia-blockchain's generator_root(version=1, ...)) already knows this
-    // blob is serde_2026 from the block's version, and has already validated
-    // the block, so this is a trusted read.
-    let node = node_from_bytes_2026_trusted(&mut a, slice).map_err(map_pyerr)?;
+    // blob is serde_2026 from the block's version. The blob may not be
+    // validated yet, so use the checked reader; the caller bounds its length
+    // with max_canonical_blob_size, and no atom can be longer than the blob.
     // serde_2026 can encode trees whose expansion is exponential in the blob
     // size, so the hash must be DAG-aware: tree_hash_cached memoizes shared
-    // pairs, keeping the work linear in the number of unique nodes (which
-    // parsing already bounds by the blob length). The uncached tree_hash
-    // would walk the full expansion.
-    let mut cache = clvm_utils::TreeCache::default();
-    let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
+    // pairs and long atoms, keeping the work linear in the blob length. The
+    // GIL is released for the parse and hash; `&[u8]` only accepts `bytes`,
+    // which is immutable, so the blob can't change meanwhile.
+    let hash = py
+        .detach(|| {
+            let mut a = clvmr::Allocator::new();
+            let node = node_from_bytes_2026(&mut a, blob, blob.len())?;
+            let mut cache = clvm_utils::TreeCache::default();
+            Ok::<_, EvalErr>(clvm_utils::tree_hash_cached(&a, node, &mut cache))
+        })
+        .map_err(map_pyerr)?;
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+#[pyfunction]
+pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
+    native_max_canonical_blob_size(max_cost, cost_per_byte)
 }
 
 #[pyfunction]
@@ -1107,6 +1119,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
+    m.add_function(wrap_pyfunction!(max_canonical_blob_size, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
