@@ -3116,9 +3116,9 @@ fn test_create_coin_with_hint() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3142,9 +3142,9 @@ fn test_create_coin_extra_arg() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3163,9 +3163,9 @@ fn test_create_coin_with_multiple_hints() {
     assert_eq!(a.atom(spend.puzzle_hash).as_ref(), H2);
     assert_eq!(spend.create_coin.len(), 1);
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == H1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), H1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }
@@ -3244,9 +3244,9 @@ fn test_create_coin_with_short_hint() {
     assert_eq!(spend.create_coin.len(), 1);
 
     for c in &spend.create_coin {
-        assert!(c.puzzle_hash.as_ref() == H2);
-        assert!(c.amount == 42_u64);
-        assert!(a.atom(c.hint).as_ref() == MSG1.to_vec());
+        assert_eq!(c.puzzle_hash.as_ref(), H2);
+        assert_eq!(c.amount, 42_u64);
+        assert_eq!(a.atom(c.hint).as_ref(), MSG1.to_vec());
     }
     assert_eq!(spend.flags, 0);
 }

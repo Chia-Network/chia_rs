@@ -14,6 +14,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 // Shared by mainnet, testnet11, and testneta.
 const MIN_BLOCKS_PER_CHALLENGE_BLOCK: u8 = 16;
 const MAX_SUB_SLOT_BLOCKS: u32 = 128;
+const PROOFS_PER_BATCH: usize = 100;
 
 /// Export all VDF proofs, including orphans, from a v2 blockchain database.
 /// The binary corpus can be concatenated with exports from other networks and
@@ -229,6 +230,15 @@ fn block_proofs<'a>(
     Ok(proofs)
 }
 
+fn flush_batch(output: &mut impl Write, batch: &mut Vec<CorpusEntry>) -> Result<u64> {
+    batch.sort_by_key(|entry| entry.info.challenge);
+    let count = batch.len() as u64;
+    for entry in batch.drain(..) {
+        output.write_all(&entry.to_bytes()?)?;
+    }
+    Ok(count)
+}
+
 fn export(args: &Args) -> Result<()> {
     let db = Connection::open_with_flags(&args.database, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let version: i64 =
@@ -237,6 +247,7 @@ fn export(args: &Args) -> Result<()> {
         return Err("expected a v2 blockchain database".into());
     }
     let mut output = BufWriter::new(File::create_new(&args.output)?);
+    let mut batch = Vec::with_capacity(PROOFS_PER_BATCH);
     let mut records = HashMap::new();
     let mut heights: VecDeque<(u32, Bytes32)> = VecDeque::new();
     // A signage point is in the current or previous sub-slot. Retain every
@@ -274,8 +285,10 @@ fn export(args: &Args) -> Result<()> {
             records.insert(hash, block_record);
             heights.push_back((height, hash));
             for proof in block_proofs(&block, &records)? {
-                output.write_all(&proof.corpus_entry(height).to_bytes()?)?;
-                proofs += 1;
+                batch.push(proof.corpus_entry(height));
+                if batch.len() == PROOFS_PER_BATCH {
+                    proofs += flush_batch(&mut output, &mut batch)?;
+                }
             }
             Ok(())
         })();
@@ -285,6 +298,7 @@ fn export(args: &Args) -> Result<()> {
             eprintln!("Height {height}: exported {blocks} blocks, {proofs} proofs");
         }
     }
+    proofs += flush_batch(&mut output, &mut batch)?;
     output.flush()?;
     eprintln!("Exported {blocks} blocks, {proofs} proofs");
     Ok(())
@@ -336,6 +350,36 @@ mod tests {
         for length in 0..bytes.len() {
             assert!(CorpusEntry::from_bytes(&bytes[..length]).is_err());
         }
+    }
+
+    #[test]
+    fn batches_group_challenges_and_flush_partial_batch() {
+        let mut output = Vec::new();
+        let mut batch = Vec::new();
+        for (height, challenge) in [(1, 2), (2, 1), (3, 2), (4, 3), (5, 1)] {
+            batch.push(CorpusEntry {
+                height,
+                input: ClassgroupElement::default(),
+                info: VDFInfo {
+                    challenge: [challenge; 32].into(),
+                    number_of_iterations: 1,
+                    output: ClassgroupElement::default(),
+                },
+                proof: VDFProof {
+                    witness_type: 0,
+                    witness: vec![0; 100].into(),
+                    normalized_to_identity: false,
+                },
+            });
+        }
+        assert_eq!(flush_batch(&mut output, &mut batch).unwrap(), 5);
+        assert!(batch.is_empty());
+        let mut cursor = Cursor::new(output.as_slice());
+        let heights: Vec<_> = (0..5)
+            .map(|_| CorpusEntry::parse::<false>(&mut cursor).unwrap().height)
+            .collect();
+        assert_eq!(heights, [2, 5, 1, 3, 4]);
+        assert_eq!(cursor.position() as usize, output.len());
     }
 
     #[test]
