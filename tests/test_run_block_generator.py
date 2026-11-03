@@ -2,10 +2,12 @@ import pytest
 
 from chia_rs import (
     generator_interned_vbytes_trusted,
+    tree_hash_2026,
     SERDE_2026_MAGIC_PREFIX,
     run_block_generator,
     run_block_generator2,
     G2Element,
+    Program,
     DONT_VALIDATE_SIGNATURE,
 )
 from run_gen import print_spend_bundle_conditions, DEFAULT_CONSTANTS
@@ -172,6 +174,22 @@ def test_generator_interned_vbytes_dedup_pair() -> None:
     )
 
 
+def test_generator_interned_vbytes_real_block() -> None:
+    with open("generator-tests/block-834768.txt", "r") as f:
+        classic = bytes.fromhex(f.read().split("\n")[0])
+    # the same generator re-encoded as serde_2026 (generator-tests/serde-2026)
+    with open("generator-tests/serde-2026/block-834768.txt", "r") as f:
+        interned = bytes.fromhex(f.read().strip())
+    assert tree_hash_2026(interned) == Program.from_bytes(classic).get_tree_hash()
+    # vbytes are computed from the interned tree, so the encoding doesn't matter.
+    # block-834768 is 39090 bytes serialized and 13465 vbytes interned.
+    assert generator_interned_vbytes_trusted(interned) == 13465
+
+
 def test_generator_interned_vbytes_bad_input() -> None:
+    # missing the serde_2026 magic prefix
     with pytest.raises(ValueError):
         generator_interned_vbytes_trusted(b"\xff\xff")
+    # prefix present, body is not a valid serde_2026 stream
+    with pytest.raises(ValueError):
+        generator_interned_vbytes_trusted(SERDE_2026_MAGIC_PREFIX + b"\xff\xff")
