@@ -79,6 +79,16 @@ mod tests {
     }
 
     #[test]
+    fn test_non_zero_tree_hash() {
+        use std::num::NonZero;
+
+        assert_eq!(NonZero::new(1u64).unwrap().tree_hash(), 1u64.tree_hash());
+        assert_eq!(NonZero::<u64>::MAX.tree_hash(), u64::MAX.tree_hash());
+        assert_eq!(NonZero::<i32>::MIN.tree_hash(), i32::MIN.tree_hash());
+        assert_eq!(NonZero::new(-1i8).unwrap().tree_hash(), (-1i8).tree_hash());
+    }
+
+    #[test]
     fn test_curry_tree_hash() {
         let hash_1 = [1, 2, 3].tree_hash();
         let hash_2 = [4, 5, 6].tree_hash();

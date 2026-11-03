@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::{num::NonZero, rc::Rc, sync::Arc};
 
 use clvmr::Atom;
 use num_bigint::BigInt;
@@ -19,6 +19,12 @@ macro_rules! clvm_primitive {
                 let bytes = self.to_be_bytes();
                 #[allow(unused_comparisons)]
                 encoder.encode_atom(Atom::Borrowed(&encode_number(&bytes, *self < 0)))
+            }
+        }
+
+        impl<N, E: ClvmEncoder<Node = N>> ToClvm<E> for NonZero<$primitive> {
+            fn to_clvm(&self, encoder: &mut E) -> Result<N, ToClvmError> {
+                self.get().to_clvm(encoder)
             }
         }
     };
@@ -247,6 +253,27 @@ mod tests {
         assert_eq!(encode(a, -27i32), Ok("81e5".to_owned()));
         assert_eq!(encode(a, -0), Ok("80".to_owned()));
         assert_eq!(encode(a, -128i8), Ok("8180".to_owned()));
+    }
+
+    #[test]
+    fn test_non_zero() {
+        let a = &mut Allocator::new();
+        assert_eq!(encode(a, NonZero::new(1u8).unwrap()), Ok("01".to_owned()));
+        assert_eq!(encode(a, NonZero::new(5u32).unwrap()), Ok("05".to_owned()));
+        assert_eq!(
+            encode(a, NonZero::new(-27i32).unwrap()),
+            Ok("81e5".to_owned())
+        );
+        assert_eq!(
+            encode(a, NonZero::new(-1i64).unwrap()),
+            Ok("81ff".to_owned())
+        );
+        assert_eq!(encode(a, NonZero::<u8>::MAX), Ok("8200ff".to_owned()));
+        assert_eq!(encode(a, NonZero::<i8>::MIN), Ok("8180".to_owned()));
+        assert_eq!(
+            encode(a, NonZero::<u64>::MAX),
+            Ok("8900ffffffffffffffff".to_owned())
+        );
     }
 
     #[test]
