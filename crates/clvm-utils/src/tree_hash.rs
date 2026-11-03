@@ -151,7 +151,7 @@ impl TreeCache {
         if idx >= slots.len() {
             false
         } else {
-            slots[idx] <= SEEN_MULTIPLE
+            slots[idx] == SEEN_MULTIPLE
         }
     }
 
@@ -626,6 +626,10 @@ fn test_tree_cache_should_memoize() {
     assert!(!cache.visit(&allocator, c));
 
     assert!(cache.should_memoize(c));
+
+    // once inserted, it's cached and no longer a candidate
+    cache.insert(c, &tree_hash(&allocator, c));
+    assert!(!cache.should_memoize(c));
 }
 
 #[test]
@@ -692,9 +696,14 @@ fn test_tree_cache_atom_memoize(#[case] len: usize, #[case] refs: usize, #[case]
         node = a.new_pair(atom, node).unwrap();
     }
 
+    // eligibility after visiting, before any insertion
+    let mut visited = TreeCache::default();
+    visited.visit_tree(&a, node);
+    assert_eq!(visited.should_memoize(atom), memoized);
+
     let mut cache = TreeCache::default();
     assert_eq!(tree_hash_cached(&a, node, &mut cache), tree_hash(&a, node));
-    assert_eq!(cache.should_memoize(atom), memoized);
+    assert!(!cache.should_memoize(atom));
     assert_eq!(cache.get(atom).is_some(), memoized);
 }
 
