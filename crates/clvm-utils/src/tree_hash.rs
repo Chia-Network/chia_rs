@@ -123,18 +123,22 @@ impl TreeCache {
 
     /// mark the node as being visited. Returns true if we need to
     /// traverse visitation down this node.
-    fn visit(&mut self, n: NodePtr) -> bool {
-        if !matches!(n.object_type(), ObjectType::Pair) {
-            return false;
-        }
+    /// Pairs and heap atoms long enough to be worth memoizing are tracked;
+    /// atoms always return false.
+    fn visit(&mut self, a: &Allocator, n: NodePtr) -> bool {
+        let slots = match n.object_type() {
+            ObjectType::Pair => &mut self.pairs,
+            ObjectType::Bytes if a.atom_len(n) >= ATOM_MEMOIZE_THRESHOLD => &mut self.atoms,
+            _ => return false,
+        };
         let idx = n.index() as usize;
-        if idx >= self.pairs.len() {
-            self.pairs.resize(idx + 1, NOT_VISITED);
+        if idx >= slots.len() {
+            slots.resize(idx + 1, NOT_VISITED);
         }
-        if self.pairs[idx] > SEEN_MULTIPLE {
-            self.pairs[idx] -= 1;
+        if slots[idx] > SEEN_MULTIPLE {
+            slots[idx] -= 1;
         }
-        self.pairs[idx] == SEEN_ONCE
+        matches!(n.object_type(), ObjectType::Pair) && slots[idx] == SEEN_ONCE
     }
 
     pub fn should_memoize(&mut self, n: NodePtr) -> bool {
@@ -151,23 +155,8 @@ impl TreeCache {
         }
     }
 
-    /// mark the node as being visited, if it's a heap atom long enough to be
-    /// worth memoizing
-    fn visit_atom(&mut self, a: &Allocator, n: NodePtr) {
-        if !matches!(n.object_type(), ObjectType::Bytes) || a.atom_len(n) < ATOM_MEMOIZE_THRESHOLD {
-            return;
-        }
-        let idx = n.index() as usize;
-        if idx >= self.atoms.len() {
-            self.atoms.resize(idx + 1, NOT_VISITED);
-        }
-        if self.atoms[idx] > SEEN_MULTIPLE {
-            self.atoms[idx] -= 1;
-        }
-    }
-
     pub fn visit_tree(&mut self, a: &Allocator, node: NodePtr) {
-        if !self.visit(node) {
+        if !self.visit(a, node) {
             return;
         }
         let mut nodes = vec![node];
@@ -175,14 +164,12 @@ impl TreeCache {
             let SExp::Pair(left, right) = a.sexp(n) else {
                 continue;
             };
-            if self.visit(left) {
+            if self.visit(a, left) {
                 nodes.push(left);
             }
-            if self.visit(right) {
+            if self.visit(a, right) {
                 nodes.push(right);
             }
-            self.visit_atom(a, left);
-            self.visit_atom(a, right);
         }
     }
 }
@@ -634,9 +621,9 @@ fn test_tree_cache_should_memoize() {
 
     // we need to visit a node at least twice for it to be considered a
     // candidate for memoization
-    assert!(cache.visit(c));
+    assert!(cache.visit(&allocator, c));
     assert!(!cache.should_memoize(c));
-    assert!(!cache.visit(c));
+    assert!(!cache.visit(&allocator, c));
 
     assert!(cache.should_memoize(c));
 }
@@ -662,6 +649,28 @@ fn test_tree_hash_cached_shared_atom_not_quadratic() {
     let mut cache = TreeCache::default();
     assert_eq!(tree_hash_cached(&a, node, &mut cache), expected);
     assert_eq!(cache.get(big), Some(&big_hash));
+}
+
+#[test]
+fn test_tree_hash_cached_repeated_atom_root() {
+    // a long atom passed as the root of repeated calls sharing a cache
+    let mut a = Allocator::new();
+    let atom = a.new_atom(&[0x5a; 100]).unwrap();
+    let expected = tree_hash_atom(&[0x5a; 100]);
+
+    let mut cache = TreeCache::default();
+    assert_eq!(tree_hash_cached(&a, atom, &mut cache), expected);
+    assert_eq!(cache.get(atom), None);
+    assert!(cache.hashes.is_empty());
+
+    assert_eq!(tree_hash_cached(&a, atom, &mut cache), expected);
+    assert_eq!(cache.get(atom), Some(&expected));
+    assert_eq!(cache.hashes.len(), 1);
+
+    for _ in 0..3 {
+        assert_eq!(tree_hash_cached(&a, atom, &mut cache), expected);
+        assert_eq!(cache.hashes.len(), 1);
+    }
 }
 
 #[cfg(test)]
