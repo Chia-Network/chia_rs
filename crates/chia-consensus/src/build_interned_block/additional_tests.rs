@@ -470,3 +470,79 @@ fn test_serde_2026_tree_hash_2026_agrees() {
     let hash_classic = tree_hash_cached(&classic_a, spend_list, &mut TreeCache::default());
     assert_eq!(hash_2026, hash_classic);
 }
+
+/// A spend bundle whose spends share one large puzzle. The mempool charges
+/// the shared puzzle once (it interns the whole bundle), so the bundle is
+/// admitted at well under the per-transaction limit. The builder must accept
+/// it into an empty block.
+#[test]
+fn test_shared_puzzle_bundle_fits_empty_block() {
+    use chia_protocol::{Coin, Program};
+    use clvm_utils::tree_hash_from_bytes;
+    use clvmr::serde::node_to_bytes;
+
+    const NUM_SPENDS: u8 = 10;
+    const PAYLOAD_LEN: usize = 100_000;
+
+    // puzzle: (f (q . (() . <payload>))) which returns nil (no conditions)
+    let mut a = Allocator::new();
+    let payload = a.new_atom(&[0x42; PAYLOAD_LEN]).unwrap();
+    let quoted = a.new_pair(a.nil(), payload).unwrap();
+    let q = a.new_atom(&[1]).unwrap();
+    let quoted = a.new_pair(q, quoted).unwrap();
+    let args = a.new_pair(quoted, a.nil()).unwrap();
+    let f = a.new_atom(&[5]).unwrap();
+    let puzzle = a.new_pair(f, args).unwrap();
+    let puzzle = Program::from(node_to_bytes(&a, puzzle).unwrap());
+    let puzzle_hash = tree_hash_from_bytes(puzzle.as_ref()).unwrap().into();
+
+    let coin_spends = (0..NUM_SPENDS)
+        .map(|i| {
+            chia_protocol::CoinSpend::new(
+                Coin::new([i; 32].into(), puzzle_hash, 1),
+                puzzle.clone(),
+                Program::from(vec![0x80]),
+            )
+        })
+        .collect();
+    let bundle = SpendBundle::new(coin_spends, Signature::default());
+
+    // mempool admission, as validate_clvm_and_signature() runs it
+    let mut a = Allocator::new();
+    let conds = run_spendbundle(
+        &mut a,
+        &bundle,
+        TEST_CONSTANTS.max_block_cost_clvm,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
+        &TEST_CONSTANTS,
+        None,
+    )
+    .expect("run_spendbundle")
+    .0;
+    // the mempool's default max_tx_clvm_cost is half a block
+    assert!(conds.cost <= TEST_CONSTANTS.max_block_cost_clvm / 2);
+
+    let mut builder = InternedBlockBuilder::new(&TEST_CONSTANTS);
+    let (added, _) = builder
+        .add_spend_bundles([&bundle], conds.execution_cost + conds.condition_cost)
+        .expect("add_spend_bundles");
+    assert!(
+        added,
+        "admitted bundle (cost {}) rejected by empty block",
+        conds.cost
+    );
+
+    let (generator, signature, cost) = builder.finalize().expect("finalize");
+    assert!(cost <= conds.cost + WRAPPER_VBYTES * TEST_CONSTANTS.cost_per_byte);
+    let (_, block_conds) = run_block_generator2::<&[u8], _>(
+        generator.as_slice(),
+        [],
+        TEST_CONSTANTS.max_block_cost_clvm,
+        MEMPOOL_MODE | ConsensusFlags::INTERNED_SPEND_LIST,
+        &signature,
+        None,
+        &TEST_CONSTANTS,
+    )
+    .expect("run_block_generator2");
+    assert_eq!(block_conds.cost, cost);
+}

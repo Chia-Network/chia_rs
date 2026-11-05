@@ -25,9 +25,6 @@ const MIN_COST_THRESHOLD: u64 = 6_000_000;
 /// Interned vbyte weight of the `((spend_list))` wrapper.
 const WRAPPER_VBYTES: u64 = 5;
 
-/// The cost of a cons cell in the generator tree
-const COST_CONS: u64 = 3;
-
 /// Returned from add_spend_bundle(), indicating whether more bundles can be
 /// added or not.
 #[derive(PartialEq)]
@@ -43,8 +40,9 @@ pub enum BuildBlockResult {
 /// specified maximum block cost. The priority of spends is typically the
 /// fee-per-cost (higher is better). The cost of the generated block is computed
 /// incrementally, based on the interned vbyte size of the generator tree, the
-/// execution cost and conditions cost of each spend. Each spend's vbyte
-/// contribution is estimated by interning it in an isolated scratch allocator.
+/// execution cost and conditions cost of each spend. Each batch's vbyte
+/// contribution is estimated by interning all of its spends together in a
+/// scratch allocator, the same way mempool admission charges a spend bundle.
 /// By the triangle inequality (vbytes(A ∪ B) ≤ vbytes(A) + vbytes(B)), the
 /// running sum is an upper bound on the true interned cost of all spends
 /// combined. finalize() computes the exact cost.
@@ -111,28 +109,27 @@ impl InternedBlockBuilder {
         Self::new_with(constants.cost_per_byte, constants.max_block_cost_clvm)
     }
 
-    /// Compute the interned vbyte cost of a single spend in isolation.
-    /// Interns the spend tuple in a scratch allocator and measures its
-    /// interned_vbytes, which is an upper bound on this spend's contribution
-    /// when added to the full generator (triangle inequality).
-    fn spend_vbytes(spend: &chia_protocol::CoinSpend) -> Result<u64> {
-        let mut a = Allocator::new();
+    /// Prepend a spend tuple, ( parent-id puzzle-reveal amount solution ),
+    /// to spend_list and return the new list.
+    fn push_spend(
+        a: &mut Allocator,
+        spend: &chia_protocol::CoinSpend,
+        spend_list: NodePtr,
+    ) -> Result<NodePtr> {
         // solution
-        let solution = node_from_bytes_backrefs(&mut a, spend.solution.as_ref())?;
+        let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
         let item = a.new_pair(solution, NodePtr::NIL)?;
         // amount
         let amount = a.new_number(spend.coin.amount.into())?;
         let item = a.new_pair(amount, item)?;
         // puzzle reveal
-        let puzzle = node_from_bytes_backrefs(&mut a, spend.puzzle_reveal.as_ref())?;
+        let puzzle = node_from_bytes_backrefs(a, spend.puzzle_reveal.as_ref())?;
         let item = a.new_pair(puzzle, item)?;
         // parent-id
         let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
         let item = a.new_pair(parent_id, item)?;
 
-        let interned = intern_tree(&a, item)?;
-        // account for the cons cell linking this spend into the spend list
-        Ok(interned_vbytes(&interned) + COST_CONS)
+        Ok(a.new_pair(item, spend_list)?)
     }
 
     /// add a batch of spend bundles to the generator. The cost for each bundle
@@ -169,31 +166,24 @@ impl InternedBlockBuilder {
 
         let a = &mut self.allocator;
 
+        // the batch's spends are also built into a nil-terminated list in a
+        // scratch allocator. Its interned vbytes is an upper bound on what the
+        // batch adds to the generator, and shares content across all spends
+        // in the batch, matching the mempool's per-bundle cost.
+        let mut scratch = Allocator::new();
+        let mut scratch_list = scratch.nil();
         let mut spend_list = self.spend_list;
-        let mut new_byte_cost = 0u64;
         let mut cumulative_signature = Signature::default();
         let checkpoint = a.checkpoint();
         for bundle in bundles {
             for spend in &bundle.borrow().coin_spends {
-                new_byte_cost += Self::spend_vbytes(spend)? * self.cost_per_byte;
-
-                // solution
-                let solution = node_from_bytes_backrefs(a, spend.solution.as_ref())?;
-                let item = a.new_pair(solution, NodePtr::NIL)?;
-                // amount
-                let amount = a.new_number(spend.coin.amount.into())?;
-                let item = a.new_pair(amount, item)?;
-                // puzzle reveal
-                let puzzle = node_from_bytes_backrefs(a, spend.puzzle_reveal.as_ref())?;
-                let item = a.new_pair(puzzle, item)?;
-                // parent-id
-                let parent_id = a.new_atom(&spend.coin.parent_coin_info)?;
-                let item = a.new_pair(parent_id, item)?;
-
-                spend_list = a.new_pair(item, spend_list)?;
+                scratch_list = Self::push_spend(&mut scratch, spend, scratch_list)?;
+                spend_list = Self::push_spend(a, spend, spend_list)?;
             }
             cumulative_signature.aggregate(&bundle.borrow().aggregated_signature);
         }
+        let new_byte_cost =
+            interned_vbytes(&intern_tree(&scratch, scratch_list)?) * self.cost_per_byte;
 
         let new_total_byte_cost = self.byte_cost + new_byte_cost;
         if new_total_byte_cost + wrapper_cost + self.block_cost + cost > self.max_block_cost {
