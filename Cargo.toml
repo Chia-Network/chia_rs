@@ -157,7 +157,7 @@ hkdf = "0.12.0"
 getrandom = { version = "0.4", features = ["sys_rng"] }
 hex = "0.4.3"
 thiserror = "2.0.0"
-pyo3 = "0.29.0"
+pyo3 = "0.30.1"
 arbitrary = "1.4.1"
 rand = "0.9"
 criterion = "0.5.1"
