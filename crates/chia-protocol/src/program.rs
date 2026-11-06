@@ -182,129 +182,207 @@ fn map_pyerr(err: EvalErr) -> PyErr {
 // function could turn a python structure directly into bytes, without taking
 // the detour via Allocator. propagating python errors through ToClvmError is a
 // bit tricky though
+
 #[cfg(feature = "py-bindings")]
-fn clvm_convert(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
+fn py_mem_err(e: impl std::fmt::Display) -> PyErr {
+    PyMemoryError::new_err(e.to_string())
+}
+
+// Both `clvm_convert` and `clvm_serialize` use an explicit, heap-allocated
+// work-stack rather than native recursion. A recursive implementation would
+// grow the thread's call stack in proportion to the nesting depth of the
+// (untrusted) python input, and a sufficiently deep structure would overflow
+// the stack and crash the process with SIGSEGV — which PyO3's `catch_unwind`
+// boundary can't turn into a python exception. With the work-stack, the only
+// thing that grows is a `Vec` on the heap.
+
+#[cfg(feature = "py-bindings")]
+enum ConvertOp<'py> {
+    // convert a single python object into a CLVM node
+    Node(Bound<'py, PyAny>),
+    // pop the two most recent results and cons them: new_pair(first, second)
+    Cons,
+    // pop `len` results and fold them into a nil-terminated cons list
+    BuildList(usize),
+}
+
+// Convert a single python object, pushing follow-up work onto `ops` (for pairs
+// and lists) or a finished node onto `results` (for leaves).
+#[cfg(feature = "py-bindings")]
+fn clvm_convert_node<'py>(
+    a: &mut Allocator,
+    o: &Bound<'py, PyAny>,
+    ops: &mut Vec<ConvertOp<'py>>,
+    results: &mut Vec<NodePtr>,
+) -> PyResult<()> {
     // None
     if o.is_none() {
-        Ok(a.nil())
+        results.push(a.nil());
     // bytes
     } else if let Ok(buffer) = o.extract::<&[u8]>() {
-        a.new_atom(buffer)
-            .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        results.push(a.new_atom(buffer).map_err(py_mem_err)?);
     // str
     } else if let Ok(text) = o.extract::<String>() {
-        a.new_atom(text.as_bytes())
-            .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        results.push(a.new_atom(text.as_bytes()).map_err(py_mem_err)?);
     // int
     } else if let Ok(val) = o.extract::<clvmr::number::Number>() {
-        a.new_number(val)
-            .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        results.push(a.new_number(val).map_err(py_mem_err)?);
     // Tuple (SExp-like)
     } else if let Ok(pair) = o.cast::<PyTuple>() {
         if pair.len() == 2 {
-            let left = clvm_convert(a, &pair.get_item(0)?)?;
-            let right = clvm_convert(a, &pair.get_item(1)?)?;
-            a.new_pair(left, right)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))
+            // build new_pair(left, right): push `Cons` first, then the two
+            // children so they're converted before `Cons` runs. The children
+            // are pushed right-then-left so `left` is processed first and ends
+            // up below `right` on the result stack.
+            ops.push(ConvertOp::Cons);
+            ops.push(ConvertOp::Node(pair.get_item(1)?));
+            ops.push(ConvertOp::Node(pair.get_item(0)?));
         } else {
-            Err(PyValueError::new_err(format!(
+            return Err(PyValueError::new_err(format!(
                 "can't cast tuple of size {}",
                 pair.len()
-            )))
+            )));
         }
     // List
     } else if let Ok(list) = o.cast::<PyList>() {
-        let mut rev = Vec::new();
-        for py_item in list.iter() {
-            rev.push(py_item);
+        // Elements are pushed in reverse so that, once each has been
+        // converted, the results sit on the stack in list order (last element
+        // on top) — which is what `BuildList` expects.
+        let items: Vec<Bound<'py, PyAny>> = list.iter().collect();
+        ops.push(ConvertOp::BuildList(items.len()));
+        for item in items.into_iter().rev() {
+            ops.push(ConvertOp::Node(item));
         }
-        let mut ret = a.nil();
-        for py_item in rev.into_iter().rev() {
-            let item = clvm_convert(a, &py_item)?;
-            ret = a
-                .new_pair(item, ret)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
-        }
-        Ok(ret)
     // SExp (such as clvm.SExp)
     } else if let (Ok(atom), Ok(pair)) = (o.getattr("atom"), o.getattr("pair")) {
         if atom.is_none() {
             if pair.is_none() {
-                Err(PyTypeError::new_err(format!("invalid SExp item {o}")))
-            } else {
-                let pair = pair.cast::<PyTuple>()?;
-                let left = clvm_convert(a, &pair.get_item(0)?)?;
-                let right = clvm_convert(a, &pair.get_item(1)?)?;
-                a.new_pair(left, right)
-                    .map_err(|e| PyMemoryError::new_err(e.to_string()))
+                return Err(PyTypeError::new_err(format!("invalid SExp item {o}")));
             }
+            let pair = pair.cast::<PyTuple>()?;
+            ops.push(ConvertOp::Cons);
+            ops.push(ConvertOp::Node(pair.get_item(1)?));
+            ops.push(ConvertOp::Node(pair.get_item(0)?));
         } else {
-            a.new_atom(atom.extract::<&[u8]>()?)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))
+            results.push(a.new_atom(atom.extract::<&[u8]>()?).map_err(py_mem_err)?);
         }
     // Program itself. This is interpreted as a program in serialized form, and
     // just a buffer of that serialization. This is an optimization to finding
     // __bytes__() and calling it
     } else if let Ok(prg) = o.extract::<Program>() {
-        a.new_atom(prg.0.as_slice())
-            .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        results.push(a.new_atom(prg.0.as_slice()).map_err(py_mem_err)?);
     // anything convertible to bytes
     } else if let Ok(fun) = o.getattr("__bytes__") {
         let bytes = fun.call0()?;
         let buffer = bytes.extract::<&[u8]>()?;
-        a.new_atom(buffer)
-            .map_err(|e| PyMemoryError::new_err(e.to_string()))
+        results.push(a.new_atom(buffer).map_err(py_mem_err)?);
     } else {
-        Err(PyTypeError::new_err(format!(
+        return Err(PyTypeError::new_err(format!(
             "unknown parameter to run_with_cost() {o}"
-        )))
+        )));
     }
+
+    Ok(())
+}
+
+// Convert a python object into a CLVM tree in the Allocator.
+#[cfg(feature = "py-bindings")]
+fn clvm_convert<'py>(a: &mut Allocator, root: &Bound<'py, PyAny>) -> PyResult<NodePtr> {
+    let mut ops: Vec<ConvertOp<'py>> = vec![ConvertOp::Node(root.clone())];
+    let mut results: Vec<NodePtr> = Vec::new();
+
+    while let Some(op) = ops.pop() {
+        match op {
+            ConvertOp::Cons => {
+                // `Cons` is only ever pushed together with two `Node` ops, each
+                // of which produces exactly one result.
+                let second = results.pop().expect("clvm_convert: missing cons operand");
+                let first = results.pop().expect("clvm_convert: missing cons operand");
+                results.push(a.new_pair(first, second).map_err(py_mem_err)?);
+            }
+            ConvertOp::BuildList(len) => {
+                let mut ret = a.nil();
+                for _ in 0..len {
+                    let item = results.pop().expect("clvm_convert: missing list element");
+                    ret = a.new_pair(item, ret).map_err(py_mem_err)?;
+                }
+                results.push(ret);
+            }
+            ConvertOp::Node(o) => {
+                clvm_convert_node(a, &o, &mut ops, &mut results)?;
+            }
+        }
+    }
+
+    Ok(results.pop().expect("clvm_convert: empty result stack"))
 }
 
 #[cfg(feature = "py-bindings")]
-fn clvm_serialize(a: &mut Allocator, o: &Bound<'_, PyAny>) -> PyResult<NodePtr> {
-    /*
-    When passing arguments to run(), there's some special treatment, before falling
-    back on the regular python -> CLVM conversion (implemented by clvm_convert
-    above). This function mimics the _serialize() function in python:
+enum SerializeOp<'py> {
+    // serialize a single python object into a CLVM node
+    Node(Bound<'py, PyAny>),
+    // pop `len` results and fold them into a nil-terminated cons list
+    BuildList(usize),
+}
 
-       def _serialize(node: object) -> bytes:
-           if isinstance(node, list):
-               serialized_list = bytearray()
-               for a in node:
-                   serialized_list += b"\xff"
-                   serialized_list += _serialize(a)
-               serialized_list += b"\x80"
-               return bytes(serialized_list)
-           if type(node) is SerializedProgram:
-               return bytes(node)
-           if type(node) is Program:
-               return bytes(node)
-           else:
-               ret: bytes = SExp.to(node).as_bin()
-               return ret
-    */
+// When passing arguments to run(), there's some special treatment, before falling
+// back on the regular python -> CLVM conversion (implemented by clvm_convert
+// above). This function mimics the _serialize() function in python:
+//
+//    def _serialize(node: object) -> bytes:
+//        if isinstance(node, list):
+//            serialized_list = bytearray()
+//            for a in node:
+//                serialized_list += b"\xff"
+//                serialized_list += _serialize(a)
+//            serialized_list += b"\x80"
+//            return bytes(serialized_list)
+//        if type(node) is SerializedProgram:
+//            return bytes(node)
+//        if type(node) is Program:
+//            return bytes(node)
+//        else:
+//            ret: bytes = SExp.to(node).as_bin()
+//            return ret
+#[cfg(feature = "py-bindings")]
+fn clvm_serialize<'py>(a: &mut Allocator, root: &Bound<'py, PyAny>) -> PyResult<NodePtr> {
+    let mut ops: Vec<SerializeOp<'py>> = vec![SerializeOp::Node(root.clone())];
+    let mut results: Vec<NodePtr> = Vec::new();
 
-    // List
-    if let Ok(list) = o.cast::<PyList>() {
-        let mut rev = Vec::new();
-        for py_item in list.iter() {
-            rev.push(py_item);
+    while let Some(op) = ops.pop() {
+        match op {
+            SerializeOp::BuildList(len) => {
+                let mut ret = a.nil();
+                for _ in 0..len {
+                    let item = results.pop().expect("clvm_serialize: missing list element");
+                    ret = a.new_pair(item, ret).map_err(py_mem_err)?;
+                }
+                results.push(ret);
+            }
+            SerializeOp::Node(o) => {
+                // List
+                if let Ok(list) = o.cast::<PyList>() {
+                    // Elements are pushed in reverse so that, once each has
+                    // been serialized, the results sit on the stack in list
+                    // order (last element on top) — which is what `BuildList`
+                    // expects.
+                    let items: Vec<Bound<'py, PyAny>> = list.iter().collect();
+                    ops.push(SerializeOp::BuildList(items.len()));
+                    for item in items.into_iter().rev() {
+                        ops.push(SerializeOp::Node(item));
+                    }
+                // Program itself: parse it into the tree
+                } else if let Ok(prg) = o.extract::<Program>() {
+                    results.push(node_from_bytes_backrefs(a, prg.0.as_slice()).map_err(map_pyerr)?);
+                // otherwise, fall through to the regular conversion
+                } else {
+                    results.push(clvm_convert(a, &o)?);
+                }
+            }
         }
-        let mut ret = a.nil();
-        for py_item in rev.into_iter().rev() {
-            let item = clvm_serialize(a, &py_item)?;
-            ret = a
-                .new_pair(item, ret)
-                .map_err(|e| PyMemoryError::new_err(e.to_string()))?;
-        }
-        Ok(ret)
-    // Program itself
-    } else if let Ok(prg) = o.extract::<Program>() {
-        node_from_bytes_backrefs(a, prg.0.as_slice()).map_err(map_pyerr)
-    } else {
-        clvm_convert(a, o)
     }
+
+    Ok(results.pop().expect("clvm_serialize: empty result stack"))
 }
 
 #[cfg(feature = "py-bindings")]
