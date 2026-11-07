@@ -62,11 +62,12 @@ const THREE_BYTE_VARINT_VBYTES: u64 = (1 << 20) + 1;
 ///
 /// [`run_block_generator2`](crate::run_block_generator::run_block_generator2)
 /// rejects an interned generator longer than this before parsing it, with
-/// `max_cost` = the block's declared cost. It is a sanity bound, not cost
-/// enforcement: the exact cost is computed from the interned tree right
-/// after parsing, and a blob under the cap can still be over cost. The bound
-/// must never be below the level-0 size of a generator that fits its cost,
-/// or consensus rejects valid blocks.
+/// `max_cost` = the block's declared cost (byte cost plus execution cost).
+/// It is a sanity bound, not cost enforcement: the exact cost is computed
+/// from the interned tree right after parsing, and a blob under the cap can
+/// still be over cost. The cap must admit the level-0 encoding of every
+/// generator whose total cost fits `max_cost`, or consensus rejects valid
+/// blocks.
 ///
 /// # Why such a bound matters
 ///
@@ -75,11 +76,13 @@ const THREE_BYTE_VARINT_VBYTES: u64 = (1 << 20) + 1;
 /// charged. Cost alone therefore does not bound pre-charge decoding work; a
 /// size cap derived from this function does.
 ///
-/// Deriving the cap from the declared cost (rather than the block cost
-/// limit) adds no protection against decoding work, since a block can
-/// declare the limit. It does bound the bytes a block carries beyond what
-/// its cost pays for (trailing bytes, unused or duplicate atoms, rebuilt
-/// pairs) to the cap's slack over the level-0 size.
+/// The cap is a function of the total declared budget, not a charge on
+/// serialized bytes. A block that spends most of its budget on execution
+/// still gets the cap for the whole budget, so its blob can be well past its
+/// level-0 size (trailing bytes, unused or duplicate atoms, rebuilt pairs)
+/// with no cost for the extra bytes. Deriving the cap from the declared cost
+/// rather than the block cost limit adds no protection against decoding
+/// work either, since a block can declare the limit.
 ///
 /// # Derivation
 ///
