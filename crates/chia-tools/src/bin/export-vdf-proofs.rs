@@ -373,7 +373,7 @@ mod tests {
             });
         }
         assert_eq!(flush_batch(&mut output, &mut batch).unwrap(), 5);
-        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
         let mut cursor = Cursor::new(output.as_slice());
         let heights: Vec<_> = (0..5)
             .map(|_| CorpusEntry::parse::<false>(&mut cursor).unwrap().height)

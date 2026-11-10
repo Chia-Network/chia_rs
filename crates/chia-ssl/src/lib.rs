@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use rcgen::{CertificateParams, DistinguishedName, DnType, Ia5String, KeyPair, SanType};
 use rsa::{
-    RsaPrivateKey,
+    PrivateKey,
     pkcs8::{EncodePrivateKey, LineEnding},
     rand_core::UnwrapErr,
 };
@@ -22,7 +22,7 @@ pub struct ChiaCertificate {
 
 impl ChiaCertificate {
     pub fn generate() -> Result<ChiaCertificate> {
-        let key = RsaPrivateKey::new(&mut UnwrapErr(getrandom::SysRng), 2048)?;
+        let key = PrivateKey::new(&mut UnwrapErr(getrandom::SysRng), 2048)?;
         let key_pem = key.to_pkcs8_pem(LineEnding::default())?.to_string();
 
         let mut params = CertificateParams::default();

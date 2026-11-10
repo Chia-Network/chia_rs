@@ -49,7 +49,7 @@ pub(crate) const BLANK: [u8; 32] =
 /// as each level returns, values are hashed pair-wise and as a hash tree.
 /// the return value is the merkle tree root that the values in the range form
 fn radix_sort(range: &mut [[u8; 32]], depth: u8) -> ([u8; 32], NodeType) {
-    assert!(!range.is_empty());
+    assert_ne!(range.len(), 0);
 
     if range.len() == 1 {
         return (range[0], NodeType::Term);

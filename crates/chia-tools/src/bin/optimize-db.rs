@@ -52,7 +52,7 @@ fn main() {
 
     println!("removed {removed} orphaned blocks");
 
-    let compact: usize = connection
+    let compact: i64 = connection
         .prepare(
             "SELECT COUNT(*) FROM full_blocks WHERE is_fully_compactified=1 AND in_main_chain=1",
         )

@@ -123,6 +123,13 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
             }
 
             let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
+            let initializers = fnames.iter().zip(&fnames_maybe_upper).map(|(field, arg)| {
+                if field == arg {
+                    quote!(#field)
+                } else {
+                    quote!(#field: #arg)
+                }
+            });
 
             py_protocol.extend(quote! {
                 #[pyo3::pymethods]
@@ -131,7 +138,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     #[new]
                     #[pyo3(signature = (#(#fnames_maybe_upper),*))]
                     pub fn py_new ( #(#fnames_maybe_upper : #ftypes),* ) -> Self {
-                        Self { #(#fnames: #fnames_maybe_upper),* }
+                        Self { #(#initializers),* }
                     }
                 }
             });

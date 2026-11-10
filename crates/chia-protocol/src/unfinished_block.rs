@@ -302,7 +302,7 @@ mod tests {
 
         assert_eq!(block2.version, 0);
         assert!(block2.transactions_generator.is_none());
-        assert!(block2.transactions_generator_ref_list.is_empty());
+        assert_eq!(block2.transactions_generator_ref_list, Vec::<u32>::new());
         assert!(block2.transactions_generator_buffer.is_none());
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
@@ -332,7 +332,7 @@ mod tests {
 
         assert_eq!(block2.version, 1);
         assert!(block2.transactions_generator.is_none());
-        assert!(block2.transactions_generator_ref_list.is_empty());
+        assert_eq!(block2.transactions_generator_ref_list, Vec::<u32>::new());
         assert!(block2.transactions_generator_buffer.is_none());
         assert_eq!(block2.to_bytes().unwrap(), buf);
     }
@@ -346,7 +346,7 @@ mod tests {
 
         assert_eq!(block2.version, 1);
         assert!(block2.transactions_generator.is_none());
-        assert!(block2.transactions_generator_ref_list.is_empty());
+        assert_eq!(block2.transactions_generator_ref_list, Vec::<u32>::new());
         assert_eq!(
             block2
                 .transactions_generator_buffer
