@@ -95,7 +95,7 @@ fn test_basic_functionality() {
 
     let (generator, sig, cost) = builder.finalize().expect("finalize");
 
-    assert_ne!(generator.len(), 0);
+    assert!(!generator.is_empty());
     assert_eq!(sig, Signature::default());
     // Empty builder: block_cost=0 + generator cost of ((nil)) wrapper
     // = 5 vbytes * cost_per_byte

@@ -175,7 +175,8 @@ lazy_static = "1.4.0"
 rcgen = "0.13.2"
 rsa = "0.10.0"
 time = "0.3.47"
-rusqlite = "0.41.1"
+# Database tools use native SQLite with statement caching.
+rusqlite = { version = "0.41.1", default-features = false, features = ["cache"] }
 clap = "4.6.7"
 zstd = "0.14.3"
 blocking-threadpool = "1.0.1"

@@ -423,7 +423,7 @@ impl MerkleSet {
         range: &mut [[u8; 32]],
         depth: u8,
     ) -> ([u8; 32], NodeType) {
-        assert_ne!(range.len(), 0);
+        assert!(!range.is_empty());
 
         if range.len() == 1 {
             // we've reached a leaf node
