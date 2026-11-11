@@ -19,10 +19,10 @@
 //! ```
 
 use chia_consensus::generator_cost::interned_vbytes;
-use chia_consensus::serde_2026::SERDE_2026_COMPRESSION_LEVEL;
+use chia_consensus::serde_2026::{SERDE_2026_COMPRESSION_LEVEL, max_canonical_blob_size};
 use clvm_fuzzing::make_tree;
 use clvmr::Allocator;
-use clvmr::serde::{SERDE_2026_MAGIC_PREFIX, intern_tree, serialize_2026};
+use clvmr::serde::{intern_tree, serialize_2026};
 use rand::rngs::SmallRng;
 use rand::{Rng, RngCore, SeedableRng};
 use std::fs;
@@ -37,7 +37,7 @@ fn fullness(data: &[u8]) -> Option<(f64, usize)> {
     let (node, _) = make_tree(&mut a, &mut u);
     let blob = serialize_2026(&a, node, SERDE_2026_COMPRESSION_LEVEL).ok()?;
     let tree = intern_tree(&a, node).ok()?;
-    let bound = interned_vbytes(&tree) as usize + 5 + SERDE_2026_MAGIC_PREFIX.len();
+    let bound = max_canonical_blob_size(interned_vbytes(&tree), 1);
     Some((blob.len() as f64 / bound as f64, blob.len()))
 }
 

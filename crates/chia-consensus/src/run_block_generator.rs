@@ -244,6 +244,9 @@ where
 
     let (mut a, base_cost, program) = if interned_generator {
         let mut decode_allocator = Allocator::new();
+        // a sanity bound on the wire size, admitting the level-0 encoding of
+        // every generator whose total cost fits `max_cost`; the exact cost is
+        // charged after interning
         let max_blob_size = max_canonical_blob_size(max_cost, constants.cost_per_byte);
         let program_node = node_from_bytes_2026(&mut decode_allocator, program, max_blob_size)?;
         let interned = intern_tree_limited(&decode_allocator, program_node, u32::MAX as usize)
@@ -1079,6 +1082,66 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             ValidationErr::Eval(clvmr::error::EvalErr::SerializationError),
+        );
+    }
+
+    /// One spend whose solution is a list of `len` distinct pairs of shared
+    /// `(atom_i . nil)` pairs.
+    fn shared_pairs_generator(num_base: usize, len: usize) -> Vec<u8> {
+        use crate::solution_generator::solution_generator_2026;
+        let mut a = Allocator::new();
+        let nil = a.nil();
+        let base: Vec<NodePtr> = (0..num_base)
+            .map(|i| {
+                let atom = a.new_atom(&(i as u16).to_be_bytes()).unwrap();
+                a.new_pair(atom, nil).unwrap()
+            })
+            .collect();
+        let mut list = nil;
+        for k in 0..len {
+            let item = a
+                .new_pair(base[k % num_base], base[(k / num_base + k) % num_base])
+                .unwrap();
+            list = a.new_pair(item, list).unwrap();
+        }
+        let solution = node_to_bytes(&a, list).unwrap();
+        let puzzle: &[u8] = &[0xff, 0x01, 0x80]; // (q): no conditions
+        let coin = Coin::new([0u8; 32].into(), [1u8; 32].into(), 1);
+        solution_generator_2026([(coin, puzzle, solution.as_slice())]).unwrap()
+    }
+
+    #[rstest]
+    #[case(9000, 60_000)]
+    #[case(20_000, 100_000)]
+    fn test_interned_generator_valid_at_declared_cost(#[case] num_base: usize, #[case] len: usize) {
+        // Consensus validates a block at its declared cost, so the size cap
+        // derived from that cost must admit the level-0 encoding of every
+        // tree that fits it.
+        let blob = shared_pairs_generator(num_base, len);
+        let flags = ConsensusFlags::DONT_VALIDATE_SIGNATURE | ConsensusFlags::INTERNED_SPEND_LIST;
+        let blocks: &[&[u8]] = &[];
+        let run = |max_cost| {
+            run_block_generator2(
+                &blob,
+                blocks,
+                max_cost,
+                flags,
+                &Signature::default(),
+                None,
+                &TEST_CONSTANTS,
+            )
+        };
+        let cost = run(TEST_CONSTANTS.max_block_cost_clvm)
+            .expect("valid at max block cost")
+            .1
+            .cost;
+        assert!(blob.len() > (cost / TEST_CONSTANTS.cost_per_byte) as usize + 11);
+        let declared = run(cost).expect("valid at its own declared cost").1;
+        assert_eq!(declared.cost, cost);
+        // one unit less is a cost failure, not a size failure
+        assert_eq!(
+            run(cost - 1).unwrap_err().error_code(),
+            ErrorCode::CostExceeded
         );
     }
 }
