@@ -327,7 +327,7 @@ dependencies = [
  "rand 0.9.4",
  "rstest",
  "serde",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "thiserror 2.0.21",
 ]
 
@@ -575,7 +575,7 @@ name = "chia-sha2"
 version = "0.54.0"
 dependencies = [
  "openssl",
- "sha2 0.10.9",
+ "sha2 0.11.0",
 ]
 
 [[package]]
