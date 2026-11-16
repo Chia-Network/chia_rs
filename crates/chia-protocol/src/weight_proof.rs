@@ -69,19 +69,19 @@ impl Streamable for SubEpochData {
 
 #[streamable]
 pub struct SubSlotData {
-    proof_of_space: Option<ProofOfSpace>,
-    cc_signage_point: Option<VDFProof>,
-    cc_infusion_point: Option<VDFProof>,
-    icc_infusion_point: Option<VDFProof>,
-    cc_sp_vdf_info: Option<VDFInfo>,
+    proof_of_space: Option<Box<ProofOfSpace>>,
+    cc_signage_point: Option<Box<VDFProof>>,
+    cc_infusion_point: Option<Box<VDFProof>>,
+    icc_infusion_point: Option<Box<VDFProof>>,
+    cc_sp_vdf_info: Option<Box<VDFInfo>>,
     signage_point_index: Option<u8>,
-    cc_slot_end: Option<VDFProof>,
-    icc_slot_end: Option<VDFProof>,
-    cc_slot_end_info: Option<VDFInfo>,
-    icc_slot_end_info: Option<VDFInfo>,
-    cc_ip_vdf_info: Option<VDFInfo>,
-    icc_ip_vdf_info: Option<VDFInfo>,
-    total_iters: Option<u128>,
+    cc_slot_end: Option<Box<VDFProof>>,
+    icc_slot_end: Option<Box<VDFProof>>,
+    cc_slot_end_info: Option<Box<VDFInfo>>,
+    icc_slot_end_info: Option<Box<VDFInfo>>,
+    cc_ip_vdf_info: Option<Box<VDFInfo>>,
+    icc_ip_vdf_info: Option<Box<VDFInfo>>,
+    total_iters: Option<Box<u128>>,
 }
 
 #[cfg(feature = "py-bindings")]
@@ -102,7 +102,7 @@ impl SubSlotData {
 pub struct SubEpochChallengeSegment {
     sub_epoch_n: u32,
     sub_slots: Vec<SubSlotData>,
-    rc_slot_end_info: Option<VDFInfo>,
+    rc_slot_end_info: Option<Box<VDFInfo>>,
 }
 
 #[streamable]

@@ -32,7 +32,7 @@ pub struct FoliageBlockData {
     // Part of the block that is signed by the plot key
     unfinished_reward_block_hash: Bytes32,
     pool_target: PoolTarget,
-    pool_signature: Option<G2Element>, // Iff ProofOfSpace has a pool pk
+    pool_signature: Option<Box<G2Element>>, // Iff ProofOfSpace has a pool pk
     farmer_reward_puzzle_hash: Bytes32,
     extension_data: Bytes32, // Used for future updates. Can be any 32 byte value initially
 }
@@ -47,5 +47,5 @@ pub struct Foliage {
     foliage_block_data: FoliageBlockData,
     foliage_block_data_signature: G2Element,
     foliage_transaction_block_hash: Option<Bytes32>,
-    foliage_transaction_block_signature: Option<G2Element>,
+    foliage_transaction_block_signature: Option<Box<G2Element>>,
 }

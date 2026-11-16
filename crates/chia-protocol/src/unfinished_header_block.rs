@@ -25,7 +25,7 @@ pub struct UnfinishedHeaderBlock {
     foliage: Foliage,
 
     /// Reward chain foliage data (tx block).
-    foliage_transaction_block: Option<FoliageTransactionBlock>,
+    foliage_transaction_block: Option<Box<FoliageTransactionBlock>>,
 
     /// Filter for block transactions.
     transactions_filter: Bytes,
