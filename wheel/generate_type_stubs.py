@@ -120,6 +120,10 @@ primitives = {
 def rust_type_to_python(t: str) -> str:
     t = t.strip()
 
+    m = re.fullmatch("Box<(.+)>", t)
+    if m is not None:
+        return rust_type_to_python(m.group(1))
+
     if t in enums:
         return "int"
 

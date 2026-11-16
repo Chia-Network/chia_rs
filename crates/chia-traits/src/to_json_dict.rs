@@ -29,6 +29,12 @@ to_json_primitive!(u128);
 to_json_primitive!(i128);
 to_json_primitive!(String);
 
+impl<T: ToJsonDict> ToJsonDict for Box<T> {
+    fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.as_ref().to_json_dict(py)
+    }
+}
+
 impl<T: ToJsonDict> ToJsonDict for Vec<T> {
     fn to_json_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let list = PyList::empty(py);

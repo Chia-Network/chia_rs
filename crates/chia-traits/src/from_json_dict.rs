@@ -10,6 +10,12 @@ pub trait FromJsonDict {
         Self: Sized;
 }
 
+impl<T: FromJsonDict> FromJsonDict for Box<T> {
+    fn from_json_dict(o: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Box::new(T::from_json_dict(o)?))
+    }
+}
+
 impl<T> FromJsonDict for Option<T>
 where
     T: FromJsonDict,

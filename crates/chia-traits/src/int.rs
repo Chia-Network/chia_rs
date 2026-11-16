@@ -29,6 +29,12 @@ primitive_int!(u64, "uint64");
 primitive_int!(i128, "int128");
 primitive_int!(u128, "uint128");
 
+impl<T: ChiaToPython> ChiaToPython for Box<T> {
+    fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
+        self.as_ref().to_python(py)
+    }
+}
+
 impl<T: ChiaToPython> ChiaToPython for Option<T> {
     fn to_python<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyAny>> {
         match &self {
