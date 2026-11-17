@@ -13,7 +13,7 @@ use std::io::Cursor;
 #[streamable(no_streamable)]
 pub struct ProofOfSpace {
     challenge: Bytes32,
-    pool_public_key: Option<G1Element>,
+    pool_public_key: Option<Box<G1Element>>,
     pool_contract_puzzle_hash: Option<Bytes32>,
     plot_public_key: G1Element,
 
@@ -139,7 +139,7 @@ impl ProofOfSpace {
             // v1 proofs
             compute_plot_id_v1(
                 &self.plot_public_key,
-                self.pool_public_key.as_ref(),
+                self.pool_public_key.as_deref(),
                 self.pool_contract_puzzle_hash.as_ref(),
             )
         } else if self.version == 1 {
@@ -147,7 +147,7 @@ impl ProofOfSpace {
             compute_plot_id_v2(
                 self.strength,
                 &self.plot_public_key,
-                self.pool_public_key.as_ref(),
+                self.pool_public_key.as_deref(),
                 self.pool_contract_puzzle_hash.as_ref(),
                 self.plot_index,
                 self.meta_group,
@@ -289,7 +289,7 @@ impl Streamable for ProofOfSpace {
 
     fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
         let challenge = <Bytes32 as Streamable>::parse::<TRUSTED>(input)?;
-        let pool_public_key = <Option<G1Element> as Streamable>::parse::<TRUSTED>(input)?;
+        let pool_public_key = <Option<Box<G1Element>> as Streamable>::parse::<TRUSTED>(input)?;
 
         let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
         let version = prefix >> 1;
@@ -369,7 +369,7 @@ mod tests {
     fn make_pos(version: u8, has_pool_pk: bool, has_contract: bool, size: u8) -> ProofOfSpace {
         ProofOfSpace::new(
             Bytes32::default(),
-            has_pool_pk.then(pool_pk),
+            has_pool_pk.then(pool_pk).map(Box::new),
             has_contract.then(Bytes32::default),
             plot_pk(),
             version,
@@ -515,7 +515,7 @@ mod tests {
 
         let pos = ProofOfSpace::new(
             Bytes32::new(challenge),
-            pool_pk,
+            pool_pk.map(Box::new),
             pool_contract,
             plot_pk,
             1,

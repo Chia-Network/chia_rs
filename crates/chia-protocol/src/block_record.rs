@@ -55,7 +55,7 @@ pub struct BlockRecord {
     finished_reward_slot_hashes: Option<Vec<Bytes32>>,
 
     // Sub-epoch (present iff this is the first SB after sub-epoch)
-    sub_epoch_summary_included: Option<SubEpochSummary>,
+    sub_epoch_summary_included: Option<Box<SubEpochSummary>>,
 }
 
 impl BlockRecord {

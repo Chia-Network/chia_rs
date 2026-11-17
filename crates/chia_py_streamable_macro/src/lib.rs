@@ -25,6 +25,27 @@ fn is_vec_type(ty: &syn::Type) -> bool {
     false
 }
 
+// Returns T for a field of type Option<Box<T>>.
+fn option_box_payload_type(ty: &syn::Type) -> Option<&syn::Type> {
+    fn type_argument<'a>(ty: &'a syn::Type, name: &str) -> Option<&'a syn::Type> {
+        let syn::Type::Path(path) = ty else {
+            return None;
+        };
+        let segment = path.path.segments.last()?;
+        if segment.ident != name {
+            return None;
+        }
+        let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+            return None;
+        };
+        let syn::GenericArgument::Type(inner) = args.args.first()? else {
+            return None;
+        };
+        Some(inner)
+    }
+    type_argument(type_argument(ty, "Option")?, "Box")
+}
+
 #[proc_macro_derive(PyStreamable, attributes(py_uppercase, py_pickle))]
 pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let found_crate = crate_name("chia-traits").expect("chia-traits is present in `Cargo.toml`");
@@ -124,14 +145,50 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
             let fnames_maybe_upper = maybe_upper_fields(py_uppercase, fnames.clone());
 
+            // Python constructor argument types: Option<Box<T>> fields accept Option<T>.
+            let py_types: Vec<_> = ftypes
+                .iter()
+                .map(|ty| {
+                    if let Some(inner) = option_box_payload_type(ty) {
+                        quote!(Option<#inner>)
+                    } else {
+                        quote!(#ty)
+                    }
+                })
+                .collect();
+            // Rust field initializer expressions: the argument name, or name.map(Box::new)
+            // when a Python-facing Option<T> initializes an Option<Box<T>> field.
+            let py_values: Vec<_> = ftypes
+                .iter()
+                .zip(&fnames_maybe_upper)
+                .map(|(ty, name)| {
+                    if option_box_payload_type(ty).is_some() {
+                        quote!(#name.map(Box::new))
+                    } else {
+                        quote!(#name)
+                    }
+                })
+                .collect();
+            // Expressions used by replace() to extract Python values and box optional payloads.
+            let extracts: Vec<_> = ftypes
+                .iter()
+                .map(|ty| {
+                    if let Some(inner) = option_box_payload_type(ty) {
+                        quote!(value.extract::<Option<#inner>>()?.map(Box::new))
+                    } else {
+                        quote!(value.extract()?)
+                    }
+                })
+                .collect();
+
             py_protocol.extend(quote! {
                 #[pyo3::pymethods]
                 impl #ident {
                     #[allow(too_many_arguments)]
                     #[new]
                     #[pyo3(signature = (#(#fnames_maybe_upper),*))]
-                    pub fn py_new ( #(#fnames_maybe_upper : #ftypes),* ) -> Self {
-                        Self { #(#fnames: #fnames_maybe_upper),* }
+                    pub fn py_new ( #(#fnames_maybe_upper : #py_types),* ) -> Self {
+                        Self { #(#fnames: #py_values),* }
                     }
                 }
             });
@@ -171,7 +228,7 @@ pub fn py_streamable_macro(input: proc_macro::TokenStream) -> proc_macro::TokenS
                                     let field = field.extract::<String>()?;
                                     match field.as_str() {
                                         #(stringify!(#fnames_maybe_upper) => {
-                                            ret.#fnames = value.extract()?;
+                                            ret.#fnames = #extracts;
                                         }),*
                                         _ => { return Err(pyo3::exceptions::PyKeyError::new_err(format!("unknown field {field}"))); }
                                     }

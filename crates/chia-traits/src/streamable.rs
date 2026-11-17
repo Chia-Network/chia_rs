@@ -231,6 +231,20 @@ impl<T: Streamable> Streamable for Option<T> {
     }
 }
 
+impl<T: Streamable> Streamable for Box<T> {
+    fn update_digest(&self, digest: &mut Sha256) {
+        self.as_ref().update_digest(digest);
+    }
+
+    fn stream(&self, out: &mut Vec<u8>) -> Result<()> {
+        self.as_ref().stream(out)
+    }
+
+    fn parse<const TRUSTED: bool>(input: &mut Cursor<&[u8]>) -> Result<Self> {
+        Ok(Box::new(T::parse::<TRUSTED>(input)?))
+    }
+}
+
 impl<T: Streamable, U: Streamable> Streamable for (T, U) {
     fn update_digest(&self, digest: &mut Sha256) {
         self.0.update_digest(digest);
@@ -453,6 +467,20 @@ fn test_parse_optional_u32() {
 fn test_parse_optional_str() {
     let buf: &[u8] = &[1, 0, 0, 0, 3, b'f', b'o', b'o'];
     from_bytes::<Option<String>>(buf, Some("foo".to_string()));
+}
+
+#[test]
+fn test_box_streamable_matches_inner_type() {
+    let value = 0x1337_u32;
+    let boxed_value = Box::new(value);
+
+    assert_eq!(stream(&boxed_value), stream(&value));
+    assert_eq!(
+        Box::<u32>::from_bytes(&stream(&value)).unwrap(),
+        boxed_value
+    );
+    assert_eq!(u32::from_bytes(&stream(&boxed_value)).unwrap(), value);
+    assert_eq!(boxed_value.hash(), value.hash());
 }
 
 #[test]

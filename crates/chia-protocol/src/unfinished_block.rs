@@ -25,9 +25,9 @@ pub struct UnfinishedBlock {
     challenge_chain_sp_proof: Option<VDFProof>,  // If not first sp in sub-slot
     reward_chain_sp_proof: Option<VDFProof>,     // If not first sp in sub-slot
     foliage: Foliage,                            // Reward chain foliage data
-    foliage_transaction_block: Option<FoliageTransactionBlock>, // Reward chain foliage data (tx block)
-    transactions_info: Option<TransactionsInfo>, // Reward chain foliage data (tx block additional)
-    transactions_generator: Option<Program>,     // Program that generates transactions
+    foliage_transaction_block: Option<Box<FoliageTransactionBlock>>, // Reward chain foliage data (tx block)
+    transactions_info: Option<Box<TransactionsInfo>>, // Reward chain foliage data (tx block additional)
+    transactions_generator: Option<Program>,          // Program that generates transactions
     transactions_generator_ref_list: Vec<u32>, // List of block heights of previous generators referenced in this block
 
     // Raw generator bytes, only used when version == 1. Mutually exclusive
@@ -103,8 +103,9 @@ impl Streamable for UnfinishedBlock {
         let reward_chain_sp_proof = <Option<VDFProof> as Streamable>::parse::<TRUSTED>(input)?;
         let foliage = <Foliage as Streamable>::parse::<TRUSTED>(input)?;
         let foliage_transaction_block =
-            <Option<FoliageTransactionBlock> as Streamable>::parse::<TRUSTED>(input)?;
-        let transactions_info = <Option<TransactionsInfo> as Streamable>::parse::<TRUSTED>(input)?;
+            <Option<Box<FoliageTransactionBlock>> as Streamable>::parse::<TRUSTED>(input)?;
+        let transactions_info =
+            <Option<Box<TransactionsInfo>> as Streamable>::parse::<TRUSTED>(input)?;
 
         let prefix = <u8 as Streamable>::parse::<TRUSTED>(input)?;
         let version = prefix >> 1;
@@ -218,7 +219,7 @@ mod tests {
     fn make_proof_of_space() -> ProofOfSpace {
         ProofOfSpace::new(
             Bytes32::default(),
-            Some(G1Element::default()),
+            Some(Box::new(G1Element::default())),
             None,
             G1Element::default(),
             0,
@@ -248,7 +249,7 @@ mod tests {
         let foliage_block_data = FoliageBlockData::new(
             Bytes32::default(),
             pool_target,
-            Some(G2Element::default()),
+            Some(Box::new(G2Element::default())),
             Bytes32::default(),
             Bytes32::default(),
         );
