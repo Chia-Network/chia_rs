@@ -1,0 +1,6 @@
+iniconfig>=2.0.0
+maturin>=1.4.0
+chia-blockchain>=2.1.4
+packaging>=23.2
+pluggy>=1.4.0
+pytest>=8.0.1
