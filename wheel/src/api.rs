@@ -157,10 +157,11 @@ pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, 
 }
 
 /// Re-encode a serde_2026 blob, preserving its tree hash. `max_size` caps
-/// the input length when supplied. `level=None` selects the highest supported
-/// compression level. Compare lengths to keep the more compact encoding.
+/// the input length when supplied. The default and `level=None` select
+/// the fast compression level (0). Compare lengths to keep the more compact
+/// encoding.
 #[pyfunction]
-#[pyo3(signature = (blob, max_size=None, level=None))]
+#[pyo3(signature = (blob, max_size=None, level=0))]
 pub fn reencode_2026<'py>(
     py: Python<'py>,
     blob: &[u8],
@@ -168,7 +169,7 @@ pub fn reencode_2026<'py>(
     level: Option<i64>,
 ) -> PyResult<Bound<'py, PyBytes>> {
     let level = match level {
-        None => u32::MAX,
+        None => 0,
         Some(l) if l < 0 => {
             return Err(PyValueError::new_err(format!("negative level: {l}")));
         }
