@@ -75,7 +75,9 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
-use chia_consensus::serde_2026::node_from_bytes_2026_trusted;
+use chia_consensus::serde_2026::{
+    node_from_bytes_2026_trusted, reencode_2026 as native_reencode_2026,
+};
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::ChiaDialect;
 use clvmr::allocator::NodePtr;
@@ -152,6 +154,35 @@ pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, 
     let mut cache = clvm_utils::TreeCache::default();
     let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+/// Re-encode a serde_2026 blob, preserving its tree hash. `max_size` caps
+/// the input length when supplied. The default and `level=None` select
+/// the fast compression level (0). Compare lengths to keep the more compact
+/// encoding.
+#[pyfunction]
+#[pyo3(signature = (blob, max_size=None, level=0))]
+pub fn reencode_2026<'py>(
+    py: Python<'py>,
+    blob: &[u8],
+    max_size: Option<usize>,
+    level: Option<i64>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let level = match level {
+        None => 0,
+        Some(l) if l < 0 => {
+            return Err(PyValueError::new_err(format!("negative level: {l}")));
+        }
+        // levels saturate, so clamping to u32::MAX doesn't change the result
+        Some(l) => u32::try_from(l).unwrap_or(u32::MAX),
+    };
+    let max_size = max_size.unwrap_or(blob.len());
+    // `&[u8]` only accepts `bytes`, which is immutable, so the blob can't
+    // change while the GIL is released.
+    let out = py
+        .detach(|| native_reencode_2026(blob, max_size, level))
+        .map_err(map_pyerr)?;
+    Ok(PyBytes::new(py, &out))
 }
 
 #[pyfunction]
@@ -1121,6 +1152,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
+    m.add_function(wrap_pyfunction!(reencode_2026, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
 
