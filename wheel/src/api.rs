@@ -76,7 +76,8 @@ use crate::run_program::{run_chia_program, serialized_length, serialized_length_
 use chia_consensus::fast_forward::fast_forward_singleton as native_ff;
 use chia_consensus::get_puzzle_and_solution::get_puzzle_and_solution_for_coin as parse_puzzle_solution;
 use chia_consensus::serde_2026::{
-    node_from_bytes_2026_trusted, reencode_2026 as native_reencode_2026,
+    max_canonical_blob_size as native_max_canonical_blob_size, node_from_bytes_2026_trusted,
+    reencode_2026 as native_reencode_2026,
 };
 use chia_consensus::validation_error::{ErrorCode, ValidationErr};
 use clvmr::ChiaDialect;
@@ -154,6 +155,12 @@ pub fn tree_hash_2026(py: Python<'_>, blob: PyBuffer<u8>) -> PyResult<Bound<'_, 
     let mut cache = clvm_utils::TreeCache::default();
     let hash = clvm_utils::tree_hash_cached(&a, node, &mut cache);
     ChiaToPython::to_python(&Bytes32::from(&hash.into()), py)
+}
+
+/// Return the conservative serialized size bound in bytes for the given cost limit.
+#[pyfunction]
+pub fn max_canonical_blob_size(max_cost: u64, cost_per_byte: u64) -> usize {
+    native_max_canonical_blob_size(max_cost, cost_per_byte)
 }
 
 /// Re-encode a serde_2026 blob, preserving its tree hash. `max_size` caps
@@ -1152,6 +1159,7 @@ pub fn chia_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_merkle_set_root, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash, m)?)?;
     m.add_function(wrap_pyfunction!(tree_hash_2026, m)?)?;
+    m.add_function(wrap_pyfunction!(max_canonical_blob_size, m)?)?;
     m.add_function(wrap_pyfunction!(reencode_2026, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin, m)?)?;
     m.add_function(wrap_pyfunction!(get_puzzle_and_solution_for_coin2, m)?)?;
